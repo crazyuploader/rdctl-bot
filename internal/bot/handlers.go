@@ -69,7 +69,7 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		}
 
 		var text strings.Builder
-		text.WriteString("Your Torrents:\n\n")
+		text.WriteString("List of Added Torrents:\n\n")
 
 		maxTorrents := 10
 		if len(torrents) < maxTorrents {
@@ -110,7 +110,7 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 				entry.WriteString(fmt.Sprintf("  <i>Files:</i> %d\n", len(t.Files)))
 			}
 			if t.Ended != nil && !t.Ended.IsZero() {
-				entry.WriteString(fmt.Sprintf("  <i>Ended on:</i> %s\n", t.Ended.Format("2006-01-02 15:04")))
+				entry.WriteString(fmt.Sprintf("  <i>Finished downloading on:</i> %s\n", t.Ended.Format("2006-01-02 15:04")))
 			}
 			entry.WriteString("\n")
 
@@ -220,8 +220,6 @@ func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID
 	if torrent.Seeders > 0 {
 		text.WriteString(fmt.Sprintf("<b>Seeders:</b> %d\n", torrent.Seeders))
 	}
-
-
 
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{

@@ -24,10 +24,10 @@ type TelegramConfig struct {
 
 // RealDebridConfig holds Real-Debrid API settings
 type RealDebridConfig struct {
-	APIToken  string `mapstructure:"api_token"`
-	BaseURL   string `mapstructure:"base_url"`
-	Timeout   int    `mapstructure:"timeout"`
-	Proxy     string `mapstructure:"proxy"`
+	APIToken    string `mapstructure:"api_token"`
+	BaseURL     string `mapstructure:"base_url"`
+	Timeout     int    `mapstructure:"timeout"`
+	Proxy       string `mapstructure:"proxy"`
 	IpTestURL   string `mapstructure:"ip_test_url"`
 	IpVerifyURL string `mapstructure:"ip_verify_url"`
 }
