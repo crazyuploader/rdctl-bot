@@ -1,0 +1,25 @@
+# Telegram Bot Configuration
+telegram:
+  bot_token: "YOUR_TELEGRAM_BOT_TOKEN"
+
+  # List of allowed chat IDs (users or groups)
+  allowed_chat_ids:
+    - 123456789
+    - 987654321
+
+  # Super admin chat IDs (full access)
+  super_admin_ids:
+    - 123456789
+
+# Real-Debrid API Configuration
+realdebrid:
+  api_token: "YOUR_REAL_DEBRID_API_TOKEN"
+  base_url: "https://api.real-debrid.com/rest/1.0"
+  timeout: 30 # seconds
+
+# Application Settings
+app:
+  log_level: "info" # debug, info, warn, error
+  rate_limit:
+    messages_per_second: 25 # Stay under Telegram's 30/s limit
+    burst: 5
