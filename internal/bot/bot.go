@@ -76,7 +76,9 @@ func (b *Bot) Start(ctx context.Context) error {
 func (b *Bot) handleUpdate(update tgbotapi.Update) {
 	// Handle callback queries
 	if update.CallbackQuery != nil {
-		b.handleCallbackQuery(update)
+		chatID := update.CallbackQuery.Message.Chat.ID
+		_, isSuperAdmin := b.middleware.CheckAuthorization(chatID)
+		b.handleCallbackQuery(update, isSuperAdmin)
 		return
 	}
 

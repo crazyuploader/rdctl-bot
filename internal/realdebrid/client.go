@@ -153,3 +153,44 @@ func (c *Client) POSTForm(endpoint string, formData map[string]string) ([]byte, 
 
 	return respBody, nil
 }
+
+// User represents a Real-Debrid user account
+type User struct {
+	ID         int    `json:"id"`
+	Username   string `json:"username"`
+	Email      string `json:"email"`
+	Points     int    `json:"points"`     // Fidelity points
+	Locale     string `json:"locale"`     // User language
+	Avatar     string `json:"avatar"`     // URL
+	Type       string `json:"type"`       // "premium" or "free"
+	Premium    int    `json:"premium"`    // seconds left as a Premium user
+	Expiration string `json:"expiration"` // jsonDate format
+}
+
+// GetExpirationTime parses and returns the expiration time
+func (u *User) GetExpirationTime() (time.Time, error) {
+	if u.Expiration == "" {
+		return time.Time{}, nil
+	}
+	return time.Parse("2006-01-02T15:04:05.000Z", u.Expiration)
+}
+
+// GetPremiumDuration returns the premium time remaining as a duration
+func (u *User) GetPremiumDuration() time.Duration {
+	return time.Duration(u.Premium) * time.Second
+}
+
+// GetUser retrieves the current user's account information
+func (c *Client) GetUser() (*User, error) {
+	respBody, err := c.GET("/user", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user info: %w", err)
+	}
+
+	var user User
+	if err := json.Unmarshal(respBody, &user); err != nil {
+		return nil, fmt.Errorf("failed to decode user info: %w", err)
+	}
+
+	return &user, nil
+}

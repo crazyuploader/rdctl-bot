@@ -29,13 +29,13 @@ func (b *Bot) handleCommand(update tgbotapi.Update, isSuperAdmin bool) {
 	case "info":
 		b.handleInfo(msg, args)
 	case "delete", "del":
-		b.handleDelete(msg, args)
+		b.handleDelete(msg, args, isSuperAdmin)
 	case "unrestrict":
 		b.handleUnrestrict(msg, args)
 	case "downloads":
 		b.handleDownloads(msg)
 	case "removelink":
-		b.handleRemoveLink(msg, args)
+		b.handleRemoveLink(msg, args, isSuperAdmin)
 	case "status":
 		b.handleStatus(msg)
 	default:
@@ -62,11 +62,11 @@ func (b *Bot) handleHelp(msg *tgbotapi.Message) {
 		"/list - List all torrents\n" +
 		"/add <magnet> - Add magnet link\n" +
 		"/info <id> - Get torrent details\n" +
-		"/delete <id> - Delete torrent\n\n" +
+		"/delete <id> - Delete torrent (superadmin only)\n\n" +
 		"*Hoster Links:*\n" +
 		"/unrestrict <link> - Unrestrict hoster link\n" +
 		"/downloads - List recent downloads\n" +
-		"/removelink <id> - Remove download from history\n\n" +
+		"/removelink <id> - Remove download from history (superadmin only)\n\n" +
 		"*General:*\n" +
 		"/status - Show account status\n" +
 		"/help - Show this help message"
@@ -255,7 +255,12 @@ func (b *Bot) handleInfo(msg *tgbotapi.Message, args []string) {
 }
 
 // handleDelete handles the /delete command
-func (b *Bot) handleDelete(msg *tgbotapi.Message, args []string) {
+func (b *Bot) handleDelete(msg *tgbotapi.Message, args []string, isSuperAdmin bool) {
+	if !isSuperAdmin {
+		b.sendMessage(msg.Chat.ID, "[Error] This command is restricted to superadmins only")
+		return
+	}
+
 	if len(args) == 0 {
 		b.sendMessage(msg.Chat.ID, "Usage: /delete <torrent_id>")
 		return
@@ -359,7 +364,12 @@ func (b *Bot) handleDownloads(msg *tgbotapi.Message) {
 }
 
 // handleRemoveLink handles the /removelink command
-func (b *Bot) handleRemoveLink(msg *tgbotapi.Message, args []string) {
+func (b *Bot) handleRemoveLink(msg *tgbotapi.Message, args []string, isSuperAdmin bool) {
+	if !isSuperAdmin {
+		b.sendMessage(msg.Chat.ID, "[Error] This command is restricted to superadmins only")
+		return
+	}
+
 	if len(args) == 0 {
 		b.sendMessage(msg.Chat.ID, "Usage: /removelink <download_id>")
 		return
@@ -376,8 +386,41 @@ func (b *Bot) handleRemoveLink(msg *tgbotapi.Message, args []string) {
 
 // handleStatus handles the /status command
 func (b *Bot) handleStatus(msg *tgbotapi.Message) {
-	// This would require implementing the user endpoint in the RD client
-	b.sendMessage(msg.Chat.ID, "Status check not yet implemented")
+	user, err := b.rdClient.GetUser()
+	if err != nil {
+		b.sendMessage(msg.Chat.ID, fmt.Sprintf("[Error] %v", err))
+		return
+	}
+
+	var text strings.Builder
+	text.WriteString("*Account Status:*\n\n")
+
+	// Mask username - show only last 5-6 characters
+	maskedUsername := maskString(user.Username, 5)
+	text.WriteString(fmt.Sprintf("*Username:* `%s`\n", maskedUsername))
+
+	text.WriteString(fmt.Sprintf("*Email:* `%s`\n", user.Email))
+	text.WriteString(fmt.Sprintf("*Account Type:* %s\n", user.Type))
+
+	if user.Points > 0 {
+		text.WriteString(fmt.Sprintf("*Fidelity Points:* %d\n", user.Points))
+	}
+
+	if user.Premium > 0 {
+		duration := user.GetPremiumDuration()
+		days := int(duration.Hours() / 24)
+		hours := int(duration.Hours()) % 24
+		text.WriteString(fmt.Sprintf("*Premium Remaining:* %d days, %d hours\n", days, hours))
+	}
+
+	if user.Expiration != "" {
+		expTime, err := user.GetExpirationTime()
+		if err == nil {
+			text.WriteString(fmt.Sprintf("*Expiration:* %s\n", expTime.Format("2006-01-02 15:04")))
+		}
+	}
+
+	b.sendMarkdownMessage(msg.Chat.ID, text.String())
 }
 
 // handleMessage processes non-command messages
@@ -400,7 +443,7 @@ func (b *Bot) handleMessage(update tgbotapi.Update) {
 }
 
 // handleCallbackQuery processes inline keyboard callbacks
-func (b *Bot) handleCallbackQuery(update tgbotapi.Update) {
+func (b *Bot) handleCallbackQuery(update tgbotapi.Update, isSuperAdmin bool) {
 	query := update.CallbackQuery
 	data := query.Data
 
@@ -427,6 +470,11 @@ func (b *Bot) handleCallbackQuery(update tgbotapi.Update) {
 		b.handleInfo(pseudoMsg, []string{torrentID})
 
 	case "delete":
+		if !isSuperAdmin {
+			b.sendMessage(query.Message.Chat.ID, "[Error] This action is restricted to superadmins only")
+			return
+		}
+
 		if err := b.rdClient.DeleteTorrent(torrentID); err != nil {
 			b.sendMessage(query.Message.Chat.ID, fmt.Sprintf("[Error] %v", err))
 			return
@@ -491,4 +539,15 @@ func (b *Bot) sendMarkdownMessage(chatID int64, text string) {
 	}
 }
 
-// escapeMD is no longer needed for filenames in mono style.
+// maskString masks a string showing only the last n characters
+// Example: "johnsmith123" with n=5 becomes "*******123"
+func maskString(s string, lastChars int) string {
+	if len(s) <= lastChars {
+		return s
+	}
+
+	visible := s[len(s)-lastChars:]
+	masked := strings.Repeat("*", len(s)-lastChars)
+
+	return masked + visible
+}
