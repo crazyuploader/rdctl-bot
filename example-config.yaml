@@ -16,6 +16,9 @@ realdebrid:
   api_token: "YOUR_REAL_DEBRID_API_TOKEN"
   base_url: "https://api.real-debrid.com/rest/1.0"
   timeout: 30 # seconds
+  proxy: "" # Optional: HTTP/SOCKS5 proxy URL (e.g., "http://localhost:8080" or "socks5://user:pass@host:port")
+  ip_test_url: "" # Optional: URL to use for IP testing when a proxy is configured (e.g., "https://api.ipify.org?format=json")
+  ip_verify_url: "" # Optional: Second URL to use for IP verification. If provided, the IP from ip_test_url must match this URL's IP.
 
 # Application Settings
 app:

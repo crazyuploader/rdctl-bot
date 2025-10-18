@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 )
 
@@ -32,12 +33,25 @@ func (e *APIError) Error() string {
 }
 
 // NewClient creates a new Real-Debrid API client
-func NewClient(baseURL, apiToken string, timeout time.Duration) *Client {
+func NewClient(baseURL, apiToken, proxyURL string, timeout time.Duration) *Client {
+	transport := &http.Transport{}
+	if proxyURL != "" {
+		parsedProxyURL, err := url.Parse(proxyURL)
+		if err != nil {
+			// Log error or handle it appropriately, for now, we'll just proceed without proxy
+			fmt.Printf("Warning: Invalid proxy URL provided: %v. Proceeding without proxy.\n", err)
+			os.Exit(1)
+		} else {
+			transport.Proxy = http.ProxyURL(parsedProxyURL)
+		}
+	}
+
 	return &Client{
 		baseURL:  baseURL,
 		apiToken: apiToken,
 		httpClient: &http.Client{
-			Timeout: timeout,
+			Timeout:   timeout,
+			Transport: transport,
 		},
 	}
 }

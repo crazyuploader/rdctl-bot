@@ -2,8 +2,12 @@ package bot
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/crazyuploader/rdctl-bot/internal/config"
@@ -20,7 +24,7 @@ type Bot struct {
 }
 
 // NewBot creates a new bot instance
-func NewBot(cfg *config.Config) (*Bot, error) {
+func NewBot(cfg *config.Config, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, error) {
 	// Create Telegram bot API
 	api, err := tgbotapi.NewBotAPI(cfg.Telegram.BotToken)
 	if err != nil {
@@ -34,8 +38,78 @@ func NewBot(cfg *config.Config) (*Bot, error) {
 	rdClient := realdebrid.NewClient(
 		cfg.RealDebrid.BaseURL,
 		cfg.RealDebrid.APIToken,
+		proxyURL,
 		time.Duration(cfg.RealDebrid.Timeout)*time.Second,
 	)
+
+	// Determine the HTTP client to use for IP tests
+	var ipTestClient *http.Client
+	var primaryIP string
+
+	currentIpTestURL := "https://api.ipify.org?format=json"
+	if ipTestURL != "" {
+		currentIpTestURL = ipTestURL
+	}
+
+	if proxyURL != "" {
+		log.Println("Proxy configured. Performing IP test...")
+		parsedProxyURL, err := url.Parse(proxyURL)
+		if err != nil {
+			log.Printf("Warning: Invalid proxy URL for IP test: %v. Skipping IP test.", err)
+			ipTestClient = &http.Client{Timeout: 10 * time.Second}
+		} else {
+			ipTestClient = &http.Client{
+				Transport: &http.Transport{
+					Proxy: http.ProxyURL(parsedProxyURL),
+				},
+				Timeout: 10 * time.Second,
+			}
+		}
+	} else {
+		log.Println("No proxy configured. Performing direct IP test...")
+		ipTestClient = &http.Client{Timeout: 10 * time.Second}
+	}
+
+	// Perform primary IP test
+	resp, err := ipTestClient.Get(currentIpTestURL)
+	if err != nil {
+		log.Printf("Warning: Failed to perform primary IP test: %v", err)
+	} else {
+		defer resp.Body.Close()
+		var ipResponse struct { IP string `json:"ip"` }
+		body, _ := io.ReadAll(resp.Body)
+		if err := json.Unmarshal(body, &ipResponse); err != nil {
+			log.Printf("Warning: Failed to parse primary IP test response: %v", err)
+		} else {
+			primaryIP = ipResponse.IP
+			log.Printf("Primary IP detected: %s", primaryIP)
+		}
+	}
+
+	// Perform IP verification test if verify URL is provided
+	if ipVerifyURL != "" {
+		if primaryIP == "" {
+			log.Fatalf("Error: Cannot perform IP verification without a primary IP. Exiting.")
+		}
+		log.Println("Performing IP verification test...")
+		verifyResp, verifyErr := ipTestClient.Get(ipVerifyURL)
+		if verifyErr != nil {
+			log.Fatalf("Error: Failed to perform IP verification test: %v", verifyErr)
+		} else {
+			defer verifyResp.Body.Close()
+			var verifyIpResponse struct { IP string `json:"ip"` }
+			verifyBody, _ := io.ReadAll(verifyResp.Body)
+			if err := json.Unmarshal(verifyBody, &verifyIpResponse); err != nil {
+				log.Fatalf("Error: Failed to parse IP verification test response: %v", err)
+			} else {
+				log.Printf("Verification IP detected: %s", verifyIpResponse.IP)
+				if primaryIP != verifyIpResponse.IP {
+					log.Fatalf("Error: Primary IP (%s) does not match verification IP (%s). Exiting.", primaryIP, verifyIpResponse.IP)
+				}
+				log.Println("Primary and verification IPs match. Continuing...")
+			}
+		}
+	}
 
 	// Create middleware
 	middleware := NewMiddleware(cfg)

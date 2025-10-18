@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -23,9 +24,12 @@ type TelegramConfig struct {
 
 // RealDebridConfig holds Real-Debrid API settings
 type RealDebridConfig struct {
-	APIToken string `mapstructure:"api_token"`
-	BaseURL  string `mapstructure:"base_url"`
-	Timeout  int    `mapstructure:"timeout"`
+	APIToken  string `mapstructure:"api_token"`
+	BaseURL   string `mapstructure:"base_url"`
+	Timeout   int    `mapstructure:"timeout"`
+	Proxy     string `mapstructure:"proxy"`
+	IpTestURL   string `mapstructure:"ip_test_url"`
+	IpVerifyURL string `mapstructure:"ip_verify_url"`
 }
 
 // AppConfig holds application settings
@@ -101,6 +105,27 @@ func (c *Config) Validate() error {
 
 	if c.RealDebrid.Timeout <= 0 {
 		c.RealDebrid.Timeout = 30
+	}
+
+	if c.RealDebrid.Proxy != "" {
+		_, err := url.Parse(c.RealDebrid.Proxy)
+		if err != nil {
+			return fmt.Errorf("invalid real-debrid proxy URL: %w", err)
+		}
+	}
+
+	if c.RealDebrid.IpTestURL != "" {
+		_, err := url.Parse(c.RealDebrid.IpTestURL)
+		if err != nil {
+			return fmt.Errorf("invalid real-debrid IP test URL: %w", err)
+		}
+	}
+
+	if c.RealDebrid.IpVerifyURL != "" {
+		_, err := url.Parse(c.RealDebrid.IpVerifyURL)
+		if err != nil {
+			return fmt.Errorf("invalid real-debrid IP verify URL: %w", err)
+		}
 	}
 
 	if c.App.RateLimit.MessagesPerSecond <= 0 {

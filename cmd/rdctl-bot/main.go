@@ -69,7 +69,7 @@ func runBot(cmd *cobra.Command, args []string) {
 	log.Printf("Super admin IDs: %v", cfg.Telegram.SuperAdminIDs)
 
 	// Create bot
-	b, err := bot.NewBot(cfg)
+	b, err := bot.NewBot(cfg, cfg.RealDebrid.Proxy, cfg.RealDebrid.IpTestURL, cfg.RealDebrid.IpVerifyURL)
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}
