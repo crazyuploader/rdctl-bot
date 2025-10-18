@@ -3,6 +3,7 @@ package realdebrid
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 // UnrestrictedLink represents an unrestricted link
@@ -18,12 +19,16 @@ type UnrestrictedLink struct {
 
 // Download represents a download entry
 type Download struct {
-	ID        string `json:"id"`
-	Filename  string `json:"filename"`
-	Filesize  int64  `json:"filesize"`
-	Link      string `json:"link"`
-	Host      string `json:"host"`
-	Generated string `json:"generated"`
+	ID        string    `json:"id"`
+	Filename  string    `json:"filename"`
+	MimeType  string    `json:"mimeType"`
+	Filesize  int64     `json:"filesize"`
+	Link      string    `json:"link"`
+	Host      string    `json:"host"`
+	Chunks    int       `json:"chunks"`
+	Download  string    `json:"download"`
+	Generated time.Time `json:"generated"`
+	Type      string    `json:"type"`
 }
 
 // UnrestrictLink unrestricts a hoster link

@@ -95,14 +95,18 @@ func (b *Bot) handleList(msg *tgbotapi.Message) {
 		maxTorrents = len(torrents)
 	}
 
+	const maxMsgLen = 4000
+	torrentsShown := 0
+
 	for i := 0; i < maxTorrents; i++ {
 		t := torrents[i]
+		entry := strings.Builder{}
 		status := asciiStatus(t.Status)
 		size := realdebrid.FormatSize(t.Bytes)
 		progress := fmt.Sprintf("%.1f%%", t.Progress)
 		added := t.Added.Format("2006-01-02 15:04")
 		// Compose torrent entry
-		text.WriteString(fmt.Sprintf(
+		entry.WriteString(fmt.Sprintf(
 			"• _Torrent name:_ `%s`\n"+
 				"  _ID:_ `%s`\n"+
 				"  _Status:_ %s\n"+
@@ -112,14 +116,30 @@ func (b *Bot) handleList(msg *tgbotapi.Message) {
 				"  _Hash:_ `%s`\n",
 			t.Filename, t.ID, status, size, progress, added, t.Hash,
 		))
+		// Host, Split size, and Links fields removed as per user request
 		if t.Seeders > 0 {
-			text.WriteString(fmt.Sprintf("  _Seeders:_ %d\n", t.Seeders))
+			entry.WriteString(fmt.Sprintf("  _Seeders:_ %d\n", t.Seeders))
 		}
 		if t.Speed > 0 {
 			speed := realdebrid.FormatSize(t.Speed) + "/s"
-			text.WriteString(fmt.Sprintf("  _Speed:_ %s\n", speed))
+			entry.WriteString(fmt.Sprintf("  _Speed:_ %s\n", speed))
 		}
-		text.WriteString("\n")
+		if len(t.Files) > 0 {
+			entry.WriteString(fmt.Sprintf("  _Files:_ %d\n", len(t.Files)))
+		}
+		// Links field removed as per user request
+		if t.Ended != nil && !t.Ended.IsZero() {
+			entry.WriteString(fmt.Sprintf("  _Ended on:_ %s\n", t.Ended.Format("2006-01-02 15:04")))
+		}
+		entry.WriteString("\n")
+
+		// Check if adding this entry would exceed the message length limit
+		if text.Len()+entry.Len() > maxMsgLen {
+			text.WriteString(fmt.Sprintf("_Only showing the first %d torrents due to message length limit._\n\n", torrentsShown))
+			break
+		}
+		text.WriteString(entry.String())
+		torrentsShown++
 	}
 
 	if len(torrents) > maxTorrents {
@@ -296,14 +316,41 @@ func (b *Bot) handleDownloads(msg *tgbotapi.Message) {
 	var text strings.Builder
 	text.WriteString("Recent Downloads:\n\n")
 
+	const maxMsgLen = 4000
+	downloadsShown := 0
+
 	for _, d := range downloads {
+		entry := strings.Builder{}
 		size := realdebrid.FormatSize(d.Filesize)
-		text.WriteString(fmt.Sprintf(
-			". `%s`\n"+
-				"   ID: `%s`\n"+
-				"   Size: %s | Host: %s\n\n",
-			d.Filename, d.ID, size, d.Host,
+		entry.WriteString(fmt.Sprintf(
+			"• _File name:_ `%s`\n"+
+				"  _ID:_ `%s`\n",
+			d.Filename, d.ID,
 		))
+		if d.MimeType != "" {
+			entry.WriteString(fmt.Sprintf("  _Mime type:_ %s\n", d.MimeType))
+		}
+		entry.WriteString(fmt.Sprintf("  _Size:_ %s\n", size))
+		entry.WriteString(fmt.Sprintf("  _Host:_ %s\n", d.Host))
+		if d.Type != "" {
+			entry.WriteString(fmt.Sprintf("  _Type:_ %s\n", d.Type))
+		}
+		if d.Chunks > 0 {
+			entry.WriteString(fmt.Sprintf("  _Chunks:_ %d\n", d.Chunks))
+		}
+		// Original link and Generated link fields removed as per user request
+		if !d.Generated.IsZero() {
+			entry.WriteString(fmt.Sprintf("  _Generated on:_ %s\n", d.Generated.Format("2006-01-02 15:04")))
+		}
+		entry.WriteString("\n")
+
+		// Check if adding this entry would exceed the message length limit
+		if text.Len()+entry.Len() > maxMsgLen {
+			text.WriteString(fmt.Sprintf("_Only showing the first %d downloads due to message length limit._\n\n", downloadsShown))
+			break
+		}
+		text.WriteString(entry.String())
+		downloadsShown++
 	}
 
 	text.WriteString("Use /removelink <id> to remove from history")

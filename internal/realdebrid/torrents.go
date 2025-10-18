@@ -9,17 +9,20 @@ import (
 
 // Torrent represents a Real-Debrid torrent
 type Torrent struct {
-	ID       string    `json:"id"`
-	Filename string    `json:"filename"`
-	Hash     string    `json:"hash"`
-	Bytes    int64     `json:"bytes"`
-	Progress float64   `json:"progress"`
-	Status   string    `json:"status"`
-	Added    time.Time `json:"added"`
-	Files    []File    `json:"files,omitempty"`
-	Links    []string  `json:"links,omitempty"`
-	Speed    int64     `json:"speed,omitempty"`
-	Seeders  int       `json:"seeders,omitempty"`
+	ID       string     `json:"id"`
+	Filename string     `json:"filename"`
+	Hash     string     `json:"hash"`
+	Bytes    int64      `json:"bytes"`
+	Host     string     `json:"host"`
+	Split    int        `json:"split"`
+	Progress float64    `json:"progress"`
+	Status   string     `json:"status"`
+	Added    time.Time  `json:"added"`
+	Ended    *time.Time `json:"ended,omitempty"`
+	Files    []File     `json:"files,omitempty"`
+	Links    []string   `json:"links,omitempty"`
+	Speed    int64      `json:"speed,omitempty"`
+	Seeders  int        `json:"seeders,omitempty"`
 }
 
 // File represents a file in a torrent
