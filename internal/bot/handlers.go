@@ -221,16 +221,7 @@ func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID
 		text.WriteString(fmt.Sprintf("<b>Seeders:</b> %d\n", torrent.Seeders))
 	}
 
-	if len(torrent.Links) > 0 {
-		text.WriteString("\n<b>Download Links:</b>\n")
-		for i, link := range torrent.Links {
-			if i >= 5 {
-				text.WriteString(fmt.Sprintf("... and %d more\n", len(torrent.Links)-5))
-				break
-			}
-			text.WriteString(fmt.Sprintf("%d. %s\n", i+1, html.EscapeString(link)))
-		}
-	}
+
 
 	keyboard := &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
@@ -317,12 +308,10 @@ func (b *Bot) handleUnrestrictCommand(ctx context.Context, tgBot *bot.Bot, updat
 			"[OK] <b>Link Unrestricted</b>\n\n"+
 				"<b>File:</b> <code>%s</code>\n"+
 				"<b>Size:</b> %s\n"+
-				"<b>Host:</b> %s\n\n"+
-				"<b>Download:</b> %s",
+				"<b>Host:</b> %s",
 			html.EscapeString(unrestricted.Filename),
 			size,
 			html.EscapeString(unrestricted.Host),
-			html.EscapeString(unrestricted.Download),
 		)
 
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text)
@@ -501,12 +490,10 @@ func (b *Bot) handleHosterLink(ctx context.Context, tgBot *bot.Bot, update *mode
 			"[OK] <b>Link Unrestricted</b>\n\n"+
 				"<b>File:</b> <code>%s</code>\n"+
 				"<b>Size:</b> %s\n"+
-				"<b>Host:</b> %s\n\n"+
-				"<b>Download:</b> %s",
+				"<b>Host:</b> %s",
 			html.EscapeString(unrestricted.Filename),
 			size,
 			html.EscapeString(unrestricted.Host),
-			html.EscapeString(unrestricted.Download),
 		)
 
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text)
