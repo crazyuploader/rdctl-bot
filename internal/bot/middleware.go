@@ -48,7 +48,9 @@ func (m *Middleware) WaitForRateLimit() error {
 // LogCommand logs command usage
 func (m *Middleware) LogCommand(update *models.Update, command string) {
 	user := "unknown"
+	userID := int64(0)
 	chatID := int64(0)
+	messageThreadID := int(0)
 
 	if update.Message != nil {
 		if update.Message.From != nil {
@@ -56,22 +58,36 @@ func (m *Middleware) LogCommand(update *models.Update, command string) {
 			if user == "" {
 				user = update.Message.From.FirstName
 			}
+			userID = update.Message.From.ID
 		}
 		chatID = update.Message.Chat.ID
+		messageThreadID = update.Message.MessageThreadID
 	} else if update.CallbackQuery != nil {
 		user = update.CallbackQuery.From.Username
 		if user == "" {
 			user = update.CallbackQuery.From.FirstName
 		}
+		userID = update.CallbackQuery.From.ID
 		chatID = update.CallbackQuery.Message.Message.Chat.ID
+		messageThreadID = update.CallbackQuery.Message.Message.MessageThreadID
 	}
 
-	log.Printf("[%s] User: %s (ID: %d) - Command: %s",
+	logMessage := fmt.Sprintf("[%s] User: [username=%s, id=%d] - Chat: [id=%d",
 		time.Now().Format("2006-01-02 15:04:05"),
 		user,
+		userID,
 		chatID,
-		command,
 	)
+
+	if messageThreadID != 0 {
+		logMessage += fmt.Sprintf(", topicID=%d]", messageThreadID)
+	} else {
+		logMessage += "]"
+	}
+
+	logMessage += fmt.Sprintf(" - Command: %s", command)
+
+	log.Println(logMessage)
 }
 
 // LogUnauthorized logs unauthorized access attempts
