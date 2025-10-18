@@ -78,6 +78,7 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 
 		const maxMsgLen = 4000
 		torrentsShown := 0
+		hitLengthLimit := false
 
 		for i := 0; i < maxTorrents; i++ {
 			t := torrents[i]
@@ -113,15 +114,20 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 			}
 			entry.WriteString("\n")
 
-			if text.Len()+entry.Len() > maxMsgLen {
-				text.WriteString(fmt.Sprintf("<i>Only showing the first %d torrents due to message length limit.</i>\n\n", torrentsShown))
+			// Check if adding this entry would exceed the limit
+			// Add buffer for the footer text we'll add later
+			if text.Len()+entry.Len()+300 > maxMsgLen {
+				hitLengthLimit = true
 				break
 			}
 			text.WriteString(entry.String())
 			torrentsShown++
 		}
 
-		if len(torrents) > maxTorrents {
+		// Add appropriate footer message
+		if hitLengthLimit {
+			text.WriteString(fmt.Sprintf("<i>Only showing the first %d torrents due to message length limit.</i>\n\n", torrentsShown))
+		} else if len(torrents) > maxTorrents {
 			text.WriteString(fmt.Sprintf("<i>Only showing the first %d torrents.</i>\n\n", maxTorrents))
 		}
 
@@ -369,7 +375,8 @@ func (b *Bot) handleDownloadsCommand(ctx context.Context, tgBot *bot.Bot, update
 			}
 			entry.WriteString("\n")
 
-			if text.Len()+entry.Len() > maxMsgLen {
+			// Check if adding this entry would exceed the limit
+			if text.Len()+entry.Len()+300 > maxMsgLen {
 				text.WriteString(fmt.Sprintf("<i>Only showing the first %d downloads due to message length limit.</i>\n\n", downloadsShown))
 				break
 			}
