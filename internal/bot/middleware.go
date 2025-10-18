@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/crazyuploader/rdctl-bot/internal/config"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/go-telegram/bot/models"
 	"golang.org/x/time/rate"
 )
 
@@ -19,7 +19,6 @@ type Middleware struct {
 
 // NewMiddleware creates a new middleware instance
 func NewMiddleware(cfg *config.Config) *Middleware {
-	// Create rate limiter based on config
 	r := rate.Limit(cfg.App.RateLimit.MessagesPerSecond)
 	b := cfg.App.RateLimit.Burst
 
@@ -47,26 +46,24 @@ func (m *Middleware) WaitForRateLimit() error {
 }
 
 // LogCommand logs command usage
-func (m *Middleware) LogCommand(update tgbotapi.Update, command string) {
+func (m *Middleware) LogCommand(update *models.Update, command string) {
 	user := "unknown"
 	chatID := int64(0)
 
 	if update.Message != nil {
 		if update.Message.From != nil {
-			user = update.Message.From.UserName
+			user = update.Message.From.Username
 			if user == "" {
 				user = update.Message.From.FirstName
 			}
 		}
 		chatID = update.Message.Chat.ID
 	} else if update.CallbackQuery != nil {
-		if update.CallbackQuery.From != nil {
-			user = update.CallbackQuery.From.UserName
-			if user == "" {
-				user = update.CallbackQuery.From.FirstName
-			}
+		user = update.CallbackQuery.From.Username
+		if user == "" {
+			user = update.CallbackQuery.From.FirstName
 		}
-		chatID = update.CallbackQuery.Message.Chat.ID
+		chatID = update.CallbackQuery.Message.Message.Chat.ID
 	}
 
 	log.Printf("[%s] User: %s (ID: %d) - Command: %s",
@@ -77,19 +74,11 @@ func (m *Middleware) LogCommand(update tgbotapi.Update, command string) {
 	)
 }
 
-// SendUnauthorizedMessage sends unauthorized message to user
-func (m *Middleware) SendUnauthorizedMessage(bot *tgbotapi.BotAPI, chatID int64) error {
-	msg := tgbotapi.NewMessage(chatID,
-		"⛔ Unauthorized\n\n"+
-			"You are not authorized to use this bot.\n"+
-			fmt.Sprintf("Your Chat ID: %d\n\n", chatID)+
-			"Please contact the administrator to get access.",
+// LogUnauthorized logs unauthorized access attempts
+func (m *Middleware) LogUnauthorized(username string, chatID int64) {
+	log.Printf("[%s] UNAUTHORIZED - User: %s (ID: %d)",
+		time.Now().Format("2006-01-02 15:04:05"),
+		username,
+		chatID,
 	)
-
-	if err := m.WaitForRateLimit(); err != nil {
-		return err
-	}
-
-	_, err := bot.Send(msg)
-	return err
 }

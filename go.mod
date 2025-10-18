@@ -3,7 +3,7 @@ module github.com/crazyuploader/rdctl-bot
 go 1.25.3
 
 require (
-	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
+	github.com/go-telegram/bot v1.17.0
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.21.0
 	golang.org/x/time v0.14.0

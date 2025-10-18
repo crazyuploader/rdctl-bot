@@ -28,7 +28,8 @@ Features:
 - View torrent status and progress
 - Delete torrents and downloads
 - Chat ID and super admin restrictions
-- Rate limiting to respect Telegram API limits`,
+- Rate limiting to respect Telegram API limits
+- Support for topics in supergroups`,
 		Run: runBot,
 	}
 )
@@ -36,11 +37,9 @@ Features:
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Add flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./config.yaml)")
 	rootCmd.Flags().BoolP("debug", "d", false, "Enable debug mode")
 
-	// Bind flags to viper
 	viper.BindPFlag("app.debug", rootCmd.Flags().Lookup("debug"))
 }
 
@@ -58,7 +57,6 @@ func main() {
 }
 
 func runBot(cmd *cobra.Command, args []string) {
-	// Load configuration
 	cfg, err := config.Load(cfgFile)
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
@@ -68,37 +66,27 @@ func runBot(cmd *cobra.Command, args []string) {
 	log.Printf("Allowed chat IDs: %v", cfg.Telegram.AllowedChatIDs)
 	log.Printf("Super admin IDs: %v", cfg.Telegram.SuperAdminIDs)
 
-	// Create bot
 	b, err := bot.NewBot(cfg, cfg.RealDebrid.Proxy, cfg.RealDebrid.IpTestURL, cfg.RealDebrid.IpVerifyURL)
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}
 
-	// Create context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Handle shutdown signals
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
-	// Start bot in goroutine
-	errCh := make(chan error, 1)
 	go func() {
 		if err := b.Start(ctx); err != nil {
-			errCh <- err
+			log.Printf("Bot error: %v", err)
 		}
 	}()
 
-	// Wait for shutdown signal or error
-	select {
-	case <-sigCh:
-		log.Println("Received shutdown signal")
-		cancel()
-		b.Stop()
-	case err := <-errCh:
-		log.Fatalf("Bot error: %v", err)
-	}
+	<-sigCh
+	log.Println("Received shutdown signal")
+	cancel()
+	b.Stop()
 
 	log.Println("Bot stopped successfully")
 }
