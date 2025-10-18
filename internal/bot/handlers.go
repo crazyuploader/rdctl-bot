@@ -46,7 +46,7 @@ func (b *Bot) handleCommand(update tgbotapi.Update, isSuperAdmin bool) {
 // handleStart handles the /start command
 func (b *Bot) handleStart(msg *tgbotapi.Message) {
 	text := fmt.Sprintf(
-		"🤖 *Real-Debrid Telegram Bot*\n\n"+
+		"*Real-Debrid Telegram Bot*\n\n"+
 			"Welcome! This bot helps you manage Real-Debrid torrents and hoster links.\n\n"+
 			"Your Chat ID: `%d`\n\n"+
 			"Use /help to see all available commands.",
@@ -76,9 +76,9 @@ func (b *Bot) handleHelp(msg *tgbotapi.Message) {
 
 // handleList handles the /list command
 func (b *Bot) handleList(msg *tgbotapi.Message) {
-	torrents, err := b.rdClient.GetTorrents(20, 0)
+	torrents, err := b.rdClient.GetTorrents(10, 0)
 	if err != nil {
-		b.sendMessage(msg.Chat.ID, fmt.Sprintf("❌ Error: %v", err))
+		b.sendMessage(msg.Chat.ID, fmt.Sprintf("[Error] %v", err))
 		return
 	}
 
@@ -88,20 +88,42 @@ func (b *Bot) handleList(msg *tgbotapi.Message) {
 	}
 
 	var text strings.Builder
-	text.WriteString("*Your Torrents:*\n\n")
+	text.WriteString("Your Torrents:\n\n")
 
-	for i, t := range torrents {
-		status := realdebrid.FormatStatus(t.Status)
+	maxTorrents := 10
+	if len(torrents) < maxTorrents {
+		maxTorrents = len(torrents)
+	}
+
+	for i := 0; i < maxTorrents; i++ {
+		t := torrents[i]
+		status := asciiStatus(t.Status)
 		size := realdebrid.FormatSize(t.Bytes)
 		progress := fmt.Sprintf("%.1f%%", t.Progress)
-
+		added := t.Added.Format("2006-01-02 15:04")
+		// Compose torrent entry
 		text.WriteString(fmt.Sprintf(
-			"%d. *%s*\n"+
-				"   ID: `%s`\n"+
-				"   Status: %s\n"+
-				"   Size: %s | Progress: %s\n\n",
-			i+1, escapeMD(t.Filename), t.ID, status, size, progress,
+			"• _Torrent name:_ `%s`\n"+
+				"  _ID:_ `%s`\n"+
+				"  _Status:_ %s\n"+
+				"  _Size:_ %s\n"+
+				"  _Progress:_ %s\n"+
+				"  _Added on:_ %s\n"+
+				"  _Hash:_ `%s`\n",
+			t.Filename, t.ID, status, size, progress, added, t.Hash,
 		))
+		if t.Seeders > 0 {
+			text.WriteString(fmt.Sprintf("  _Seeders:_ %d\n", t.Seeders))
+		}
+		if t.Speed > 0 {
+			speed := realdebrid.FormatSize(t.Speed) + "/s"
+			text.WriteString(fmt.Sprintf("  _Speed:_ %s\n", speed))
+		}
+		text.WriteString("\n")
+	}
+
+	if len(torrents) > maxTorrents {
+		text.WriteString(fmt.Sprintf("_Only showing the first %d torrents._\n\n", maxTorrents))
 	}
 
 	text.WriteString("Use /info <id> for more details")
@@ -118,13 +140,13 @@ func (b *Bot) handleAddMagnet(msg *tgbotapi.Message, args []string) {
 
 	magnetLink := strings.Join(args, " ")
 	if !strings.HasPrefix(magnetLink, "magnet:?") {
-		b.sendMessage(msg.Chat.ID, "❌ Invalid magnet link")
+		b.sendMessage(msg.Chat.ID, "[Error] Invalid magnet link")
 		return
 	}
 
 	response, err := b.rdClient.AddMagnet(magnetLink)
 	if err != nil {
-		b.sendMessage(msg.Chat.ID, fmt.Sprintf("❌ Error: %v", err))
+		b.sendMessage(msg.Chat.ID, fmt.Sprintf("[Error] %v", err))
 		return
 	}
 
@@ -134,7 +156,7 @@ func (b *Bot) handleAddMagnet(msg *tgbotapi.Message, args []string) {
 	}
 
 	text := fmt.Sprintf(
-		"✅ *Torrent Added*\n\n"+
+		"[OK] *Torrent Added*\n\n"+
 			"ID: `%s`\n\n"+
 			"Use /info %s to check status",
 		response.ID, response.ID,
@@ -153,7 +175,7 @@ func (b *Bot) handleInfo(msg *tgbotapi.Message, args []string) {
 	torrentID := args[0]
 	torrent, err := b.rdClient.GetTorrentInfo(torrentID)
 	if err != nil {
-		b.sendMessage(msg.Chat.ID, fmt.Sprintf("❌ Error: %v", err))
+		b.sendMessage(msg.Chat.ID, fmt.Sprintf("[Error] %v", err))
 		return
 	}
 
@@ -163,7 +185,7 @@ func (b *Bot) handleInfo(msg *tgbotapi.Message, args []string) {
 
 	var text strings.Builder
 	text.WriteString("*Torrent Details:*\n\n")
-	text.WriteString(fmt.Sprintf("*Name:* %s\n", escapeMD(torrent.Filename)))
+	text.WriteString(fmt.Sprintf("*Name:* `%s`\n", torrent.Filename))
 	text.WriteString(fmt.Sprintf("*ID:* `%s`\n", torrent.ID))
 	text.WriteString(fmt.Sprintf("*Status:* %s\n", status))
 	text.WriteString(fmt.Sprintf("*Size:* %s\n", size))
@@ -194,8 +216,8 @@ func (b *Bot) handleInfo(msg *tgbotapi.Message, args []string) {
 	// Add action buttons
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("🔄 Refresh", fmt.Sprintf("refresh_%s", torrentID)),
-			tgbotapi.NewInlineKeyboardButtonData("🗑️ Delete", fmt.Sprintf("delete_%s", torrentID)),
+			tgbotapi.NewInlineKeyboardButtonData("Refresh", fmt.Sprintf("refresh_%s", torrentID)),
+			tgbotapi.NewInlineKeyboardButtonData("Delete", fmt.Sprintf("delete_%s", torrentID)),
 		),
 	)
 
@@ -221,11 +243,11 @@ func (b *Bot) handleDelete(msg *tgbotapi.Message, args []string) {
 
 	torrentID := args[0]
 	if err := b.rdClient.DeleteTorrent(torrentID); err != nil {
-		b.sendMessage(msg.Chat.ID, fmt.Sprintf("❌ Error: %v", err))
+		b.sendMessage(msg.Chat.ID, fmt.Sprintf("[Error] %v", err))
 		return
 	}
 
-	b.sendMessage(msg.Chat.ID, "✅ Torrent deleted successfully")
+	b.sendMessage(msg.Chat.ID, "[OK] Torrent deleted successfully")
 }
 
 // handleUnrestrict handles the /unrestrict command
@@ -238,18 +260,18 @@ func (b *Bot) handleUnrestrict(msg *tgbotapi.Message, args []string) {
 	link := strings.Join(args, " ")
 	unrestricted, err := b.rdClient.UnrestrictLink(link)
 	if err != nil {
-		b.sendMessage(msg.Chat.ID, fmt.Sprintf("❌ Error: %v", err))
+		b.sendMessage(msg.Chat.ID, fmt.Sprintf("[Error] %v", err))
 		return
 	}
 
 	size := realdebrid.FormatSize(unrestricted.Filesize)
 	text := fmt.Sprintf(
-		"✅ *Link Unrestricted*\n\n"+
+		"[OK] *Link Unrestricted*\n\n"+
 			"*File:* %s\n"+
 			"*Size:* %s\n"+
 			"*Host:* %s\n\n"+
 			"*Download:* %s",
-		escapeMD(unrestricted.Filename),
+		"`"+unrestricted.Filename+"`",
 		size,
 		unrestricted.Host,
 		unrestricted.Download,
@@ -262,7 +284,7 @@ func (b *Bot) handleUnrestrict(msg *tgbotapi.Message, args []string) {
 func (b *Bot) handleDownloads(msg *tgbotapi.Message) {
 	downloads, err := b.rdClient.GetDownloads(10, 0)
 	if err != nil {
-		b.sendMessage(msg.Chat.ID, fmt.Sprintf("❌ Error: %v", err))
+		b.sendMessage(msg.Chat.ID, fmt.Sprintf("[Error] %v", err))
 		return
 	}
 
@@ -272,15 +294,15 @@ func (b *Bot) handleDownloads(msg *tgbotapi.Message) {
 	}
 
 	var text strings.Builder
-	text.WriteString("*Recent Downloads:*\n\n")
+	text.WriteString("Recent Downloads:\n\n")
 
-	for i, d := range downloads {
+	for _, d := range downloads {
 		size := realdebrid.FormatSize(d.Filesize)
 		text.WriteString(fmt.Sprintf(
-			"%d. *%s*\n"+
+			". `%s`\n"+
 				"   ID: `%s`\n"+
 				"   Size: %s | Host: %s\n\n",
-			i+1, escapeMD(d.Filename), d.ID, size, d.Host,
+			d.Filename, d.ID, size, d.Host,
 		))
 	}
 
@@ -298,11 +320,11 @@ func (b *Bot) handleRemoveLink(msg *tgbotapi.Message, args []string) {
 
 	downloadID := args[0]
 	if err := b.rdClient.DeleteDownload(downloadID); err != nil {
-		b.sendMessage(msg.Chat.ID, fmt.Sprintf("❌ Error: %v", err))
+		b.sendMessage(msg.Chat.ID, fmt.Sprintf("[Error] %v", err))
 		return
 	}
 
-	b.sendMessage(msg.Chat.ID, "✅ Download removed from history")
+	b.sendMessage(msg.Chat.ID, "[OK] Download removed from history")
 }
 
 // handleStatus handles the /status command
@@ -359,7 +381,7 @@ func (b *Bot) handleCallbackQuery(update tgbotapi.Update) {
 
 	case "delete":
 		if err := b.rdClient.DeleteTorrent(torrentID); err != nil {
-			b.sendMessage(query.Message.Chat.ID, fmt.Sprintf("❌ Error: %v", err))
+			b.sendMessage(query.Message.Chat.ID, fmt.Sprintf("[Error] %v", err))
 			return
 		}
 
@@ -367,11 +389,35 @@ func (b *Bot) handleCallbackQuery(update tgbotapi.Update) {
 		deleteMsg := tgbotapi.NewDeleteMessage(query.Message.Chat.ID, query.Message.MessageID)
 		b.api.Send(deleteMsg)
 
-		b.sendMessage(query.Message.Chat.ID, "✅ Torrent deleted successfully")
+		b.sendMessage(query.Message.Chat.ID, "[OK] Torrent deleted successfully")
 	}
 }
 
 // Helper functions
+
+// asciiStatus returns a plain ASCII status string for a torrent.
+func asciiStatus(status string) string {
+	switch status {
+	case "downloaded", "Downloaded", "complete", "Complete":
+		return "[Downloaded]"
+	case "downloading", "Downloading":
+		return "[Downloading]"
+	case "error", "Error":
+		return "[Error]"
+	case "magnet_error", "Magnet Error":
+		return "[Magnet Error]"
+	case "waiting_files_selection", "Waiting Files Selection":
+		return "[Waiting Files Selection]"
+	case "queued", "Queued":
+		return "[Queued]"
+	case "compressing", "Compressing":
+		return "[Compressing]"
+	case "uploading", "Uploading":
+		return "[Uploading]"
+	default:
+		return "[" + status + "]"
+	}
+}
 
 func (b *Bot) sendMessage(chatID int64, text string) {
 	msg := tgbotapi.NewMessage(chatID, text)
@@ -398,26 +444,4 @@ func (b *Bot) sendMarkdownMessage(chatID int64, text string) {
 	}
 }
 
-func escapeMD(text string) string {
-	replacer := strings.NewReplacer(
-		"_", "\\_",
-		"*", "\\*",
-		"[", "\\[",
-		"]", "\\]",
-		"(", "\\(",
-		")", "\\)",
-		"~", "\\~",
-		"`", "\\`",
-		">", "\\>",
-		"#", "\\#",
-		"+", "\\+",
-		"-", "\\-",
-		"=", "\\=",
-		"|", "\\|",
-		"{", "\\{",
-		"}", "\\}",
-		".", "\\.",
-		"!", "\\!",
-	)
-	return replacer.Replace(text)
-}
+// escapeMD is no longer needed for filenames in mono style.
