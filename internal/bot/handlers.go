@@ -44,19 +44,19 @@ func (b *Bot) handleHelpCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "help")
 
-		text := "<b>Available Commands</b>\n\n" +
-			"<b>Torrent Management:</b>\n" +
-			"<code>/list</code> - List all active torrents\n" +
-			"<code>/add &lt;magnet&gt;</code> - Add a new torrent via magnet link\n" +
-			"<code>/info &lt;id&gt;</code> - Get detailed information about a torrent\n" +
-			"<code>/delete &lt;id&gt;</code> - Delete a torrent (superadmin only)\n\n" +
-			"<b>Hoster Link Management:</b>\n" +
-			"<code>/unrestrict &lt;link&gt;</code> - Unrestrict a hoster link\n" +
-			"<code>/downloads</code> - List recent downloads\n" +
-			"<code>/removelink &lt;id&gt;</code> - Remove a download from history (superadmin only)\n\n" +
-			"<b>General Commands:</b>\n" +
-			"<code>/status</code> - Show your Real-Debrid account status\n" +
-			"<code>/help</code> - Display this help message"
+		text := "<b>🧭 Available Commands</b>\n\n" +
+			"<b>🎬 Torrent Management:</b>\n" +
+			"• <code>/list</code> — List all active torrents\n" +
+			"• <code>/add &lt;magnet&gt;</code> — Add a new torrent via magnet link\n" +
+			"• <code>/info &lt;id&gt;</code> — Get detailed information about a torrent\n" +
+			"• <code>/delete &lt;id&gt;</code> — Delete a torrent <i>(superadmin only)</i>\n\n" +
+			"<b>📦 Hoster Link Management:</b>\n" +
+			"• <code>/unrestrict &lt;link&gt;</code> — Unrestrict a hoster link\n" +
+			"• <code>/downloads</code> — List recent downloads\n" +
+			"• <code>/removelink &lt;id&gt;</code> — Remove a download from history <i>(superadmin only)</i>\n\n" +
+			"<b>⚙️ General Commands:</b>\n" +
+			"• <code>/status</code> — Show your Real-Debrid account status\n" +
+			"• <code>/help</code> — Display this help message"
 
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text)
 
@@ -88,7 +88,7 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 			b.sendMessage(ctx, chatID, messageThreadID, "No torrents found.")
 			if user != nil {
 				b.commandRepo.LogCommand(user.ID, chatID, user.Username, "list", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0)
-				b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentList, "list", messageThreadID, true, "", map[string]interface{}{"torrent_count": 0})
+				b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentList, "list", messageThreadID, true, "", map[string]any{"torrent_count": 0})
 			}
 			return
 		}
@@ -101,7 +101,7 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		torrentsShown := 0
 		hitLengthLimit := false
 
-		for i := 0; i < maxTorrents; i++ {
+		for i := range maxTorrents {
 			t := torrents[i]
 			entry := strings.Builder{}
 			status := realdebrid.FormatStatus(t.Status)
@@ -109,19 +109,19 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 			progress := fmt.Sprintf("%.1f%%", t.Progress)
 			added := t.Added.Format("2006-01-02 15:04")
 
-			entry.WriteString(fmt.Sprintf("<b>File:</b> <code>%s</code>\n", html.EscapeString(t.Filename)))
-			entry.WriteString(fmt.Sprintf("<b>ID:</b> <code>%s</code>\n", t.ID))
-			entry.WriteString(fmt.Sprintf("<b>Status:</b> %s\n", status))
-			entry.WriteString(fmt.Sprintf("<b>Size:</b> %s\n", size))
-			entry.WriteString(fmt.Sprintf("<b>Progress:</b> %s\n", progress))
-			entry.WriteString(fmt.Sprintf("<b>Added:</b> %s\n", added))
+			entry.WriteString(fmt.Sprintf("<i>File:</i> <code>%s</code>\n", html.EscapeString(t.Filename)))
+			entry.WriteString(fmt.Sprintf("<i>ID:</i> <code>%s</code>\n", t.ID))
+			entry.WriteString(fmt.Sprintf("<i>Status:</ib> %s\n", status))
+			entry.WriteString(fmt.Sprintf("<i>Size:</i> %s\n", size))
+			entry.WriteString(fmt.Sprintf("<i>Progress:</i> %s\n", progress))
+			entry.WriteString(fmt.Sprintf("<i>Added:</i> %s\n", added))
 
 			if t.Speed > 0 {
 				speed := realdebrid.FormatSize(t.Speed) + "/s"
-				entry.WriteString(fmt.Sprintf("<b>Speed:</b> %s\n", speed))
+				entry.WriteString(fmt.Sprintf("<i>Speed:</i> %s\n", speed))
 			}
 			if t.Seeders > 0 {
-				entry.WriteString(fmt.Sprintf("<b>Seeders:</b> %d\n", t.Seeders))
+				entry.WriteString(fmt.Sprintf("<i>Seeders:</i> %d\n", t.Seeders))
 			}
 			entry.WriteString("\n")
 
@@ -142,7 +142,7 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 
 		if user != nil {
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "list", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text.String()))
-			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentList, "list", messageThreadID, true, "", map[string]interface{}{"torrent_count": len(torrents)})
+			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentList, "list", messageThreadID, true, "", map[string]any{"torrent_count": len(torrents)})
 		}
 	})
 }
@@ -155,7 +155,7 @@ func (b *Bot) handleAddCommand(ctx context.Context, tgBot *bot.Bot, update *mode
 
 		parts := strings.Fields(update.Message.Text)
 		if len(parts) < 2 {
-			b.sendMessage(ctx, chatID, messageThreadID, "Usage: /add <magnet_link>")
+			b.sendMessage(ctx, chatID, messageThreadID, "<b>Usage:</b> /add <magnet_link>")
 			if user != nil {
 				b.commandRepo.LogCommand(user.ID, chatID, user.Username, "add", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, "Missing arguments", 0)
 			}
@@ -188,7 +188,7 @@ func (b *Bot) handleAddCommand(ctx context.Context, tgBot *bot.Bot, update *mode
 
 		text := fmt.Sprintf(
 			"<b>Torrent Added Successfully</b>\n\n"+
-				"<b>ID:</b> <code>%s</code>\n\n"+
+				"<i>ID:</i> <code>%s</code>\n\n"+
 				"Use <code>/info %s</code> to check its status.",
 			response.ID, response.ID,
 		)
@@ -197,7 +197,7 @@ func (b *Bot) handleAddCommand(ctx context.Context, tgBot *bot.Bot, update *mode
 		if user != nil {
 			b.torrentRepo.LogTorrentActivity(user.ID, chatID, response.ID, "", "", magnetLink, "add", "waiting_files_selection", 0, 0, true, "", nil)
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "add", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text))
-			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentAdd, "add", messageThreadID, true, "", map[string]interface{}{"torrent_id": response.ID})
+			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentAdd, "add", messageThreadID, true, "", map[string]any{"torrent_id": response.ID})
 		}
 	})
 }
@@ -210,7 +210,7 @@ func (b *Bot) handleInfoCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 
 		parts := strings.Fields(update.Message.Text)
 		if len(parts) < 2 {
-			b.sendMessage(ctx, chatID, messageThreadID, "Usage: /info <torrent_id>")
+			b.sendMessage(ctx, chatID, messageThreadID, "<b>Usage:</b> /info <torrent_id>")
 			if user != nil {
 				b.commandRepo.LogCommand(user.ID, chatID, user.Username, "info", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, "Missing arguments", 0)
 			}
@@ -220,7 +220,7 @@ func (b *Bot) handleInfoCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		b.sendTorrentInfo(ctx, chatID, messageThreadID, torrentID, user, 0)
 
 		if user != nil {
-			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentInfo, "info", messageThreadID, true, "", map[string]interface{}{"torrent_id": torrentID})
+			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentInfo, "info", messageThreadID, true, "", map[string]any{"torrent_id": torrentID})
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "info", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0) // Response length logged in sendTorrentInfo
 		}
 	})
@@ -243,19 +243,19 @@ func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID
 
 	var text strings.Builder
 	text.WriteString("<b>Torrent Details</b>\n\n")
-	text.WriteString(fmt.Sprintf("<b>Name:</b> <code>%s</code>\n", html.EscapeString(torrent.Filename)))
-	text.WriteString(fmt.Sprintf("<b>ID:</b> <code>%s</code>\n", torrent.ID))
-	text.WriteString(fmt.Sprintf("<b>Status:</b> %s\n", status))
-	text.WriteString(fmt.Sprintf("<b>Size:</b> %s\n", size))
-	text.WriteString(fmt.Sprintf("<b>Progress:</b> %s\n", progress))
-	text.WriteString(fmt.Sprintf("<b>Hash:</b> <code>%s</code>\n", torrent.Hash))
+	text.WriteString(fmt.Sprintf("<i>Name:</i> <code>%s</code>\n", html.EscapeString(torrent.Filename)))
+	text.WriteString(fmt.Sprintf("<i>ID:</i> <code>%s</code>\n", torrent.ID))
+	text.WriteString(fmt.Sprintf("<i>Status:</i> %s\n", status))
+	text.WriteString(fmt.Sprintf("<i>Size:</i> %s\n", size))
+	text.WriteString(fmt.Sprintf("<i>Progress:</i> %s\n", progress))
+	text.WriteString(fmt.Sprintf("<i>Hash:</i> <code>%s</code>\n", torrent.Hash))
 
 	if torrent.Speed > 0 {
 		speed := realdebrid.FormatSize(torrent.Speed) + "/s"
-		text.WriteString(fmt.Sprintf("<b>Speed:</b> %s\n", speed))
+		text.WriteString(fmt.Sprintf("<i>Speed:</i> %s\n", speed))
 	}
 	if torrent.Seeders > 0 {
-		text.WriteString(fmt.Sprintf("<b>Seeders:</b> %d\n", torrent.Seeders))
+		text.WriteString(fmt.Sprintf("<i>Seeders:</i> %d\n", torrent.Seeders))
 	}
 
 	if messageID > 0 {
@@ -293,7 +293,7 @@ func (b *Bot) handleDeleteCommand(ctx context.Context, tgBot *bot.Bot, update *m
 
 		parts := strings.Fields(update.Message.Text)
 		if len(parts) < 2 {
-			b.sendMessage(ctx, chatID, messageThreadID, "Usage: /delete <torrent_id>")
+			b.sendMessage(ctx, chatID, messageThreadID, "<b>Usage:</b> /delete <torrent_id>")
 			if user != nil {
 				b.commandRepo.LogCommand(user.ID, chatID, user.Username, "delete", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, "Missing arguments", 0)
 			}
@@ -316,7 +316,7 @@ func (b *Bot) handleDeleteCommand(ctx context.Context, tgBot *bot.Bot, update *m
 		if user != nil {
 			b.torrentRepo.LogTorrentActivity(user.ID, chatID, torrentID, "", "", "", "delete", "deleted", 0, 0, true, "", nil)
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "delete", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text))
-			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentDelete, "delete", messageThreadID, true, "", map[string]interface{}{"torrent_id": torrentID})
+			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentDelete, "delete", messageThreadID, true, "", map[string]any{"torrent_id": torrentID})
 		}
 	})
 }
@@ -329,7 +329,7 @@ func (b *Bot) handleUnrestrictCommand(ctx context.Context, tgBot *bot.Bot, updat
 
 		parts := strings.Fields(update.Message.Text)
 		if len(parts) < 2 {
-			b.sendMessage(ctx, chatID, messageThreadID, "Usage: /unrestrict <link>")
+			b.sendMessage(ctx, chatID, messageThreadID, "<b>Usage:</b> /unrestrict <link>")
 			if user != nil {
 				b.commandRepo.LogCommand(user.ID, chatID, user.Username, "unrestrict", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, "Missing arguments", 0)
 			}
@@ -350,9 +350,9 @@ func (b *Bot) handleUnrestrictCommand(ctx context.Context, tgBot *bot.Bot, updat
 		size := realdebrid.FormatSize(unrestricted.Filesize)
 		text := fmt.Sprintf(
 			"<b>Link Unrestricted Successfully</b>\n\n"+
-				"<b>File:</b> <code>%s</code>\n"+
-				"<b>Size:</b> %s\n"+
-				"<b>Host:</b> %s",
+				"<i>File:</i> <code>%s</code>\n"+
+				"<i>Size:</i> %s\n"+
+				"<i>Host:</i> %s",
 			html.EscapeString(unrestricted.Filename),
 			size,
 			html.EscapeString(unrestricted.Host),
@@ -362,7 +362,7 @@ func (b *Bot) handleUnrestrictCommand(ctx context.Context, tgBot *bot.Bot, updat
 		if user != nil {
 			b.downloadRepo.LogDownloadActivity(user.ID, chatID, unrestricted.ID, link, unrestricted.Filename, unrestricted.Host, "unrestrict", unrestricted.Filesize, true, "", nil, nil)
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "unrestrict", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text))
-			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeDownloadUnrestrict, "unrestrict", messageThreadID, true, "", map[string]interface{}{"download_id": unrestricted.ID, "filename": unrestricted.Filename})
+			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeDownloadUnrestrict, "unrestrict", messageThreadID, true, "", map[string]any{"download_id": unrestricted.ID, "filename": unrestricted.Filename})
 		}
 	})
 }
@@ -387,7 +387,7 @@ func (b *Bot) handleDownloadsCommand(ctx context.Context, tgBot *bot.Bot, update
 			b.sendMessage(ctx, chatID, messageThreadID, "No recent downloads found.")
 			if user != nil {
 				b.commandRepo.LogCommand(user.ID, chatID, user.Username, "downloads", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0)
-				b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeDownloadList, "downloads", messageThreadID, true, "", map[string]interface{}{"download_count": 0})
+				b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeDownloadList, "downloads", messageThreadID, true, "", map[string]any{"download_count": 0})
 			}
 			return
 		}
@@ -401,12 +401,12 @@ func (b *Bot) handleDownloadsCommand(ctx context.Context, tgBot *bot.Bot, update
 		for _, d := range downloads {
 			entry := strings.Builder{}
 			size := realdebrid.FormatSize(d.Filesize)
-			entry.WriteString(fmt.Sprintf("<b>File:</b> <code>%s</code>\n", html.EscapeString(d.Filename)))
-			entry.WriteString(fmt.Sprintf("<b>ID:</b> <code>%s</code>\n", d.ID))
-			entry.WriteString(fmt.Sprintf("<b>Size:</b> %s\n", size))
-			entry.WriteString(fmt.Sprintf("<b>Host:</b> %s\n", html.EscapeString(d.Host)))
+			entry.WriteString(fmt.Sprintf("<i>File:</i> <code>%s</code>\n", html.EscapeString(d.Filename)))
+			entry.WriteString(fmt.Sprintf("<i>ID:</i> <code>%s</code>\n", d.ID))
+			entry.WriteString(fmt.Sprintf("<i>Size:</i> %s\n", size))
+			entry.WriteString(fmt.Sprintf("<i>Host:</i> %s\n", html.EscapeString(d.Host)))
 			if !d.Generated.IsZero() {
-				entry.WriteString(fmt.Sprintf("<b>Generated:</b> %s\n", d.Generated.Format("2006-01-02 15:04")))
+				entry.WriteString(fmt.Sprintf("<i>Generated:</i> %s\n", d.Generated.Format("2006-01-02 15:04")))
 			}
 			entry.WriteString("\n")
 
@@ -423,7 +423,7 @@ func (b *Bot) handleDownloadsCommand(ctx context.Context, tgBot *bot.Bot, update
 
 		if user != nil {
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "downloads", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text.String()))
-			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeDownloadList, "downloads", messageThreadID, true, "", map[string]interface{}{"download_count": len(downloads)})
+			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeDownloadList, "downloads", messageThreadID, true, "", map[string]any{"download_count": len(downloads)})
 		}
 	})
 }
@@ -444,7 +444,7 @@ func (b *Bot) handleRemoveLinkCommand(ctx context.Context, tgBot *bot.Bot, updat
 
 		parts := strings.Fields(update.Message.Text)
 		if len(parts) < 2 {
-			b.sendMessage(ctx, chatID, messageThreadID, "Usage: /removelink <download_id>")
+			b.sendMessage(ctx, chatID, messageThreadID, "<b>Usage:</b> /removelink <download_id>")
 			if user != nil {
 				b.commandRepo.LogCommand(user.ID, chatID, user.Username, "removelink", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, "Missing arguments", 0)
 			}
@@ -467,7 +467,7 @@ func (b *Bot) handleRemoveLinkCommand(ctx context.Context, tgBot *bot.Bot, updat
 		if user != nil {
 			b.downloadRepo.LogDownloadActivity(user.ID, chatID, downloadID, "", "", "", "delete", 0, true, "", nil, nil)
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "removelink", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text))
-			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeDownloadDelete, "removelink", messageThreadID, true, "", map[string]interface{}{"download_id": downloadID})
+			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeDownloadDelete, "removelink", messageThreadID, true, "", map[string]any{"download_id": downloadID})
 		}
 	})
 }
@@ -490,23 +490,23 @@ func (b *Bot) handleStatusCommand(ctx context.Context, tgBot *bot.Bot, update *m
 
 		var text strings.Builder
 		text.WriteString("<b>Account Status</b>\n\n")
-		text.WriteString(fmt.Sprintf("<b>Username:</b> <code>%s</code>\n", html.EscapeString(rdUser.Username)))
-		text.WriteString(fmt.Sprintf("<b>Email:</b> <code>%s</code>\n", html.EscapeString(rdUser.Email)))
-		text.WriteString(fmt.Sprintf("<b>Account Type:</b> %s\n", html.EscapeString(strings.Title(rdUser.Type))))
+		text.WriteString(fmt.Sprintf("<i>Username:</i> <code>%s</code>\n", html.EscapeString(rdUser.Username)))
+		text.WriteString(fmt.Sprintf("<i>Email:</i> <code>%s</code>\n", html.EscapeString(rdUser.Email)))
+		text.WriteString(fmt.Sprintf("<i>Account Type:</i> %s\n", html.EscapeString(strings.Title(rdUser.Type))))
 
 		if rdUser.Points > 0 {
-			text.WriteString(fmt.Sprintf("<b>Fidelity Points:</b> %d\n", rdUser.Points))
+			text.WriteString(fmt.Sprintf("<i>Fidelity Points:</i> %d\n", rdUser.Points))
 		}
 
 		if rdUser.Premium > 0 {
 			duration := rdUser.GetPremiumDuration()
 			days := int(duration.Hours() / 24)
 			hours := int(duration.Hours()) % 24
-			text.WriteString(fmt.Sprintf("<b>Premium Remaining:</b> %d days, %d hours\n", days, hours))
+			text.WriteString(fmt.Sprintf("<i>Premium Remaining:</i> %d days, %d hours\n", days, hours))
 		}
 
 		if expTime, err := rdUser.GetExpirationTime(); err == nil && !expTime.IsZero() {
-			text.WriteString(fmt.Sprintf("<b>Expires On:</b> %s\n", expTime.Format("2006-01-02 15:04 MST")))
+			text.WriteString(fmt.Sprintf("<i>Expires On:</i> %s\n", expTime.Format("2006-01-02 15:04 IST")))
 		}
 
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String())
@@ -541,7 +541,7 @@ func (b *Bot) handleMagnetLink(ctx context.Context, tgBot *bot.Bot, update *mode
 
 		text := fmt.Sprintf(
 			"<b>Torrent Added Successfully</b>\n\n"+
-				"<b>ID:</b> <code>%s</code>\n\n"+
+				"<i>ID:</i> <code>%s</code>\n\n"+
 				"Use <code>/info %s</code> to check its status.",
 			response.ID, response.ID,
 		)
@@ -550,7 +550,7 @@ func (b *Bot) handleMagnetLink(ctx context.Context, tgBot *bot.Bot, update *mode
 		if user != nil {
 			b.torrentRepo.LogTorrentActivity(user.ID, chatID, response.ID, "", "", magnetLink, "add", "waiting_files_selection", 0, 0, true, "", nil)
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "magnet_link", magnetLink, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text))
-			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeMagnetLink, "magnet_link", messageThreadID, true, "", map[string]interface{}{"torrent_id": response.ID})
+			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeMagnetLink, "magnet_link", messageThreadID, true, "", map[string]any{"torrent_id": response.ID})
 		}
 	})
 }
@@ -575,9 +575,9 @@ func (b *Bot) handleHosterLink(ctx context.Context, tgBot *bot.Bot, update *mode
 		size := realdebrid.FormatSize(unrestricted.Filesize)
 		text := fmt.Sprintf(
 			"<b>Link Unrestricted Successfully</b>\n\n"+
-				"<b>File:</b> <code>%s</code>\n"+
-				"<b>Size:</b> %s\n"+
-				"<b>Host:</b> %s",
+				"<i>File:</i> <code>%s</code>\n"+
+				"<i>Size:</i> %s\n"+
+				"<i>Host:</i> %s",
 			html.EscapeString(unrestricted.Filename),
 			size,
 			html.EscapeString(unrestricted.Host),
@@ -587,7 +587,7 @@ func (b *Bot) handleHosterLink(ctx context.Context, tgBot *bot.Bot, update *mode
 		if user != nil {
 			b.downloadRepo.LogDownloadActivity(user.ID, chatID, unrestricted.ID, link, unrestricted.Filename, unrestricted.Host, "unrestrict", unrestricted.Filesize, true, "", nil, nil)
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "hoster_link", link, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text))
-			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeHosterLink, "hoster_link", messageThreadID, true, "", map[string]interface{}{"download_id": unrestricted.ID, "filename": unrestricted.Filename})
+			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeHosterLink, "hoster_link", messageThreadID, true, "", map[string]any{"download_id": unrestricted.ID, "filename": unrestricted.Filename})
 		}
 	})
 }
