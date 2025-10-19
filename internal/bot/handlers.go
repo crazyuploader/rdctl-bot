@@ -764,10 +764,12 @@ func (b *Bot) handleDeleteCallback(ctx context.Context, tgBot *bot.Bot, update *
 		}
 
 		// Delete the original message
-		b.api.DeleteMessage(ctx, &bot.DeleteMessageParams{
-			ChatID:    chatID,
-			MessageID: update.CallbackQuery.Message.Message.ID,
-		})
+		if update.CallbackQuery.Message.Message != nil {
+			b.api.DeleteMessage(ctx, &bot.DeleteMessageParams{
+				ChatID:    chatID,
+				MessageID: update.CallbackQuery.Message.Message.ID,
+			})
+		}
 
 		b.sendMessage(ctx, chatID, messageThreadID, "[OK] Torrent deleted successfully")
 	})

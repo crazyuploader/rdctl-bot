@@ -68,8 +68,10 @@ func (m *Middleware) LogCommand(update *models.Update, command string) {
 			user = update.CallbackQuery.From.FirstName
 		}
 		userID = update.CallbackQuery.From.ID
-		chatID = update.CallbackQuery.Message.Message.Chat.ID
-		messageThreadID = update.CallbackQuery.Message.Message.MessageThreadID
+		if update.CallbackQuery.Message.Message != nil {
+			chatID = update.CallbackQuery.Message.Message.Chat.ID
+			messageThreadID = update.CallbackQuery.Message.Message.MessageThreadID
+		}
 	}
 
 	logMessage := fmt.Sprintf("[%s] User: [username=%s, id=%d] - Chat: [id=%d",

@@ -157,9 +157,11 @@ func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThr
 			lastName = update.Message.From.LastName
 		}
 	} else if update.CallbackQuery != nil {
-		chatID = update.CallbackQuery.Message.Message.Chat.ID
-		if update.CallbackQuery.Message.Message.MessageThreadID != 0 {
-			messageThreadID = update.CallbackQuery.Message.Message.MessageThreadID
+		if update.CallbackQuery.Message.Message != nil {
+			chatID = update.CallbackQuery.Message.Message.Chat.ID
+			if update.CallbackQuery.Message.Message.MessageThreadID != 0 {
+				messageThreadID = update.CallbackQuery.Message.Message.MessageThreadID
+			}
 		}
 		username = update.CallbackQuery.From.Username
 		firstName = update.CallbackQuery.From.FirstName
