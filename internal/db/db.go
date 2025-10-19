@@ -14,7 +14,14 @@ import (
 var DB *gorm.DB
 
 // Init initializes the global database handle using the provided DSN, configures the connection pool, and runs automatic migrations.
-// It opens a PostgreSQL connection with a custom GORM logger and UTC timestamps, applies connection pool settings (max idle 10, max open 100, conn max lifetime 1h), runs AutoMigrate for the application's models, assigns the resulting *gorm.DB to the package-level DB, and returns it. An error is returned if connecting, obtaining the underlying sql.DB, or running migrations fails.
+// Init initializes the package-level GORM database connection using the provided PostgreSQL DSN.
+// It configures a custom GORM logger, forces UTC for timestamps, applies connection pool settings
+// (max idle connections 10, max open connections 100, connection max lifetime 1 hour), runs automatic
+// schema migrations for the application's models, assigns the configured *gorm.DB to the package-level
+// DB variable, and returns it.
+// The dsn parameter is the PostgreSQL connection string.
+// The function returns the configured *gorm.DB on success, or an error if connecting, obtaining the
+// underlying sql.DB, or running migrations fails.
 func Init(dsn string) (*gorm.DB, error) {
 	// Configure custom logger
 	newLogger := logger.New(
@@ -60,7 +67,7 @@ func Init(dsn string) (*gorm.DB, error) {
 
 // runMigrations performs automatic schema migrations for the application's models.
 // It migrates the User, ActivityLog, TorrentActivity, DownloadActivity and CommandLog
-// models and returns any error encountered during migration.
+// It returns any error encountered while migrating the User, ActivityLog, TorrentActivity, DownloadActivity, and CommandLog models.
 func runMigrations(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&User{},
@@ -73,7 +80,9 @@ func runMigrations(db *gorm.DB) error {
 
 // Close closes the underlying database connection initialized by Init.
 // If the package DB is nil, Close does nothing and returns nil.
-// Any error encountered while retrieving the underlying sql.DB or while closing it is returned.
+// Close closes the underlying database connection held in the package-level DB.
+// If DB is nil, Close does nothing and returns nil. Any error encountered while
+// obtaining the underlying *sql.DB or while closing it is returned.
 func Close() error {
 	if DB != nil {
 		sqlDB, err := DB.DB()

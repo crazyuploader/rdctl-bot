@@ -630,6 +630,7 @@ func (b *Bot) sendHTMLMessage(ctx context.Context, chatID int64, messageThreadID
 	}
 }
 
+// min returns the smaller of a and b.
 func min(a, b int) int {
 	if a < b {
 		return a

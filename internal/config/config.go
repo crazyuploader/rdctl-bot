@@ -68,7 +68,17 @@ func (d *DatabaseConfig) GetDSN() string {
 // supports overriding via environment variables prefixed with TGRD (dots replaced by underscores),
 // unmarshals the resulting configuration, and validates it before returning it or an error.
 // If cfgFile is non-empty it is used as the config file; otherwise a YAML file named "config"
-// is searched for in the current directory, $HOME/.telegram-rd-bot, and /etc/telegram-rd-bot.
+// Load loads application configuration from the given file or from standard locations,
+// applying environment variable overrides, unmarshals the result into a Config, validates it,
+// and stores the loaded configuration in the package-level cfg variable.
+//
+// If cfgFile is non-empty it is used as the explicit config file. Otherwise the loader
+// searches for a file named "config.yaml" in the current directory, $HOME/.telegram-rd-bot,
+// and /etc/telegram-rd-bot. Environment variables prefixed with "TGRD" (dot replaced by underscore)
+// override config values.
+//
+// On success the configured *Config is returned. An error is returned if the config file
+// cannot be read, cannot be unmarshaled, or fails validation.
 func Load(cfgFile string) (*Config, error) {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)

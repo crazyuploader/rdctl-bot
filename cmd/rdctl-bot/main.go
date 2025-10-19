@@ -79,7 +79,8 @@ The bot also supports direct message handling:
 // init registers CLI flags, binds them to viper configuration keys, and attaches subcommands.
 // It defines persistent flags for config file and debug mode, root-local flags for shutdown
 // timeout and configuration validation, binds those flags to `app.debug` and
-// `app.shutdown_timeout` viper keys, and adds the version subcommand.
+// init configures CLI flags, binds selected flags to viper configuration keys, and registers subcommands.
+// It defines persistent flags for config file and debug mode, local flags for shutdown timeout and config validation, binds those flags to `app.debug` and `app.shutdown_timeout`, and adds the version subcommand.
 func init() {
 	cobra.OnInitialize(initConfig)
 
@@ -99,7 +100,8 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 }
 
-// initConfig sets Viper's configuration file path when cfgFile is not empty.
+// initConfig sets Viper's configuration file to the path provided in the
+// package-level cfgFile variable when cfgFile is not empty.
 func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
@@ -107,7 +109,7 @@ func initConfig() {
 }
 
 // main is the program entry point for the CLI application.
-// It executes the root cobra command and, on execution error, prints the error to stderr and exits with status 1.
+// main is the program entry point. It executes the root Cobra command and, if execution fails, writes the error to stderr and exits with status 1.
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -116,7 +118,9 @@ func main() {
 }
 
 // runBot starts the Telegram Real‑Debrid bot: it loads and optionally validates configuration, initializes the bot, and orchestrates runtime signal- and error-driven graceful shutdown with a configurable timeout.
-// cmd is the Cobra command invoking the action; args are the positional command-line arguments passed to the command.
+// runBot executes the main lifecycle of the CLI bot: it loads configuration, optionally validates it, starts the bot, and manages graceful shutdown.
+//
+// runBot loads the application configuration (respecting an explicit config file path and debug flag), prints key configuration details when requested, initializes and starts the bot, and waits for either an OS shutdown signal or a bot error. When shutdown is triggered it attempts a graceful stop within the configured timeout and forces exit if the timeout is exceeded.
 func runBot(cmd *cobra.Command, args []string) {
 	// Load configuration
 	cfg, err := config.Load(cfgFile)

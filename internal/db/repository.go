@@ -14,7 +14,7 @@ type UserRepository struct {
 	db *gorm.DB
 }
 
-// NewUserRepository returns a new UserRepository backed by the provided gorm.DB.
+// NewUserRepository creates a UserRepository using the provided gorm.DB.
 func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
@@ -97,7 +97,7 @@ type TorrentRepository struct {
 	db *gorm.DB
 }
 
-// NewTorrentRepository creates a new TorrentRepository using the provided gorm DB handle.
+// NewTorrentRepository creates and returns a TorrentRepository backed by the provided gorm.DB.
 func NewTorrentRepository(db *gorm.DB) *TorrentRepository {
 	return &TorrentRepository{db: db}
 }
@@ -161,7 +161,7 @@ type DownloadRepository struct {
 
 // NewDownloadRepository returns a DownloadRepository configured with the provided GORM database handle.
 //
-// The returned repository uses the given *gorm.DB for all persistence operations.
+// NewDownloadRepository creates a DownloadRepository that uses the provided *gorm.DB for persistence.
 func NewDownloadRepository(db *gorm.DB) *DownloadRepository {
 	return &DownloadRepository{db: db}
 }
@@ -201,7 +201,7 @@ type CommandRepository struct {
 	db *gorm.DB
 }
 
-// NewCommandRepository returns a new CommandRepository using the provided GORM DB handle.
+// NewCommandRepository creates a new CommandRepository backed by the provided GORM DB handle.
 func NewCommandRepository(db *gorm.DB) *CommandRepository {
 	return &CommandRepository{db: db}
 }
