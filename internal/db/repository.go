@@ -69,7 +69,10 @@ func NewActivityRepository(db *gorm.DB) *ActivityRepository {
 
 // LogActivity logs a general activity
 func (r *ActivityRepository) LogActivity(userID uint, chatID int64, username string, activityType ActivityType, command string, messageThreadID int, success bool, errorMsg string, metadata map[string]interface{}) error {
-	metadataJSON, _ := json.Marshal(metadata)
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		metadataJSON = []byte("{}")
+	}
 
 	activity := ActivityLog{
 		UserID:          userID,
@@ -98,7 +101,10 @@ func NewTorrentRepository(db *gorm.DB) *TorrentRepository {
 
 // LogTorrentActivity logs torrent-specific activity
 func (r *TorrentRepository) LogTorrentActivity(userID uint, chatID int64, torrentID, torrentHash, torrentName, magnetLink, action, status string, fileSize int64, progress float64, success bool, errorMsg string, metadata map[string]interface{}) error {
-	metadataJSON, _ := json.Marshal(metadata)
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		metadataJSON = []byte("{}")
+	}
 
 	activity := TorrentActivity{
 		UserID:       userID,
@@ -148,7 +154,10 @@ func NewDownloadRepository(db *gorm.DB) *DownloadRepository {
 
 // LogDownloadActivity logs download/unrestrict activity
 func (r *DownloadRepository) LogDownloadActivity(userID uint, chatID int64, downloadID, originalLink, fileName, host, action string, fileSize int64, success bool, errorMsg string, metadata map[string]interface{}) error {
-	metadataJSON, _ := json.Marshal(metadata)
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		metadataJSON = []byte("{}")
+	}
 
 	activity := DownloadActivity{
 		UserID:       userID,
