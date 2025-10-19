@@ -111,7 +111,7 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 
 			entry.WriteString(fmt.Sprintf("<i>File:</i> <code>%s</code>\n", html.EscapeString(t.Filename)))
 			entry.WriteString(fmt.Sprintf("<i>ID:</i> <code>%s</code>\n", t.ID))
-			entry.WriteString(fmt.Sprintf("<i>Status:</ib> %s\n", status))
+			entry.WriteString(fmt.Sprintf("<i>Status:</i> %s\n", status))
 			entry.WriteString(fmt.Sprintf("<i>Size:</i> %s\n", size))
 			entry.WriteString(fmt.Sprintf("<i>Progress:</i> %s\n", progress))
 			entry.WriteString(fmt.Sprintf("<i>Added:</i> %s\n", added))
