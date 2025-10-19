@@ -298,23 +298,13 @@ func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID
 		text.WriteString(fmt.Sprintf("<b>Seeders:</b> %d\n", torrent.Seeders))
 	}
 
-	keyboard := &models.InlineKeyboardMarkup{
-		InlineKeyboard: [][]models.InlineKeyboardButton{
-			{
-				{Text: "Refresh", CallbackData: fmt.Sprintf("refresh_%s", torrentID)},
-				{Text: "Delete", CallbackData: fmt.Sprintf("delete_%s", torrentID)},
-			},
-		},
-	}
-
 	if messageID > 0 {
 		// Edit existing message
 		params := &bot.EditMessageTextParams{
-			ChatID:      chatID,
-			MessageID:   messageID,
-			Text:        text.String(),
-			ParseMode:   models.ParseModeHTML,
-			ReplyMarkup: keyboard,
+			ChatID:    chatID,
+			MessageID: messageID,
+			Text:      text.String(),
+			ParseMode: models.ParseModeHTML,
 		}
 
 		if _, err := b.api.EditMessageText(ctx, params); err != nil {
@@ -327,24 +317,7 @@ func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID
 		}
 	} else {
 		// Send new message
-		if messageID > 0 {
-			// Edit existing message
-			params := &bot.EditMessageTextParams{
-				ChatID:      chatID,
-				MessageID:   messageID,
-				Text:        text.String(),
-				ParseMode:   models.ParseModeHTML,
-				ReplyMarkup: keyboard,
-			}
-
-			if _, err := b.api.EditMessageText(ctx, params); err != nil {
-				log.Printf("Error editing message: %v", err)
-				// Fallback to sending new message if edit fails
-				b.sendNewTorrentInfo(ctx, chatID, messageThreadID, text.String(), keyboard)
-			}
-		} else {
-			b.sendNewTorrentInfo(ctx, chatID, messageThreadID, text.String(), keyboard)
-		}
+		b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String())
 	}
 }
 
@@ -715,93 +688,6 @@ func (b *Bot) handleHosterLink(ctx context.Context, tgBot *bot.Bot, update *mode
 	})
 }
 
-// handleRefreshCallback handles the refresh button callback
-func (b *Bot) handleRefreshCallback(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
-	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
-		b.middleware.LogCommand(update, "refresh_callback")
-
-		// Answer callback query
-		b.api.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
-			CallbackQueryID: update.CallbackQuery.ID,
-		})
-
-		torrentID := strings.TrimPrefix(update.CallbackQuery.Data, "refresh_")
-
-		// Log activity
-		if user != nil {
-			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentInfo, "refresh", messageThreadID, true, "", map[string]interface{}{"torrent_id": torrentID})
-		}
-
-		// Handle different message types
-		maybeInaccessibleMessage := update.CallbackQuery.Message
-		switch maybeInaccessibleMessage.Type {
-		case models.MaybeInaccessibleMessageTypeMessage:
-			// Accessible message - use its ID
-			originalMessageID := maybeInaccessibleMessage.Message.ID
-			b.sendTorrentInfo(ctx, chatID, messageThreadID, torrentID, user, originalMessageID)
-		case models.MaybeInaccessibleMessageTypeInaccessibleMessage:
-			// Inaccessible message - fallback to new message
-			b.sendTorrentInfo(ctx, chatID, messageThreadID, torrentID, user, 0)
-		default:
-			// Unknown type - fallback to new message
-			b.sendTorrentInfo(ctx, chatID, messageThreadID, torrentID, user, 0)
-		}
-	})
-}
-
-// handleDeleteCallback handles the delete button callback
-func (b *Bot) handleDeleteCallback(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
-	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
-		b.middleware.LogCommand(update, "delete_callback")
-
-		if !isSuperAdmin {
-			b.api.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
-				CallbackQueryID: update.CallbackQuery.ID,
-				Text:            "This action is restricted to superadmins only",
-				ShowAlert:       true,
-			})
-
-			// Log unauthorized attempt
-			if user != nil {
-				b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentDelete, "delete_callback", messageThreadID, false, "Unauthorized - not superadmin", nil)
-			}
-			return
-		}
-
-		// Answer callback query
-		b.api.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
-			CallbackQueryID: update.CallbackQuery.ID,
-		})
-
-		torrentID := strings.TrimPrefix(update.CallbackQuery.Data, "delete_")
-		if err := b.rdClient.DeleteTorrent(torrentID); err != nil {
-			b.sendMessage(ctx, chatID, messageThreadID, fmt.Sprintf("[Error] %v", err))
-
-			// Log failed activity
-			if user != nil {
-				b.torrentRepo.LogTorrentActivity(user.ID, chatID, torrentID, "", "", "", "delete", "error", 0, 0, false, err.Error(), nil)
-			}
-			return
-		}
-
-		// Log successful activity
-		if user != nil {
-			b.torrentRepo.LogTorrentActivity(user.ID, chatID, torrentID, "", "", "", "delete", "deleted", 0, 0, true, "", nil)
-			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentDelete, "delete_callback", messageThreadID, true, "", map[string]any{"torrent_id": torrentID})
-		}
-
-		// Delete the original message
-		if update.CallbackQuery.Message.Message != nil {
-			b.api.DeleteMessage(ctx, &bot.DeleteMessageParams{
-				ChatID:    chatID,
-				MessageID: update.CallbackQuery.Message.Message.ID,
-			})
-		}
-
-		b.sendMessage(ctx, chatID, messageThreadID, "[OK] Torrent deleted successfully")
-	})
-}
-
 // Helper functions
 
 func asciiStatus(status string) string {
@@ -831,28 +717,6 @@ func (b *Bot) sendMessage(ctx context.Context, chatID int64, messageThreadID int
 	params := &bot.SendMessageParams{
 		ChatID: chatID,
 		Text:   text,
-	}
-
-	if messageThreadID != 0 {
-		params.MessageThreadID = messageThreadID
-	}
-
-	if err := b.middleware.WaitForRateLimit(); err != nil {
-		log.Printf("Rate limit error: %v", err)
-	}
-
-	if _, err := b.api.SendMessage(ctx, params); err != nil {
-		log.Printf("Error sending message: %v", err)
-	}
-}
-
-// Helper function to send new torrent info message
-func (b *Bot) sendNewTorrentInfo(ctx context.Context, chatID int64, messageThreadID int, text string, keyboard *models.InlineKeyboardMarkup) {
-	params := &bot.SendMessageParams{
-		ChatID:      chatID,
-		Text:        text,
-		ParseMode:   models.ParseModeHTML,
-		ReplyMarkup: keyboard,
 	}
 
 	if messageThreadID != 0 {

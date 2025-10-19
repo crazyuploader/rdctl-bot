@@ -123,10 +123,6 @@ func (b *Bot) registerHandlers() {
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/removelink", bot.MatchTypePrefix, b.handleRemoveLinkCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/status", bot.MatchTypeExact, b.handleStatusCommand)
 
-	// Callback query handlers
-	b.api.RegisterHandler(bot.HandlerTypeCallbackQueryData, "refresh_", bot.MatchTypePrefix, b.handleRefreshCallback)
-	b.api.RegisterHandler(bot.HandlerTypeCallbackQueryData, "delete_", bot.MatchTypePrefix, b.handleDeleteCallback)
-
 	// Message handlers for links (not commands)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "magnet:?", bot.MatchTypeContains, b.handleMagnetLink)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "http://", bot.MatchTypePrefix, b.handleHosterLink)
