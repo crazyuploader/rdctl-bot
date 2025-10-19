@@ -32,7 +32,10 @@ type Bot struct {
 	commandRepo  *db.CommandRepository
 }
 
-// NewBot creates a new bot instance
+// NewBot creates and returns a fully configured Bot.
+// It performs IP verification (optionally using the provided proxy), initializes the Telegram API client,
+// constructs the Real-Debrid client, sets up middleware, initializes the database and repository components,
+// and returns the ready-to-run Bot or an error if any initialization step fails.
 func NewBot(cfg *config.Config, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, error) {
 	// Perform IP tests first
 	if err := performIPTests(proxyURL, ipTestURL, ipVerifyURL); err != nil {
@@ -139,7 +142,9 @@ func (b *Bot) Stop() {
 	log.Println("Bot stopped")
 }
 
-// defaultHandler handles messages that don't match any registered handler
+// defaultHandler ignores updates that do not match any registered handler.
+//
+// It performs no action so unhandled updates are silently dropped.
 func defaultHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 	// Silently ignore unhandled updates
 }
