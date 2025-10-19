@@ -6,7 +6,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -14,6 +17,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.25.3"
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Run Go vet
+        run: go vet ./...
 
       - name: Build
         run: go build -v ./cmd/rdctl-bot
