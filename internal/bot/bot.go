@@ -190,6 +190,18 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 	user, err := b.userRepo.GetOrCreateUser(chatID, username, firstName, lastName, isSuperAdmin, isAllowed)
 	if err != nil {
 		log.Printf("Error getting/creating user: %v", err)
+		// Inform user and abort safely
+		if chatID != 0 {
+			if err2 := b.middleware.WaitForRateLimit(); err2 != nil {
+				log.Printf("Rate limit error: %v", err2)
+			}
+			_, _ = b.api.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID:          chatID,
+				Text:            "Internal error. Please try again later.",
+				MessageThreadID: messageThreadID,
+			})
+		}
+		return
 	}
 
 	if !isAllowed {
