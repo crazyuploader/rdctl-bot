@@ -8,6 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/crazyuploader/rdctl-bot/internal/db"
 	"github.com/crazyuploader/rdctl-bot/internal/realdebrid"
 	"github.com/go-telegram/bot"
@@ -492,7 +495,7 @@ func (b *Bot) handleStatusCommand(ctx context.Context, tgBot *bot.Bot, update *m
 		text.WriteString("<b>Account Status</b>\n\n")
 		text.WriteString(fmt.Sprintf("<i>Username:</i> <code>%s</code>\n", html.EscapeString(rdUser.Username)))
 		text.WriteString(fmt.Sprintf("<i>Email:</i> <code>%s</code>\n", html.EscapeString(rdUser.Email)))
-		text.WriteString(fmt.Sprintf("<i>Account Type:</i> %s\n", html.EscapeString(strings.Title(rdUser.Type))))
+		text.WriteString(fmt.Sprintf("<i>Account Type:</i> %s\n", html.EscapeString(cases.Title(language.English).String(rdUser.Type))))
 
 		if rdUser.Points > 0 {
 			text.WriteString(fmt.Sprintf("<i>Fidelity Points:</i> %d\n", rdUser.Points))
@@ -506,7 +509,7 @@ func (b *Bot) handleStatusCommand(ctx context.Context, tgBot *bot.Bot, update *m
 		}
 
 		if expTime, err := rdUser.GetExpirationTime(); err == nil && !expTime.IsZero() {
-			text.WriteString(fmt.Sprintf("<i>Expires On:</i> %s\n", expTime.Format("2006-01-02 15:04 IST")))
+			text.WriteString(fmt.Sprintf("<i>Expires On:</i> %s\n", expTime.Local().Format("2006-01-02 15:04 MST")))
 		}
 
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String())
