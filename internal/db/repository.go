@@ -2,9 +2,11 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // UserRepository handles user operations
@@ -16,45 +18,46 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-// GetOrCreateUser gets or creates a user
+// GetOrCreateUser gets or creates a user, handling updates if the user already exists.
 func (r *UserRepository) GetOrCreateUser(chatID int64, username, firstName, lastName string, isSuperAdmin, isAllowed bool) (*User, error) {
-	var user User
 	now := time.Now().UTC()
+	user := User{
+		ChatID:        chatID,
+		Username:      username,
+		FirstName:     firstName,
+		LastName:      lastName,
+		IsSuperAdmin:  isSuperAdmin,
+		IsAllowed:     isAllowed,
+		FirstSeenAt:   now, // This will only be set on creation
+		LastSeenAt:    now,
+		TotalCommands: 1, // This will be incremented on update
+	}
 
-	err := r.db.Where("chat_id = ?", chatID).First(&user).Error
-	if err == gorm.ErrRecordNotFound {
-		user = User{
-			ChatID:        chatID,
-			Username:      username,
-			FirstName:     firstName,
-			LastName:      lastName,
-			IsSuperAdmin:  isSuperAdmin,
-			IsAllowed:     isAllowed,
-			FirstSeenAt:   now,
-			LastSeenAt:    now,
-			TotalCommands: 1,
-		}
-		if err := r.db.Create(&user).Error; err != nil {
-			return nil, err
-		}
-		return &user, nil
-	} else if err != nil {
+	// Use clause.OnConflict to perform an upsert (create or update)
+	// If a user with the same chat_id exists, update the specified fields.
+	result := r.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "chat_id"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"username":       username,
+			"first_name":     firstName,
+			"last_name":      lastName,
+			"last_seen_at":   now,
+			"total_commands": gorm.Expr("total_commands + ?", 1),
+		}),
+	}).Create(&user)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	// After upsert, retrieve the potentially updated user to ensure all fields are current
+	// This is important because Create(&user) with OnConflict might not load all updated fields back into 'user'
+	var updatedUser User
+	if err := r.db.Where("chat_id = ?", chatID).First(&updatedUser).Error; err != nil {
 		return nil, err
 	}
 
-	// Update user info and last seen
-	updates := map[string]interface{}{
-		"username":       username,
-		"first_name":     firstName,
-		"last_name":      lastName,
-		"last_seen_at":   now,
-		"total_commands": gorm.Expr("total_commands + ?", 1),
-	}
-	if err := r.db.Model(&user).Updates(updates).Error; err != nil {
-		return nil, err
-	}
-
-	return &user, nil
+	return &updatedUser, nil
 }
 
 // ActivityRepository handles activity logging
@@ -198,7 +201,11 @@ func (r *CommandRepository) LogCommand(userID uint, chatID int64, username, comm
 // GetUserStats retrieves user statistics
 func (r *CommandRepository) GetUserStats(userID uint) (map[string]interface{}, error) {
 	var user User
-	if err := r.db.First(&user, userID).Error; err != nil {
+	err := r.db.First(&user, userID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New("user not found") // Or a more specific error type
+	}
+	if err != nil {
 		return nil, err
 	}
 
