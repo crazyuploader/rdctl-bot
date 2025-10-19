@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // Torrent represents a Real-Debrid torrent
@@ -176,7 +179,7 @@ func FormatSize(bytes int64) string {
 func FormatStatus(status string) string {
 	switch status {
 	case "magnet_error":
-		return "Magnet Error ✗"
+		return "Magnet Error"
 	case "magnet_conversion":
 		return "Converting Magnet"
 	case "waiting_files_selection":
@@ -186,14 +189,15 @@ func FormatStatus(status string) string {
 	case "downloading":
 		return "Downloading"
 	case "downloaded":
-		return "Downloaded ✓"
+		return "Downloaded"
 	case "error":
-		return "Error ✗"
+		return "Error"
 	case "virus":
 		return "Virus Detected"
 	case "dead":
 		return "Dead"
 	default:
-		return status
+		caser := cases.Title(language.English)
+		return caser.String(status)
 	}
 }
