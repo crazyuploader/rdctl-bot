@@ -26,3 +26,24 @@ Key configuration options include:
 - `database.password`: The database password.
 - `database.dbname`: The database name.
 - `database.sslmode`: The SSL mode for the database connection (e.g., `disable`, `require`).
+
+## 🐳 Running with Docker Compose
+
+You can easily run the bot using **Docker Compose**, which automatically handles deployment configuration and environment variables.
+
+### Quick Start (Docker Compose)
+
+1. **Create config.yaml from example**
+
+   ```bash
+   cp example-config.yaml config.yaml
+   ```
+
+   Edit your credentials inside [`config.yaml`](example-config.yaml).
+
+2. **Start the bot**
+   ```bash
+   docker compose up -d
+   ```
+
+That’s it — the bot will load configuration from your mounted `config.yaml` automatically.

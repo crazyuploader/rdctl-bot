@@ -1,0 +1,9 @@
+services:
+  rdctl-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rdctl-bot
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    restart: unless-stopped
