@@ -38,12 +38,12 @@ func (r *UserRepository) GetOrCreateUser(chatID int64, username, firstName, last
 	result := r.db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "chat_id"}},
 		DoUpdates: clause.Assignments(map[string]interface{}{
-			"username":     username,
-			"first_name":   firstName,
-			"last_name":    lastName,
+			"username":       username,
+			"first_name":     firstName,
+			"last_name":      lastName,
 			"is_super_admin": isSuperAdmin,
-			"is_allowed":   isAllowed,
-			"last_seen_at": now,
+			"is_allowed":     isAllowed,
+			"last_seen_at":   now,
 		}),
 	}).Create(&user)
 

@@ -227,6 +227,14 @@ func (b *Bot) sendUnauthorizedMessage(ctx context.Context, chatID int64, message
 	}
 }
 
+// maskUsername masks the username for privacy
+func (b *Bot) maskUsername(username string) string {
+	if len(username) <= 5 {
+		return "*****"
+	}
+	return "*****" + username[5:]
+}
+
 // performIPTests performs IP address checks using an optional proxy and test endpoints.
 // When ipVerifyURL is provided, it verifies the primary IP (from ipTestURL or default) matches the verification endpoint and returns an error if the primary IP cannot be obtained, the verification request or response parsing fails, or the IPs do not match; it returns nil on success.
 func performIPTests(proxyURL, ipTestURL, ipVerifyURL string) error {
