@@ -229,13 +229,19 @@ func (r *CommandRepository) GetUserStats(userID uint) (map[string]interface{}, e
 	}
 
 	var totalActivities int64
-	r.db.Model(&ActivityLog{}).Where("user_id = ?", userID).Count(&totalActivities)
+	if res := r.db.Model(&ActivityLog{}).Where("user_id = ?", userID).Count(&totalActivities); res.Error != nil {
+		return nil, res.Error
+	}
 
 	var totalTorrents int64
-	r.db.Model(&TorrentActivity{}).Where("user_id = ? AND action = ?", userID, "add").Count(&totalTorrents)
+	if res := r.db.Model(&TorrentActivity{}).Where("user_id = ? AND action = ?", userID, "add").Count(&totalTorrents); res.Error != nil {
+		return nil, res.Error
+	}
 
 	var totalDownloads int64
-	r.db.Model(&DownloadActivity{}).Where("user_id = ? AND action = ?", userID, "unrestrict").Count(&totalDownloads)
+	if res := r.db.Model(&DownloadActivity{}).Where("user_id = ? AND action = ?", userID, "unrestrict").Count(&totalDownloads); res.Error != nil {
+		return nil, res.Error
+	}
 
 	stats := map[string]interface{}{
 		"total_commands":   user.TotalCommands,

@@ -24,9 +24,9 @@ builds:
       - arm
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.FullCommit}}
-      - -X main.buildDate={{.Date}}
+      - -X main.Version={{.Version}}
+      - -X main.GitCommit={{.FullCommit}}
+      - -X main.BuildDate={{.Date}}
     flags:
       - -trimpath
 
