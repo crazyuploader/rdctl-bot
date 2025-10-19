@@ -22,27 +22,25 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 func (r *UserRepository) GetOrCreateUser(chatID int64, username, firstName, lastName string, isSuperAdmin, isAllowed bool) (*User, error) {
 	now := time.Now().UTC()
 	user := User{
-		ChatID:        chatID,
-		Username:      username,
-		FirstName:     firstName,
-		LastName:      lastName,
-		IsSuperAdmin:  isSuperAdmin,
-		IsAllowed:     isAllowed,
-		FirstSeenAt:   now, // This will only be set on creation
-		LastSeenAt:    now,
-		TotalCommands: 1, // This will be incremented on update
+		ChatID:       chatID,
+		Username:     username,
+		FirstName:    firstName,
+		LastName:     lastName,
+		IsSuperAdmin: isSuperAdmin,
+		IsAllowed:    isAllowed,
+		FirstSeenAt:  now, // This will only be set on creation
+		LastSeenAt:   now,
 	}
 
 	// Use clause.OnConflict to perform an upsert (create or update)
 	// If a user with the same chat_id exists, update the specified fields.
 	result := r.db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "chat_id"}},
+		Columns: []clause.Column{{Name: "chat_id"}},
 		DoUpdates: clause.Assignments(map[string]interface{}{
-			"username":       username,
-			"first_name":     firstName,
-			"last_name":      lastName,
-			"last_seen_at":   now,
-			"total_commands": gorm.Expr("total_commands + ?", 1),
+			"username":     username,
+			"first_name":   firstName,
+			"last_name":    lastName,
+			"last_seen_at": now,
 		}),
 	}).Create(&user)
 
@@ -179,7 +177,7 @@ func NewCommandRepository(db *gorm.DB) *CommandRepository {
 	return &CommandRepository{db: db}
 }
 
-// LogCommand logs command execution
+// LogCommand logs command execution and atomically increments the user's total_commands counter.
 func (r *CommandRepository) LogCommand(userID uint, chatID int64, username, command, fullCommand string, messageThreadID int, executionTime int64, success bool, errorMsg string, responseLength int) error {
 	cmdLog := CommandLog{
 		UserID:          userID,
@@ -195,7 +193,19 @@ func (r *CommandRepository) LogCommand(userID uint, chatID int64, username, comm
 		CreatedAt:       time.Now().UTC(),
 	}
 
-	return r.db.Create(&cmdLog).Error
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Create the command log within the transaction
+		if err := tx.Create(&cmdLog).Error; err != nil {
+			return err
+		}
+
+		// Atomically increment total_commands for the user
+		if err := tx.Model(&User{}).Where("id = ?", userID).UpdateColumn("total_commands", gorm.Expr("total_commands + ?", 1)).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 // GetUserStats retrieves user statistics
