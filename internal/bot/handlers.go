@@ -180,7 +180,8 @@ func (b *Bot) handleInfoCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool) {
 		b.middleware.LogCommand(update, "info")
 
-		args := strings.Fields(strings.TrimPrefix(update.Message.Text, "/info "))
+		cmdArgs := strings.TrimPrefix(update.Message.Text, "/info")
+		args := strings.Fields(strings.TrimSpace(cmdArgs))
 		if len(args) == 0 {
 			b.sendMessage(ctx, chatID, messageThreadID, "Usage: /info <torrent_id>")
 			return
@@ -260,14 +261,8 @@ func (b *Bot) handleDeleteCommand(ctx context.Context, tgBot *bot.Bot, update *m
 			return
 		}
 
-		cmdText := update.Message.Text
-		if strings.HasPrefix(cmdText, "/del ") {
-			cmdText = strings.TrimPrefix(cmdText, "/del ")
-		} else {
-			cmdText = strings.TrimPrefix(cmdText, "/delete ")
-		}
-
-		args := strings.Fields(cmdText)
+		cmdText := strings.TrimPrefix(update.Message.Text, "/delete")
+		args := strings.Fields(strings.TrimSpace(cmdText))
 		if len(args) == 0 {
 			b.sendMessage(ctx, chatID, messageThreadID, "Usage: /delete <torrent_id>")
 			return
@@ -288,7 +283,8 @@ func (b *Bot) handleUnrestrictCommand(ctx context.Context, tgBot *bot.Bot, updat
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool) {
 		b.middleware.LogCommand(update, "unrestrict")
 
-		args := strings.Fields(strings.TrimPrefix(update.Message.Text, "/unrestrict "))
+		cmdArgs := strings.TrimPrefix(update.Message.Text, "/unrestrict")
+		args := strings.Fields(strings.TrimSpace(cmdArgs))
 		if len(args) == 0 {
 			b.sendMessage(ctx, chatID, messageThreadID, "Usage: /unrestrict <link>")
 			return
@@ -387,7 +383,8 @@ func (b *Bot) handleRemoveLinkCommand(ctx context.Context, tgBot *bot.Bot, updat
 			return
 		}
 
-		args := strings.Fields(strings.TrimPrefix(update.Message.Text, "/removelink "))
+		cmdArgs := strings.TrimPrefix(update.Message.Text, "/removelink")
+		args := strings.Fields(strings.TrimSpace(cmdArgs))
 		if len(args) == 0 {
 			b.sendMessage(ctx, chatID, messageThreadID, "Usage: /removelink <download_id>")
 			return
