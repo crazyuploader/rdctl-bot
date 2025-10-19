@@ -258,12 +258,12 @@ func (b *Bot) handleInfoCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "info", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0)
 		}
 
-		b.sendTorrentInfo(ctx, chatID, messageThreadID, torrentID, user)
+		b.sendTorrentInfo(ctx, chatID, messageThreadID, torrentID, user, 0)
 	})
 }
 
-// sendTorrentInfo sends detailed torrent information
-func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID int, torrentID string, user *db.User) {
+// sendTorrentInfo sends detailed torrent information (edits existing message if messageID > 0)
+func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID int, torrentID string, user *db.User, messageID int) {
 	torrent, err := b.rdClient.GetTorrentInfo(torrentID)
 	if err != nil {
 		b.sendMessage(ctx, chatID, messageThreadID, fmt.Sprintf("[Error] %v", err))
@@ -311,23 +311,44 @@ func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID
 		},
 	}
 
-	params := &bot.SendMessageParams{
-		ChatID:      chatID,
-		Text:        text.String(),
-		ParseMode:   models.ParseModeHTML,
-		ReplyMarkup: keyboard,
-	}
+	if messageID > 0 {
+		// Edit existing message
+		params := &bot.EditMessageTextParams{
+			ChatID:      chatID,
+			MessageID:   messageID,
+			Text:        text.String(),
+			ParseMode:   models.ParseModeHTML,
+			ReplyMarkup: keyboard,
+		}
 
-	if messageThreadID != 0 {
-		params.MessageThreadID = messageThreadID
-	}
+		if _, err := b.api.EditMessageText(ctx, params); err != nil {
+			if strings.Contains(err.Error(), "message is not modified") {
+				// Log as a non-critical issue or ignore
+				log.Printf("Message not modified, ignoring: %v", err)
+			} else {
+				log.Printf("Error editing message: %v", err)
+			}
+		}
+	} else {
+		// Send new message
+		if messageID > 0 {
+			// Edit existing message
+			params := &bot.EditMessageTextParams{
+				ChatID:      chatID,
+				MessageID:   messageID,
+				Text:        text.String(),
+				ParseMode:   models.ParseModeHTML,
+				ReplyMarkup: keyboard,
+			}
 
-	if err := b.middleware.WaitForRateLimit(); err != nil {
-		log.Printf("Rate limit error: %v", err)
-	}
-
-	if _, err := b.api.SendMessage(ctx, params); err != nil {
-		log.Printf("Error sending message: %v", err)
+			if _, err := b.api.EditMessageText(ctx, params); err != nil {
+				log.Printf("Error editing message: %v", err)
+				// Fallback to sending new message if edit fails
+				b.sendNewTorrentInfo(ctx, chatID, messageThreadID, text.String(), keyboard)
+			}
+		} else {
+			b.sendNewTorrentInfo(ctx, chatID, messageThreadID, text.String(), keyboard)
+		}
 	}
 }
 
@@ -407,7 +428,7 @@ func (b *Bot) handleUnrestrictCommand(ctx context.Context, tgBot *bot.Bot, updat
 
 			// Log failed activity
 			if user != nil {
-				b.downloadRepo.LogDownloadActivity(user.ID, chatID, "", link, "", "", "unrestrict", 0, false, err.Error(), nil)
+				b.downloadRepo.LogDownloadActivity(user.ID, chatID, "", link, "", "", "unrestrict", 0, false, err.Error(), nil, nil)
 				b.commandRepo.LogCommand(user.ID, chatID, user.Username, "unrestrict", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, err.Error(), 0)
 			}
 			return
@@ -415,7 +436,7 @@ func (b *Bot) handleUnrestrictCommand(ctx context.Context, tgBot *bot.Bot, updat
 
 		// Log successful activity
 		if user != nil {
-			b.downloadRepo.LogDownloadActivity(user.ID, chatID, unrestricted.ID, link, unrestricted.Filename, unrestricted.Host, "unrestrict", unrestricted.Filesize, true, "", nil)
+			b.downloadRepo.LogDownloadActivity(user.ID, chatID, unrestricted.ID, link, unrestricted.Filename, unrestricted.Host, "unrestrict", unrestricted.Filesize, true, "", nil, nil)
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "unrestrict", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0)
 			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeDownloadUnrestrict, "unrestrict", messageThreadID, true, "", map[string]interface{}{"download_id": unrestricted.ID, "filename": unrestricted.Filename})
 		}
@@ -548,7 +569,7 @@ func (b *Bot) handleRemoveLinkCommand(ctx context.Context, tgBot *bot.Bot, updat
 
 			// Log failed activity
 			if user != nil {
-				b.downloadRepo.LogDownloadActivity(user.ID, chatID, downloadID, "", "", "", "delete", 0, false, err.Error(), nil)
+				b.downloadRepo.LogDownloadActivity(user.ID, chatID, downloadID, "", "", "", "delete", 0, false, err.Error(), nil, nil)
 				b.commandRepo.LogCommand(user.ID, chatID, user.Username, "removelink", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, err.Error(), 0)
 			}
 			return
@@ -556,7 +577,7 @@ func (b *Bot) handleRemoveLinkCommand(ctx context.Context, tgBot *bot.Bot, updat
 
 		// Log successful activity
 		if user != nil {
-			b.downloadRepo.LogDownloadActivity(user.ID, chatID, downloadID, "", "", "", "delete", 0, true, "", nil)
+			b.downloadRepo.LogDownloadActivity(user.ID, chatID, downloadID, "", "", "", "delete", 0, true, "", nil, nil)
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "removelink", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0)
 			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeDownloadDelete, "removelink", messageThreadID, true, "", map[string]interface{}{"download_id": downloadID})
 		}
@@ -673,7 +694,7 @@ func (b *Bot) handleHosterLink(ctx context.Context, tgBot *bot.Bot, update *mode
 
 			// Log failed activity
 			if user != nil {
-				b.downloadRepo.LogDownloadActivity(user.ID, chatID, "", link, "", "", "unrestrict", 0, false, err.Error(), nil)
+				b.downloadRepo.LogDownloadActivity(user.ID, chatID, "", link, "", "", "unrestrict", 0, false, err.Error(), nil, nil)
 				b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeHosterLink, "hoster_link", messageThreadID, false, err.Error(), nil)
 			}
 			return
@@ -681,7 +702,7 @@ func (b *Bot) handleHosterLink(ctx context.Context, tgBot *bot.Bot, update *mode
 
 		// Log successful activity
 		if user != nil {
-			b.downloadRepo.LogDownloadActivity(user.ID, chatID, unrestricted.ID, link, unrestricted.Filename, unrestricted.Host, "unrestrict", unrestricted.Filesize, true, "", nil)
+			b.downloadRepo.LogDownloadActivity(user.ID, chatID, unrestricted.ID, link, unrestricted.Filename, unrestricted.Host, "unrestrict", unrestricted.Filesize, true, "", nil, nil)
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "hoster_link", link, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0)
 			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeHosterLink, "hoster_link", messageThreadID, true, "", map[string]interface{}{"download_id": unrestricted.ID, "filename": unrestricted.Filename})
 		}
@@ -718,7 +739,20 @@ func (b *Bot) handleRefreshCallback(ctx context.Context, tgBot *bot.Bot, update 
 			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentInfo, "refresh", messageThreadID, true, "", map[string]interface{}{"torrent_id": torrentID})
 		}
 
-		b.sendTorrentInfo(ctx, chatID, messageThreadID, torrentID, user)
+		// Handle different message types
+		maybeInaccessibleMessage := update.CallbackQuery.Message
+		switch maybeInaccessibleMessage.Type {
+		case models.MaybeInaccessibleMessageTypeMessage:
+			// Accessible message - use its ID
+			originalMessageID := maybeInaccessibleMessage.Message.ID
+			b.sendTorrentInfo(ctx, chatID, messageThreadID, torrentID, user, originalMessageID)
+		case models.MaybeInaccessibleMessageTypeInaccessibleMessage:
+			// Inaccessible message - fallback to new message
+			b.sendTorrentInfo(ctx, chatID, messageThreadID, torrentID, user, 0)
+		default:
+			// Unknown type - fallback to new message
+			b.sendTorrentInfo(ctx, chatID, messageThreadID, torrentID, user, 0)
+		}
 	})
 }
 
@@ -760,7 +794,7 @@ func (b *Bot) handleDeleteCallback(ctx context.Context, tgBot *bot.Bot, update *
 		// Log successful activity
 		if user != nil {
 			b.torrentRepo.LogTorrentActivity(user.ID, chatID, torrentID, "", "", "", "delete", "deleted", 0, 0, true, "", nil)
-			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentDelete, "delete_callback", messageThreadID, true, "", map[string]interface{}{"torrent_id": torrentID})
+			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeTorrentDelete, "delete_callback", messageThreadID, true, "", map[string]any{"torrent_id": torrentID})
 		}
 
 		// Delete the original message
@@ -804,6 +838,28 @@ func (b *Bot) sendMessage(ctx context.Context, chatID int64, messageThreadID int
 	params := &bot.SendMessageParams{
 		ChatID: chatID,
 		Text:   text,
+	}
+
+	if messageThreadID != 0 {
+		params.MessageThreadID = messageThreadID
+	}
+
+	if err := b.middleware.WaitForRateLimit(); err != nil {
+		log.Printf("Rate limit error: %v", err)
+	}
+
+	if _, err := b.api.SendMessage(ctx, params); err != nil {
+		log.Printf("Error sending message: %v", err)
+	}
+}
+
+// Helper function to send new torrent info message
+func (b *Bot) sendNewTorrentInfo(ctx context.Context, chatID int64, messageThreadID int, text string, keyboard *models.InlineKeyboardMarkup) {
+	params := &bot.SendMessageParams{
+		ChatID:      chatID,
+		Text:        text,
+		ParseMode:   models.ParseModeHTML,
+		ReplyMarkup: keyboard,
 	}
 
 	if messageThreadID != 0 {

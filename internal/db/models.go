@@ -71,44 +71,48 @@ type ActivityLog struct {
 
 // TorrentActivity tracks torrent-specific activities
 type TorrentActivity struct {
-	ID           uint   `gorm:"primaryKey"`
-	UserID       uint   `gorm:"index;not null"`
-	ChatID       int64  `gorm:"index;not null"`
-	TorrentID    string `gorm:"index;not null"`
-	TorrentHash  string `gorm:"index"`
-	TorrentName  string
-	MagnetLink   string `gorm:"type:text"`
-	Action       string `gorm:"index;not null"` // add, delete, info, select_files
-	Status       string
-	FileSize     int64
-	Progress     float64
-	Success      bool      `gorm:"default:true"`
-	ErrorMessage string    `gorm:"type:text"`
-	Metadata     string    `gorm:"type:jsonb"`
-	CreatedAt    time.Time `gorm:"index"`
+	ID            uint   `gorm:"primaryKey"`
+	UserID        uint   `gorm:"index;not null"`
+	ChatID        int64  `gorm:"index;not null"`
+	TorrentID     string `gorm:"index;not null"`
+	TorrentHash   string `gorm:"index"`
+	TorrentName   string
+	MagnetLink    string `gorm:"type:text"`
+	Action        string `gorm:"index;not null"` // add, delete, info, select_files
+	Status        string
+	FileSize      int64
+	Progress      float64
+	Success       bool      `gorm:"default:true"`
+	ErrorMessage  string    `gorm:"type:text"`
+	Metadata      string    `gorm:"type:jsonb;default:'{}'"`
+	CreatedAt     time.Time `gorm:"index"`
+	SelectedFiles string    `gorm:"type:jsonb;not null;default:'[]'"` // Stores selected files as JSON array
 
 	// Relationships
-	User User `gorm:"foreignKey:UserID"`
+	User               User               `gorm:"foreignKey:UserID"`
+	DownloadActivities []DownloadActivity `gorm:"foreignKey:TorrentActivityID"`
 }
 
 // DownloadActivity tracks download/unrestrict activities
 type DownloadActivity struct {
-	ID           uint   `gorm:"primaryKey"`
-	UserID       uint   `gorm:"index;not null"`
-	ChatID       int64  `gorm:"index;not null"`
-	DownloadID   string `gorm:"index"`
-	OriginalLink string `gorm:"type:text"`
-	FileName     string
-	FileSize     int64
-	Host         string    `gorm:"index"`
-	Action       string    `gorm:"index;not null"` // unrestrict, list, delete
-	Success      bool      `gorm:"default:true"`
-	ErrorMessage string    `gorm:"type:text"`
-	Metadata     string    `gorm:"type:jsonb"`
-	CreatedAt    time.Time `gorm:"index"`
+	ID                uint   `gorm:"primaryKey"`
+	UserID            uint   `gorm:"index;not null"`
+	ChatID            int64  `gorm:"index;not null"`
+	DownloadID        string `gorm:"index"`
+	OriginalLink      string `gorm:"type:text"`
+	FileName          string
+	FileSize          int64
+	Host              string    `gorm:"index"`
+	Action            string    `gorm:"index;not null"` // unrestrict, list, delete
+	Success           bool      `gorm:"default:true"`
+	ErrorMessage      string    `gorm:"type:text"`
+	Metadata          string    `gorm:"type:jsonb"`
+	CreatedAt         time.Time `gorm:"index"`
+	TorrentActivityID *uint     `gorm:"index"` // Links to originating torrent activity
 
 	// Relationships
-	User User `gorm:"foreignKey:UserID"`
+	User            User             `gorm:"foreignKey:UserID"`
+	TorrentActivity *TorrentActivity `gorm:"foreignKey:TorrentActivityID"`
 }
 
 // CommandLog tracks all command executions

@@ -104,26 +104,34 @@ func NewTorrentRepository(db *gorm.DB) *TorrentRepository {
 
 // LogTorrentActivity logs torrent-specific activity
 func (r *TorrentRepository) LogTorrentActivity(userID uint, chatID int64, torrentID, torrentHash, torrentName, magnetLink, action, status string, fileSize int64, progress float64, success bool, errorMsg string, metadata map[string]interface{}) error {
+	// Ensure metadata is never nil
+	if metadata == nil {
+		metadata = make(map[string]interface{})
+	}
 	metadataJSON, err := json.Marshal(metadata)
 	if err != nil {
 		metadataJSON = []byte("{}")
 	}
 
+	// Ensure selected_files has valid default JSON array
+	selectedFiles := "[]"
+
 	activity := TorrentActivity{
-		UserID:       userID,
-		ChatID:       chatID,
-		TorrentID:    torrentID,
-		TorrentHash:  torrentHash,
-		TorrentName:  torrentName,
-		MagnetLink:   magnetLink,
-		Action:       action,
-		Status:       status,
-		FileSize:     fileSize,
-		Progress:     progress,
-		Success:      success,
-		ErrorMessage: errorMsg,
-		Metadata:     string(metadataJSON),
-		CreatedAt:    time.Now().UTC(),
+		UserID:        userID,
+		ChatID:        chatID,
+		TorrentID:     torrentID,
+		TorrentHash:   torrentHash,
+		TorrentName:   torrentName,
+		MagnetLink:    magnetLink,
+		Action:        action,
+		Status:        status,
+		FileSize:      fileSize,
+		Progress:      progress,
+		Success:       success,
+		ErrorMessage:  errorMsg,
+		Metadata:      string(metadataJSON),
+		SelectedFiles: selectedFiles,
+		CreatedAt:     time.Now().UTC(),
 	}
 
 	return r.db.Create(&activity).Error
@@ -152,32 +160,37 @@ type DownloadRepository struct {
 }
 
 // NewDownloadRepository returns a DownloadRepository configured with the provided GORM database handle.
-// 
+//
 // The returned repository uses the given *gorm.DB for all persistence operations.
 func NewDownloadRepository(db *gorm.DB) *DownloadRepository {
 	return &DownloadRepository{db: db}
 }
 
-// LogDownloadActivity logs download/unrestrict activity
-func (r *DownloadRepository) LogDownloadActivity(userID uint, chatID int64, downloadID, originalLink, fileName, host, action string, fileSize int64, success bool, errorMsg string, metadata map[string]interface{}) error {
+// LogDownloadActivity logs download/unrestrict activity with optional torrent association
+func (r *DownloadRepository) LogDownloadActivity(userID uint, chatID int64, downloadID, originalLink, fileName, host, action string, fileSize int64, success bool, errorMsg string, metadata map[string]interface{}, torrentActivityID *uint) error {
+	// Ensure metadata is never nil
+	if metadata == nil {
+		metadata = make(map[string]interface{})
+	}
 	metadataJSON, err := json.Marshal(metadata)
 	if err != nil {
 		metadataJSON = []byte("{}")
 	}
 
 	activity := DownloadActivity{
-		UserID:       userID,
-		ChatID:       chatID,
-		DownloadID:   downloadID,
-		OriginalLink: originalLink,
-		FileName:     fileName,
-		FileSize:     fileSize,
-		Host:         host,
-		Action:       action,
-		Success:      success,
-		ErrorMessage: errorMsg,
-		Metadata:     string(metadataJSON),
-		CreatedAt:    time.Now().UTC(),
+		UserID:            userID,
+		ChatID:            chatID,
+		DownloadID:        downloadID,
+		OriginalLink:      originalLink,
+		FileName:          fileName,
+		FileSize:          fileSize,
+		Host:              host,
+		Action:            action,
+		Success:           success,
+		ErrorMessage:      errorMsg,
+		Metadata:          string(metadataJSON),
+		CreatedAt:         time.Now().UTC(),
+		TorrentActivityID: torrentActivityID,
 	}
 
 	return r.db.Create(&activity).Error
