@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // Torrent represents a Real-Debrid torrent
@@ -172,28 +175,32 @@ func FormatSize(bytes int64) string {
 	return fmt.Sprintf("%.2f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
-// FormatStatus formats torrent status to user-friendly text
+// FormatStatus formats a torrent status identifier into a user-friendly label.
+// Known internal statuses are mapped to readable strings (for example
+// "magnet_error" -> "Magnet Error", "downloading" -> "Downloading").
+// For unknown statuses, the input is title-cased using English casing rules.
 func FormatStatus(status string) string {
 	switch status {
 	case "magnet_error":
-		return "❌ Magnet Error"
+		return "Magnet Error"
 	case "magnet_conversion":
-		return "🔄 Converting Magnet"
+		return "Converting Magnet"
 	case "waiting_files_selection":
-		return "⏳ Waiting for File Selection"
+		return "Waiting for File Selection"
 	case "queued":
-		return "⏸️ Queued"
+		return "Queued"
 	case "downloading":
-		return "⬇️ Downloading"
+		return "Downloading"
 	case "downloaded":
-		return "✅ Downloaded"
+		return "Downloaded"
 	case "error":
-		return "❌ Error"
+		return "Error"
 	case "virus":
-		return "🦠 Virus Detected"
+		return "Virus Detected"
 	case "dead":
-		return "💀 Dead"
+		return "Dead"
 	default:
-		return status
+		caser := cases.Title(language.English)
+		return caser.String(status)
 	}
 }

@@ -20,3 +20,9 @@ Key configuration options include:
 - `app.log_level`: The logging level (e.g., `debug`, `info`, `warn`, `error`).
 - `app.rate_limit.messages_per_second`: The maximum number of messages per second the bot can send to Telegram.
 - `app.rate_limit.burst`: The maximum burst of messages the bot can send to Telegram.
+- `database.host`: The database host.
+- `database.port`: The database port.
+- `database.user`: The database user.
+- `database.password`: The database password.
+- `database.dbname`: The database name.
+- `database.sslmode`: The SSL mode for the database connection (e.g., `disable`, `require`).

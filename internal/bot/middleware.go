@@ -17,7 +17,8 @@ type Middleware struct {
 	limiter *rate.Limiter
 }
 
-// NewMiddleware creates a new middleware instance
+// NewMiddleware creates a Middleware configured from cfg.
+// It initializes an internal rate limiter using cfg.App.RateLimit.MessagesPerSecond and cfg.App.RateLimit.Burst.
 func NewMiddleware(cfg *config.Config) *Middleware {
 	r := rate.Limit(cfg.App.RateLimit.MessagesPerSecond)
 	b := cfg.App.RateLimit.Burst
@@ -29,8 +30,8 @@ func NewMiddleware(cfg *config.Config) *Middleware {
 }
 
 // CheckAuthorization verifies if the user is allowed to use the bot
-func (m *Middleware) CheckAuthorization(chatID int64) (bool, bool) {
-	isSuperAdmin := m.config.IsSuperAdmin(chatID)
+func (m *Middleware) CheckAuthorization(chatID, userID int64) (bool, bool) {
+	isSuperAdmin := m.config.IsSuperAdmin(userID)
 	isAllowed := m.config.IsAllowedChat(chatID) || isSuperAdmin
 
 	return isAllowed, isSuperAdmin
@@ -68,8 +69,10 @@ func (m *Middleware) LogCommand(update *models.Update, command string) {
 			user = update.CallbackQuery.From.FirstName
 		}
 		userID = update.CallbackQuery.From.ID
-		chatID = update.CallbackQuery.Message.Message.Chat.ID
-		messageThreadID = update.CallbackQuery.Message.Message.MessageThreadID
+		if update.CallbackQuery.Message.Message != nil {
+			chatID = update.CallbackQuery.Message.Message.Chat.ID
+			messageThreadID = update.CallbackQuery.Message.Message.MessageThreadID
+		}
 	}
 
 	logMessage := fmt.Sprintf("[%s] User: [username=%s, id=%d] - Chat: [id=%d",
