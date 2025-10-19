@@ -98,7 +98,7 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		}
 
 		var text strings.Builder
-		text.WriteString("List of Added Torrents:\n\n")
+		text.WriteString("<b>List of Added Torrents:</b>\n\n")
 
 		maxTorrents := min(len(torrents), 10)
 
@@ -282,20 +282,20 @@ func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID
 
 	var text strings.Builder
 	text.WriteString("<b>Torrent Details:</b>\n\n")
-	text.WriteString(fmt.Sprintf("<b>Name:</b> <code>%s</code>\n", html.EscapeString(torrent.Filename)))
-	text.WriteString(fmt.Sprintf("<b>ID:</b> <code>%s</code>\n", torrent.ID))
-	text.WriteString(fmt.Sprintf("<b>Status:</b> %s\n", status))
-	text.WriteString(fmt.Sprintf("<b>Size:</b> %s\n", size))
-	text.WriteString(fmt.Sprintf("<b>Progress:</b> %s\n", progress))
-	text.WriteString(fmt.Sprintf("<b>Hash:</b> <code>%s</code>\n", torrent.Hash))
+	text.WriteString(fmt.Sprintf("<i>Name:</i> <code>%s</code>\n", html.EscapeString(torrent.Filename)))
+	text.WriteString(fmt.Sprintf("<i>ID:</i> <code>%s</code>\n", torrent.ID))
+	text.WriteString(fmt.Sprintf("<i>Status:</i> %s\n", status))
+	text.WriteString(fmt.Sprintf("<i>Size:</i> %s\n", size))
+	text.WriteString(fmt.Sprintf("<i>Progress:</i> %s\n", progress))
+	text.WriteString(fmt.Sprintf("<i>Hash:</i> <code>%s</code>\n", torrent.Hash))
 
 	if torrent.Speed > 0 {
 		speed := realdebrid.FormatSize(torrent.Speed) + "/s"
-		text.WriteString(fmt.Sprintf("<b>Speed:</b> %s\n", speed))
+		text.WriteString(fmt.Sprintf("<i>Speed:</i> %s\n", speed))
 	}
 
 	if torrent.Seeders > 0 {
-		text.WriteString(fmt.Sprintf("<b>Seeders:</b> %d\n", torrent.Seeders))
+		text.WriteString(fmt.Sprintf("<i>Seeders:</i> %d\n", torrent.Seeders))
 	}
 
 	if messageID > 0 {

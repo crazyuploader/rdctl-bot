@@ -176,23 +176,23 @@ func FormatSize(bytes int64) string {
 func FormatStatus(status string) string {
 	switch status {
 	case "magnet_error":
-		return "❌ Magnet Error"
+		return "Magnet Error ✗"
 	case "magnet_conversion":
-		return "🔄 Converting Magnet"
+		return "Converting Magnet"
 	case "waiting_files_selection":
-		return "⏳ Waiting for File Selection"
+		return "Waiting for File Selection"
 	case "queued":
-		return "⏸️ Queued"
+		return "Queued"
 	case "downloading":
-		return "⬇️ Downloading"
+		return "Downloading"
 	case "downloaded":
-		return "✅ Downloaded"
+		return "Downloaded ✓"
 	case "error":
-		return "❌ Error"
+		return "Error ✗"
 	case "virus":
-		return "🦠 Virus Detected"
+		return "Virus Detected"
 	case "dead":
-		return "💀 Dead"
+		return "Dead"
 	default:
 		return status
 	}
