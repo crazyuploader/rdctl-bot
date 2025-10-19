@@ -109,18 +109,21 @@ func main() {
 }
 
 func runBot(cmd *cobra.Command, args []string) {
-	// Setup logging
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	log.SetOutput(os.Stdout)
-
-	log.Println("Starting rdctl-bot...")
-	log.Printf("Version: %s, Build: %s, Commit: %s", Version, BuildDate, GitCommit)
-
 	// Load configuration
 	cfg, err := config.Load(cfgFile)
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
+
+	// Override log level if debug flag is set
+	if viper.GetBool("app.debug") {
+		cfg.App.LogLevel = "debug"
+		log.Printf("Debug mode enabled via flag. Log level set to: %s", cfg.App.LogLevel)
+	}
+
+	// Setup logging
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.SetOutput(os.Stdout)
 
 	log.Println("Configuration loaded successfully")
 
@@ -153,13 +156,9 @@ func runBot(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to create bot: %v", err)
 	}
 
-	// Setup graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Channel to listen for OS signals
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+	// Setup graceful shutdown using context with signal notification
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	// Channel to listen for errors from bot
 	errCh := make(chan error, 1)
@@ -174,18 +173,13 @@ func runBot(cmd *cobra.Command, args []string) {
 
 	// Wait for shutdown signal or error
 	select {
-	case sig := <-sigCh:
-		log.Printf("Received shutdown signal: %v", sig)
+	case <-ctx.Done():
+		log.Printf("Received shutdown signal: %v", ctx.Err())
 		log.Println("Initiating graceful shutdown...")
 	case err := <-errCh:
 		log.Printf("Bot encountered an error: %v", err)
 		log.Println("Initiating shutdown due to error...")
 	}
-
-	// Stop signal notification (allows force quit with second Ctrl+C)
-	signal.Stop(sigCh)
-	log.Println("Press Ctrl+C again to force shutdown")
-
 	// Get shutdown timeout from flags
 	shutdownTimeout, _ := cmd.Flags().GetDuration("shutdown-timeout")
 
@@ -201,7 +195,8 @@ func runBot(cmd *cobra.Command, args []string) {
 		defer close(shutdownComplete)
 
 		log.Println("Stopping bot...")
-		cancel() // Cancel bot context
+		// The bot's context is already canceled by the signal handler,
+		// so we don't need to call cancel() here.
 
 		// Allow bot to cleanup
 		time.Sleep(500 * time.Millisecond)
@@ -217,9 +212,6 @@ func runBot(cmd *cobra.Command, args []string) {
 		log.Println("Bot stopped gracefully")
 	case <-shutdownCtx.Done():
 		log.Println("Shutdown timeout exceeded, forcing exit")
-	case <-sigCh:
-		log.Println("Force shutdown requested")
-		os.Exit(130) // Standard exit code for Ctrl+C
 	}
 
 	log.Println("Bot exited successfully")
