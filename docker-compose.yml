@@ -1,8 +1,6 @@
 services:
   rdctl-bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/crazyuploader/rdctl-bot:latest
     container_name: rdctl-bot
     volumes:
       - ./config.yaml:/app/config.yaml
