@@ -15,6 +15,13 @@ type Config struct {
 	RealDebrid RealDebridConfig `mapstructure:"realdebrid"`
 	App        AppConfig        `mapstructure:"app"`
 	Database   DatabaseConfig   `mapstructure:"database"`
+	Web        WebConfig        `mapstructure:"web"`
+}
+
+// WebConfig holds all web server configuration
+type WebConfig struct {
+	ListenAddr string `mapstructure:"listen_addr"`
+	APIKey     string `mapstructure:"api_key"`
 }
 
 // TelegramConfig holds Telegram bot settings
@@ -187,6 +194,13 @@ func (c *Config) Validate() error {
 
 	if c.Database.SSLMode == "" {
 		c.Database.SSLMode = "disable"
+	}
+
+	if c.Web.ListenAddr == "" {
+		c.Web.ListenAddr = ":8080"
+	}
+	if c.Web.APIKey == "" {
+		return fmt.Errorf("web api_key is required for dashboard access")
 	}
 
 	return nil

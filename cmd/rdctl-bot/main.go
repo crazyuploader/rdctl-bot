@@ -11,6 +11,9 @@ import (
 
 	"github.com/crazyuploader/rdctl-bot/internal/bot"
 	"github.com/crazyuploader/rdctl-bot/internal/config"
+	"github.com/crazyuploader/rdctl-bot/internal/db"
+	"github.com/crazyuploader/rdctl-bot/internal/realdebrid"
+	"github.com/crazyuploader/rdctl-bot/internal/web"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -152,6 +155,12 @@ func runBot(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	// Initialize database
+	database, err := db.Init(cfg.Database.GetDSN())
+	if err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
+
 	// Log configuration details
 	log.Printf("Allowed chat IDs: %v", cfg.Telegram.AllowedChatIDs)
 	log.Printf("Super admin IDs: %v", cfg.Telegram.SuperAdminIDs)
@@ -168,6 +177,20 @@ func runBot(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
 	}
+
+	go func() {
+		// Create dependencies for web handlers
+		deps := web.Dependencies{
+			RDClient:     realdebrid.NewClient(cfg.RealDebrid.BaseURL, cfg.RealDebrid.APIToken, cfg.RealDebrid.Proxy, time.Duration(cfg.RealDebrid.Timeout)*time.Second),
+			UserRepo:     db.NewUserRepository(database),
+			ActivityRepo: db.NewActivityRepository(database),
+			TorrentRepo:  db.NewTorrentRepository(database),
+			DownloadRepo: db.NewDownloadRepository(database),
+			CommandRepo:  db.NewCommandRepository(database),
+			Config:       cfg,
+		}
+		web.Start(deps)
+	}()
 
 	// Setup graceful shutdown using context with signal notification
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
