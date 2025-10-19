@@ -100,10 +100,7 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		var text strings.Builder
 		text.WriteString("List of Added Torrents:\n\n")
 
-		maxTorrents := 10
-		if len(torrents) < maxTorrents {
-			maxTorrents = len(torrents)
-		}
+		maxTorrents := min(len(torrents), 10)
 
 		const maxMsgLen = 4000
 		torrentsShown := 0
@@ -175,8 +172,8 @@ func (b *Bot) handleAddCommand(ctx context.Context, tgBot *bot.Bot, update *mode
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "add")
 
-		args := strings.Fields(strings.TrimPrefix(update.Message.Text, "/add "))
-		if len(args) == 0 {
+		parts := strings.Fields(update.Message.Text)
+		if len(parts) < 2 {
 			b.sendMessage(ctx, chatID, messageThreadID, "Usage: /add <magnet_link>")
 
 			// Log failed command
@@ -186,7 +183,7 @@ func (b *Bot) handleAddCommand(ctx context.Context, tgBot *bot.Bot, update *mode
 			return
 		}
 
-		magnetLink := strings.Join(args, " ")
+		magnetLink := strings.Join(parts[1:], " ")
 		if !strings.HasPrefix(magnetLink, "magnet:?") {
 			b.sendMessage(ctx, chatID, messageThreadID, "[Error] Invalid magnet link")
 
@@ -238,9 +235,8 @@ func (b *Bot) handleInfoCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "info")
 
-		cmdArgs := strings.TrimPrefix(update.Message.Text, "/info")
-		args := strings.Fields(strings.TrimSpace(cmdArgs))
-		if len(args) == 0 {
+		parts := strings.Fields(update.Message.Text)
+		if len(parts) < 2 {
 			b.sendMessage(ctx, chatID, messageThreadID, "Usage: /info <torrent_id>")
 
 			// Log failed command
@@ -250,7 +246,7 @@ func (b *Bot) handleInfoCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 			return
 		}
 
-		torrentID := args[0]
+		torrentID := parts[1]
 
 		// Log activity
 		if user != nil {
@@ -368,9 +364,8 @@ func (b *Bot) handleDeleteCommand(ctx context.Context, tgBot *bot.Bot, update *m
 			return
 		}
 
-		cmdText := strings.TrimPrefix(update.Message.Text, "/delete")
-		args := strings.Fields(strings.TrimSpace(cmdText))
-		if len(args) == 0 {
+		parts := strings.Fields(update.Message.Text)
+		if len(parts) < 2 {
 			b.sendMessage(ctx, chatID, messageThreadID, "Usage: /delete <torrent_id>")
 
 			// Log failed command
@@ -380,7 +375,7 @@ func (b *Bot) handleDeleteCommand(ctx context.Context, tgBot *bot.Bot, update *m
 			return
 		}
 
-		torrentID := args[0]
+		torrentID := parts[1]
 		if err := b.rdClient.DeleteTorrent(torrentID); err != nil {
 			b.sendMessage(ctx, chatID, messageThreadID, fmt.Sprintf("[Error] %v", err))
 
@@ -409,9 +404,8 @@ func (b *Bot) handleUnrestrictCommand(ctx context.Context, tgBot *bot.Bot, updat
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "unrestrict")
 
-		cmdArgs := strings.TrimPrefix(update.Message.Text, "/unrestrict")
-		args := strings.Fields(strings.TrimSpace(cmdArgs))
-		if len(args) == 0 {
+		parts := strings.Fields(update.Message.Text)
+		if len(parts) < 2 {
 			b.sendMessage(ctx, chatID, messageThreadID, "Usage: /unrestrict <link>")
 
 			// Log failed command
@@ -421,7 +415,7 @@ func (b *Bot) handleUnrestrictCommand(ctx context.Context, tgBot *bot.Bot, updat
 			return
 		}
 
-		link := strings.Join(args, " ")
+		link := strings.Join(parts[1:], " ")
 		unrestricted, err := b.rdClient.UnrestrictLink(link)
 		if err != nil {
 			b.sendMessage(ctx, chatID, messageThreadID, fmt.Sprintf("[Error] %v", err))
@@ -551,9 +545,8 @@ func (b *Bot) handleRemoveLinkCommand(ctx context.Context, tgBot *bot.Bot, updat
 			return
 		}
 
-		cmdArgs := strings.TrimPrefix(update.Message.Text, "/removelink")
-		args := strings.Fields(strings.TrimSpace(cmdArgs))
-		if len(args) == 0 {
+		parts := strings.Fields(update.Message.Text)
+		if len(parts) < 2 {
 			b.sendMessage(ctx, chatID, messageThreadID, "Usage: /removelink <download_id>")
 
 			// Log failed command
@@ -563,7 +556,7 @@ func (b *Bot) handleRemoveLinkCommand(ctx context.Context, tgBot *bot.Bot, updat
 			return
 		}
 
-		downloadID := args[0]
+		downloadID := parts[1]
 		if err := b.rdClient.DeleteDownload(downloadID); err != nil {
 			b.sendMessage(ctx, chatID, messageThreadID, fmt.Sprintf("[Error] %v", err))
 
