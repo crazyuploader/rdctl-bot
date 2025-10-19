@@ -26,3 +26,17 @@ app:
   rate_limit:
     messages_per_second: 25 # Stay under Telegram's 30/s limit
     burst: 5
+
+database:
+  # Database host
+  host: "localhost"
+  # Database port
+  port: 5432
+  # Database user
+  user: "postgres"
+  # Database password
+  password: "your_password"
+  # Database name
+  dbname: "rdctl_bot"
+  # SSL mode for database connection (e.g., "disable", "require")
+  sslmode: "disable"

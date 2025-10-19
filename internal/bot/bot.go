@@ -11,17 +11,25 @@ import (
 	"time"
 
 	"github.com/crazyuploader/rdctl-bot/internal/config"
+	"github.com/crazyuploader/rdctl-bot/internal/db"
 	"github.com/crazyuploader/rdctl-bot/internal/realdebrid"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+	"gorm.io/gorm"
 )
 
 // Bot represents the Telegram bot
 type Bot struct {
-	api        *bot.Bot
-	rdClient   *realdebrid.Client
-	middleware *Middleware
-	config     *config.Config
+	api          *bot.Bot
+	rdClient     *realdebrid.Client
+	middleware   *Middleware
+	config       *config.Config
+	db           *gorm.DB
+	userRepo     *db.UserRepository
+	activityRepo *db.ActivityRepository
+	torrentRepo  *db.TorrentRepository
+	downloadRepo *db.DownloadRepository
+	commandRepo  *db.CommandRepository
 }
 
 // NewBot creates a new bot instance
@@ -64,11 +72,23 @@ func NewBot(cfg *config.Config, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, 
 
 	log.Printf("Authorized on account @%s", me.Username)
 
+	// Initialize database
+	database, err := db.Init(cfg.Database.GetDSN())
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
+	}
+
 	return &Bot{
-		api:        api,
-		rdClient:   rdClient,
-		middleware: middleware,
-		config:     cfg,
+		api:          api,
+		rdClient:     rdClient,
+		middleware:   middleware,
+		config:       cfg,
+		db:           database,
+		userRepo:     db.NewUserRepository(database),
+		activityRepo: db.NewActivityRepository(database),
+		torrentRepo:  db.NewTorrentRepository(database),
+		downloadRepo: db.NewDownloadRepository(database),
+		commandRepo:  db.NewCommandRepository(database),
 	}, nil
 }
 
@@ -112,6 +132,10 @@ func (b *Bot) registerHandlers() {
 
 // Stop gracefully stops the bot
 func (b *Bot) Stop() {
+	log.Println("Bot stopping...")
+	if err := db.Close(); err != nil {
+		log.Printf("Error closing database: %v", err)
+	}
 	log.Println("Bot stopped")
 }
 
@@ -120,20 +144,17 @@ func defaultHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 	// Silently ignore unhandled updates
 }
 
-// Helper to check authorization and execute handler
-func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool)) {
-	var chatID int64
-	var messageThreadID int
-	var username string
-
+// getUserFromUpdate extracts user information from an update
+func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThreadID int, username, firstName, lastName string) {
 	if update.Message != nil {
 		chatID = update.Message.Chat.ID
 		if update.Message.MessageThreadID != 0 {
 			messageThreadID = update.Message.MessageThreadID
 		}
-		username = update.Message.From.Username
-		if username == "" {
-			username = update.Message.From.FirstName
+		if update.Message.From != nil {
+			username = update.Message.From.Username
+			firstName = update.Message.From.FirstName
+			lastName = update.Message.From.LastName
 		}
 	} else if update.CallbackQuery != nil {
 		chatID = update.CallbackQuery.Message.Message.Chat.ID
@@ -141,19 +162,41 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 			messageThreadID = update.CallbackQuery.Message.Message.MessageThreadID
 		}
 		username = update.CallbackQuery.From.Username
-		if username == "" {
-			username = update.CallbackQuery.From.FirstName
-		}
+		firstName = update.CallbackQuery.From.FirstName
+		lastName = update.CallbackQuery.From.LastName
 	}
 
+	if username == "" {
+		username = firstName
+	}
+
+	return
+}
+
+// Helper to check authorization and execute handler
+func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User)) {
+	chatID, messageThreadID, username, firstName, lastName := b.getUserFromUpdate(update)
+
 	isAllowed, isSuperAdmin := b.middleware.CheckAuthorization(chatID)
+
+	// Get or create user
+	user, err := b.userRepo.GetOrCreateUser(chatID, username, firstName, lastName, isSuperAdmin, isAllowed)
+	if err != nil {
+		log.Printf("Error getting/creating user: %v", err)
+	}
+
 	if !isAllowed {
 		b.middleware.LogUnauthorized(username, chatID)
 		b.sendUnauthorizedMessage(ctx, chatID, messageThreadID)
+
+		// Log unauthorized attempt
+		if user != nil {
+			b.activityRepo.LogActivity(user.ID, chatID, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil)
+		}
 		return
 	}
 
-	handler(ctx, chatID, messageThreadID, isSuperAdmin)
+	handler(ctx, chatID, messageThreadID, isSuperAdmin, user)
 }
 
 // sendUnauthorizedMessage sends an unauthorized message
