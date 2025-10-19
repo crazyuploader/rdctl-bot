@@ -41,6 +41,8 @@ func (r *UserRepository) GetOrCreateUser(chatID int64, username, firstName, last
 			"username":     username,
 			"first_name":   firstName,
 			"last_name":    lastName,
+			"is_super_admin": isSuperAdmin,
+			"is_allowed":   isAllowed,
 			"last_seen_at": now,
 		}),
 	}).Create(&user)
