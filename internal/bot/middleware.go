@@ -29,8 +29,8 @@ func NewMiddleware(cfg *config.Config) *Middleware {
 }
 
 // CheckAuthorization verifies if the user is allowed to use the bot
-func (m *Middleware) CheckAuthorization(chatID int64) (bool, bool) {
-	isSuperAdmin := m.config.IsSuperAdmin(chatID)
+func (m *Middleware) CheckAuthorization(chatID, userID int64) (bool, bool) {
+	isSuperAdmin := m.config.IsSuperAdmin(userID)
 	isAllowed := m.config.IsAllowedChat(chatID) || isSuperAdmin
 
 	return isAllowed, isSuperAdmin

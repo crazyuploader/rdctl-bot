@@ -136,7 +136,7 @@ func defaultHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 }
 
 // getUserFromUpdate extracts user information from an update
-func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThreadID int, username, firstName, lastName string) {
+func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThreadID int, username, firstName, lastName string, userID int64) {
 	if update.Message != nil {
 		chatID = update.Message.Chat.ID
 		if update.Message.MessageThreadID != 0 {
@@ -146,6 +146,7 @@ func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThr
 			username = update.Message.From.Username
 			firstName = update.Message.From.FirstName
 			lastName = update.Message.From.LastName
+			userID = update.Message.From.ID
 		}
 	} else if update.CallbackQuery != nil {
 		if update.CallbackQuery.Message.Message != nil {
@@ -157,6 +158,7 @@ func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThr
 		username = update.CallbackQuery.From.Username
 		firstName = update.CallbackQuery.From.FirstName
 		lastName = update.CallbackQuery.From.LastName
+		userID = update.CallbackQuery.From.ID
 	}
 
 	if username == "" {
@@ -167,9 +169,9 @@ func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThr
 
 // withAuth is a middleware to check authorization and execute the handler
 func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User)) {
-	chatID, messageThreadID, username, firstName, lastName := b.getUserFromUpdate(update)
+	chatID, messageThreadID, username, firstName, lastName, userID := b.getUserFromUpdate(update)
 
-	isAllowed, isSuperAdmin := b.middleware.CheckAuthorization(chatID)
+	isAllowed, isSuperAdmin := b.middleware.CheckAuthorization(chatID, userID)
 
 	user, err := b.userRepo.GetOrCreateUser(chatID, username, firstName, lastName, isSuperAdmin, isAllowed)
 	if err != nil {

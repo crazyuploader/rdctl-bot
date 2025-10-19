@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -196,12 +197,7 @@ func (c *Config) IsAllowedChat(chatID int64) bool {
 	return false
 }
 
-// IsSuperAdmin checks if a chat ID belongs to a super admin
-func (c *Config) IsSuperAdmin(chatID int64) bool {
-	for _, id := range c.Telegram.SuperAdminIDs {
-		if id == chatID {
-			return true
-		}
-	}
-	return false
+// IsSuperAdmin checks if a user ID belongs to a super admin
+func (c *Config) IsSuperAdmin(userID int64) bool {
+	return slices.Contains(c.Telegram.SuperAdminIDs, userID)
 }
