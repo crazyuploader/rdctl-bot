@@ -58,10 +58,8 @@ type ActivityLog struct {
 	ActivityType    ActivityType `gorm:"index;not null"`
 	Command         string       `gorm:"index"`
 	MessageThreadID int
-	Success         bool   `gorm:"default:true"`
-	ErrorMessage    string `gorm:"type:text"`
-	IPAddress       string
-	UserAgent       string
+	Success         bool      `gorm:"default:true"`
+	ErrorMessage    string    `gorm:"type:text"`
 	Metadata        string    `gorm:"type:jsonb"` // Store additional data as JSON
 	CreatedAt       time.Time `gorm:"index"`
 
