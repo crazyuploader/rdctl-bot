@@ -63,7 +63,11 @@ func (d *DatabaseConfig) GetDSN() string {
 		d.Host, d.User, d.Password, d.DBName, d.Port, d.SSLMode)
 }
 
-// Load reads configuration from file and environment variables
+// Load reads configuration into a Config from the specified file or from standard locations,
+// supports overriding via environment variables prefixed with TGRD (dots replaced by underscores),
+// unmarshals the resulting configuration, and validates it before returning it or an error.
+// If cfgFile is non-empty it is used as the config file; otherwise a YAML file named "config"
+// is searched for in the current directory, $HOME/.telegram-rd-bot, and /etc/telegram-rd-bot.
 func Load(cfgFile string) (*Config, error) {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)

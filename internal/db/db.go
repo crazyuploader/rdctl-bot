@@ -13,7 +13,8 @@ import (
 
 var DB *gorm.DB
 
-// Init initializes the database connection
+// Init initializes the global database handle using the provided DSN, configures the connection pool, and runs automatic migrations.
+// It opens a PostgreSQL connection with a custom GORM logger and UTC timestamps, applies connection pool settings (max idle 10, max open 100, conn max lifetime 1h), runs AutoMigrate for the application's models, assigns the resulting *gorm.DB to the package-level DB, and returns it. An error is returned if connecting, obtaining the underlying sql.DB, or running migrations fails.
 func Init(dsn string) (*gorm.DB, error) {
 	// Configure custom logger
 	newLogger := logger.New(
@@ -57,7 +58,9 @@ func Init(dsn string) (*gorm.DB, error) {
 	return db, nil
 }
 
-// runMigrations runs all database migrations
+// runMigrations performs automatic schema migrations for the application's models.
+// It migrates the User, ActivityLog, TorrentActivity, DownloadActivity and CommandLog
+// models and returns any error encountered during migration.
 func runMigrations(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&User{},
@@ -68,7 +71,9 @@ func runMigrations(db *gorm.DB) error {
 	)
 }
 
-// Close closes the database connection
+// Close closes the underlying database connection initialized by Init.
+// If the package DB is nil, Close does nothing and returns nil.
+// Any error encountered while retrieving the underlying sql.DB or while closing it is returned.
 func Close() error {
 	if DB != nil {
 		sqlDB, err := DB.DB()
