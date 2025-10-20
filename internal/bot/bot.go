@@ -173,7 +173,7 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 
 	isAllowed, isSuperAdmin := b.middleware.CheckAuthorization(chatID, userID)
 
-	user, err := b.userRepo.GetOrCreateUser(chatID, username, firstName, lastName, isSuperAdmin, isAllowed)
+	user, err := b.userRepo.GetOrCreateUser(userID, username, firstName, lastName, isSuperAdmin)
 	if err != nil {
 		log.Printf("Error getting/creating user: %v", err)
 		if chatID != 0 {
@@ -190,8 +190,8 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 	}
 
 	if !isAllowed {
-		b.middleware.LogUnauthorized(username, chatID)
-		b.sendUnauthorizedMessage(ctx, chatID, messageThreadID)
+		b.middleware.LogUnauthorized(username, chatID, userID)
+		b.sendUnauthorizedMessage(ctx, chatID, messageThreadID, userID)
 		if user != nil {
 			b.activityRepo.LogActivity(user.ID, chatID, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil)
 		}
@@ -202,9 +202,14 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 }
 
 // sendUnauthorizedMessage sends an unauthorized message
-func (b *Bot) sendUnauthorizedMessage(ctx context.Context, chatID int64, messageThreadID int) {
+func (b *Bot) sendUnauthorizedMessage(ctx context.Context, chatID int64, messageThreadID int, userID int64) {
 	text := fmt.Sprintf(
-		"[UNAUTHORIZED]\n\nYou are not authorized to use this bot.\n\nYour Chat ID is: <code>%d</code>\n\nPlease contact the administrator for access.",
+		"[UNAUTHORIZED]\n\n"+
+			"You are not authorized to use this bot.\n\n"+
+			"Your User ID is: <code>%d</code>\n"+
+			"Chat ID: <code>%d</code>\n\n"+
+			"Please contact the administrator to add your User ID to the super admin list or add this chat to the allowed chats list.",
+		userID,
 		chatID,
 	)
 

@@ -9,12 +9,11 @@ import (
 // User represents a Telegram user
 type User struct {
 	ID            uint   `gorm:"primaryKey"`
-	ChatID        int64  `gorm:"uniqueIndex;not null"`
+	UserID        int64  `gorm:"uniqueIndex;not null"`
 	Username      string `gorm:"index"`
 	FirstName     string
 	LastName      string
 	IsSuperAdmin  bool      `gorm:"default:false"`
-	IsAllowed     bool      `gorm:"default:false"`
 	FirstSeenAt   time.Time `gorm:"not null"`
 	LastSeenAt    time.Time `gorm:"not null"`
 	TotalCommands int       `gorm:"default:0"`
