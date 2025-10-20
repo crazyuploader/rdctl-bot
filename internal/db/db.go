@@ -9,6 +9,8 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/crazyuploader/rdctl-bot/internal/config"
 )
 
 var DB *gorm.DB
@@ -23,14 +25,25 @@ var DB *gorm.DB
 // The function returns the configured *gorm.DB on success, or an error if connecting, obtaining the
 // underlying sql.DB, or running migrations fails.
 func Init(dsn string) (*gorm.DB, error) {
+	cfg := config.Get()
+	isDebug := cfg != nil && cfg.App.LogLevel == "debug"
+
 	// Configure custom logger
+	logLevel := logger.Warn
+	paramQueries := true
+	if isDebug {
+		logLevel = logger.Info
+		paramQueries = false
+	}
+
 	newLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags),
 		logger.Config{
 			SlowThreshold:             200 * time.Millisecond,
-			LogLevel:                  logger.Info,
+			LogLevel:                  logLevel,
 			IgnoreRecordNotFoundError: true,
 			Colorful:                  true,
+			ParameterizedQueries:      paramQueries,
 		},
 	)
 
