@@ -6,124 +6,130 @@ import (
 	"gorm.io/gorm"
 )
 
-// User represents a Telegram user
+// User represents a Telegram user in the system.
+// It stores user information and activity tracking data.
 type User struct {
-	ID            uint   `gorm:"primaryKey"`
-	UserID        int64  `gorm:"uniqueIndex;not null"`
-	Username      string `gorm:"index"`
-	FirstName     string
-	LastName      string
-	IsSuperAdmin  bool      `gorm:"default:false"`
-	IsAllowed     bool      `gorm:"default:false"` // Not used anymore, kept for migration compatibility
-	FirstSeenAt   time.Time `gorm:"not null"`
-	LastSeenAt    time.Time `gorm:"not null"`
-	TotalCommands int       `gorm:"default:0"`
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	DeletedAt     gorm.DeletedAt `gorm:"index"`
+	ID            uint           `gorm:"primaryKey"`           // Unique identifier for the user in the database
+	UserID        int64          `gorm:"uniqueIndex;not null"` // Telegram user ID (unique identifier from Telegram)
+	Username      string         `gorm:"index"`                // Telegram username (may be empty)
+	FirstName     string         // User's first name
+	LastName      string         // User's last name
+	IsSuperAdmin  bool           `gorm:"default:false"` // Indicates if the user has super admin privileges
+	IsAllowed     bool           `gorm:"default:false"` // Legacy field - not used anymore, kept for migration compatibility
+	FirstSeenAt   time.Time      `gorm:"not null"`      // Timestamp of when the user was first seen by the bot
+	LastSeenAt    time.Time      `gorm:"not null"`      // Timestamp of when the user was last active
+	TotalCommands int            `gorm:"default:0"`     // Count of commands executed by the user
+	CreatedAt     time.Time      // When the user record was created
+	UpdatedAt     time.Time      // When the user record was last updated
+	DeletedAt     gorm.DeletedAt `gorm:"index"` // Soft delete timestamp
 }
 
-// ActivityType represents the type of activity
+// ActivityType represents the type of activity performed by a user.
+// It's used to categorize different actions in the activity log.
 type ActivityType string
 
 const (
-	ActivityTypeTorrentAdd         ActivityType = "torrent_add"
-	ActivityTypeTorrentDelete      ActivityType = "torrent_delete"
-	ActivityTypeTorrentInfo        ActivityType = "torrent_info"
-	ActivityTypeTorrentList        ActivityType = "torrent_list"
-	ActivityTypeDownloadUnrestrict ActivityType = "download_unrestrict"
-	ActivityTypeDownloadList       ActivityType = "download_list"
-	ActivityTypeDownloadDelete     ActivityType = "download_delete"
-	ActivityTypeCommandStart       ActivityType = "command_start"
-	ActivityTypeCommandHelp        ActivityType = "command_help"
-	ActivityTypeCommandStatus      ActivityType = "command_status"
-	ActivityTypeMagnetLink         ActivityType = "magnet_link"
-	ActivityTypeHosterLink         ActivityType = "hoster_link"
-	ActivityTypeUnauthorized       ActivityType = "unauthorized"
-	ActivityTypeError              ActivityType = "error"
+	ActivityTypeTorrentAdd         ActivityType = "torrent_add"         // User added a torrent
+	ActivityTypeTorrentDelete      ActivityType = "torrent_delete"      // User deleted a torrent
+	ActivityTypeTorrentInfo        ActivityType = "torrent_info"        // User requested torrent information
+	ActivityTypeTorrentList        ActivityType = "torrent_list"        // User listed torrents
+	ActivityTypeDownloadUnrestrict ActivityType = "download_unrestrict" // User unrestricted a download
+	ActivityTypeDownloadList       ActivityType = "download_list"       // User listed downloads
+	ActivityTypeDownloadDelete     ActivityType = "download_delete"     // User deleted a download
+	ActivityTypeCommandStart       ActivityType = "command_start"       // User started the bot
+	ActivityTypeCommandHelp        ActivityType = "command_help"        // User requested help
+	ActivityTypeCommandStatus      ActivityType = "command_status"      // User checked status
+	ActivityTypeMagnetLink         ActivityType = "magnet_link"         // User used a magnet link
+	ActivityTypeHosterLink         ActivityType = "hoster_link"         // User used a hoster link
+	ActivityTypeUnauthorized       ActivityType = "unauthorized"        // Unauthorized access attempt
+	ActivityTypeError              ActivityType = "error"               // An error occurred
 )
 
-// ActivityLog is the main activity logging table
+// ActivityLog tracks general user activities in the system.
+// It records what actions users perform and their outcomes.
 type ActivityLog struct {
-	ID              uint         `gorm:"primaryKey"`
-	UserID          uint         `gorm:"index;not null"`
-	ChatID          int64        `gorm:"index;not null"`
-	Username        string       `gorm:"index"`
-	ActivityType    ActivityType `gorm:"index;not null"`
-	Command         string       `gorm:"index"`
-	MessageThreadID int
-	Success         bool      `gorm:"default:true"`
-	ErrorMessage    string    `gorm:"type:text"`
-	Metadata        string    `gorm:"type:jsonb"` // Store additional data as JSON
-	CreatedAt       time.Time `gorm:"index"`
+	ID              uint         `gorm:"primaryKey"`     // Unique identifier for the activity log entry
+	UserID          uint         `gorm:"index;not null"` // ID of the user who performed the activity
+	ChatID          int64        `gorm:"index;not null"` // Telegram chat ID where the activity occurred
+	Username        string       `gorm:"index"`          // Username of the user (may be empty)
+	ActivityType    ActivityType `gorm:"index;not null"` // Type of activity performed
+	Command         string       `gorm:"index"`          // Command that was executed (if applicable)
+	MessageThreadID int          // ID of the message thread (if in a thread)
+	Success         bool         `gorm:"default:true"` // Whether the activity was successful
+	ErrorMessage    string       `gorm:"type:text"`    // Error message if the activity failed
+	Metadata        string       `gorm:"type:jsonb"`   // Additional data stored as JSON
+	CreatedAt       time.Time    `gorm:"index"`        // When the activity was recorded
 
 	// Relationships
-	User User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	User User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"` // Reference to the User who performed the activity
 }
 
-// TorrentActivity tracks torrent-specific activities
+// TorrentActivity tracks torrent-specific activities performed by users.
+// It records detailed information about torrent operations.
 type TorrentActivity struct {
-	ID            uint   `gorm:"primaryKey"`
-	UserID        uint   `gorm:"index;not null"`
-	ChatID        int64  `gorm:"index;not null"`
-	TorrentID     string `gorm:"index;not null"`
-	TorrentHash   string `gorm:"index"`
-	TorrentName   string
-	MagnetLink    string `gorm:"type:text"`
-	Action        string `gorm:"index;not null"` // add, delete, info, select_files
-	Status        string
-	FileSize      int64
-	Progress      float64
-	Success       bool      `gorm:"default:true"`
-	ErrorMessage  string    `gorm:"type:text"`
-	Metadata      string    `gorm:"type:jsonb;default:'{}'"`
-	CreatedAt     time.Time `gorm:"index"`
-	SelectedFiles string    `gorm:"type:jsonb;not null;default:'[]'"` // Stores selected files as JSON array
+	ID            uint      `gorm:"primaryKey"`     // Unique identifier for the torrent activity
+	UserID        uint      `gorm:"index;not null"` // ID of the user who performed the activity
+	ChatID        int64     `gorm:"index;not null"` // Telegram chat ID where the activity occurred
+	TorrentID     string    `gorm:"index;not null"` // Unique identifier for the torrent
+	TorrentHash   string    `gorm:"index"`          // Hash of the torrent
+	TorrentName   string    // Name of the torrent
+	MagnetLink    string    `gorm:"type:text"`      // Magnet link for the torrent
+	Action        string    `gorm:"index;not null"` // Action performed (add, delete, info, select_files)
+	Status        string    // Current status of the torrent operation
+	FileSize      int64     // Size of the torrent in bytes
+	Progress      float64   // Progress of the torrent operation (0.0 to 1.0)
+	Success       bool      `gorm:"default:true"`                     // Whether the operation was successful
+	ErrorMessage  string    `gorm:"type:text"`                        // Error message if the operation failed
+	Metadata      string    `gorm:"type:jsonb;default:'{}'"`          // Additional data stored as JSON
+	CreatedAt     time.Time `gorm:"index"`                            // When the activity was recorded
+	SelectedFiles string    `gorm:"type:jsonb;not null;default:'[]'"` // Selected files stored as JSON array
 
 	// Relationships
-	User               User               `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
-	DownloadActivities []DownloadActivity `gorm:"foreignKey:TorrentActivityID"`
+	User               User               `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"` // Reference to the User
+	DownloadActivities []DownloadActivity `gorm:"foreignKey:TorrentActivityID"`                  // Related download activities
 }
 
-// DownloadActivity tracks download/unrestrict activities
+// DownloadActivity tracks download/unrestrict activities.
+// It records detailed information about file downloads and unrestrict operations.
 type DownloadActivity struct {
-	ID                uint   `gorm:"primaryKey"`
-	UserID            uint   `gorm:"index;not null"`
-	ChatID            int64  `gorm:"index;not null"`
-	DownloadID        string `gorm:"index"`
-	OriginalLink      string `gorm:"type:text"`
-	FileName          string
-	FileSize          int64
-	Host              string    `gorm:"index"`
-	Action            string    `gorm:"index;not null"` // unrestrict, list, delete
-	Success           bool      `gorm:"default:true"`
-	ErrorMessage      string    `gorm:"type:text"`
-	Metadata          string    `gorm:"type:jsonb"`
-	CreatedAt         time.Time `gorm:"index"`
-	TorrentActivityID *uint     `gorm:"index"` // Links to originating torrent activity
+	ID                uint      `gorm:"primaryKey"`     // Unique identifier for the download activity
+	UserID            uint      `gorm:"index;not null"` // ID of the user who performed the activity
+	ChatID            int64     `gorm:"index;not null"` // Telegram chat ID where the activity occurred
+	DownloadID        string    `gorm:"index"`          // Unique identifier for the download
+	OriginalLink      string    `gorm:"type:text"`      // Original link that was downloaded or unrestricted
+	FileName          string    // Name of the downloaded file
+	FileSize          int64     // Size of the file in bytes
+	Host              string    `gorm:"index"`          // Host service where the file is stored
+	Action            string    `gorm:"index;not null"` // Action performed (unrestrict, list, delete)
+	Success           bool      `gorm:"default:true"`   // Whether the operation was successful
+	ErrorMessage      string    `gorm:"type:text"`      // Error message if the operation failed
+	Metadata          string    `gorm:"type:jsonb"`     // Additional data stored as JSON
+	CreatedAt         time.Time `gorm:"index"`          // When the activity was recorded
+	TorrentActivityID *uint     `gorm:"index"`          // Optional reference to a related TorrentActivity
 
 	// Relationships
-	User            User             `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
-	TorrentActivity *TorrentActivity `gorm:"foreignKey:TorrentActivityID;constraint:OnDelete:SET NULL"`
+	User            User             `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`             // Reference to the User
+	TorrentActivity *TorrentActivity `gorm:"foreignKey:TorrentActivityID;constraint:OnDelete:SET NULL"` // Optional reference to TorrentActivity
 }
 
-// CommandLog tracks all command executions
+// CommandLog tracks all command executions in the system.
+// It records detailed information about commands users run.
 type CommandLog struct {
-	ID              uint   `gorm:"primaryKey"`
-	UserID          uint   `gorm:"index;not null"`
-	ChatID          int64  `gorm:"index;not null"`
-	Username        string `gorm:"index"`
-	Command         string `gorm:"index;not null"`
-	FullCommand     string `gorm:"type:text"`
-	MessageThreadID int
-	ExecutionTime   int64  // milliseconds
-	Success         bool   `gorm:"default:true"`
-	ErrorMessage    string `gorm:"type:text"`
-	ResponseLength  int
-	CreatedAt       time.Time `gorm:"index"`
+	ID              uint      `gorm:"primaryKey"`      // Unique identifier for the command log entry
+	UserID          uint      `gorm:"index;not null"`  // ID of the user who executed the command
+	ChatID          int64     `gorm:"index;not null"`  // Telegram chat ID where the command was executed
+	Username        string    `gorm:"index"`           // Username of the user (may be empty)
+	Command         string    `gorm:"index; not null"` // The command that was executed
+	FullCommand     string    `gorm:"type:text"`       // The full command with arguments
+	MessageThreadID int       // ID of the message thread (if in a thread)
+	ExecutionTime   int64     // Execution time in milliseconds
+	Success         bool      `gorm:"default:true"` // Whether the command was successful
+	ErrorMessage    string    `gorm:"type:text"`    // Error message if the command failed
+	ResponseLength  int       // Length of the response in bytes
+	CreatedAt       time.Time `gorm:"index"` // When the command was executed
 
 	// Relationships
-	User User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	User User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"` // Reference to the User
 }
 
 // TableName overrides

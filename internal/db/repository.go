@@ -9,17 +9,21 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// UserRepository handles user operations
+// UserRepository handles all database operations related to User entities.
+// It provides methods for creating, retrieving, and updating user information.
 type UserRepository struct {
 	db *gorm.DB
 }
 
-// NewUserRepository creates a UserRepository using the provided gorm.DB.
+// NewUserRepository creates a new UserRepository instance with the provided database connection.
+// It initializes the repository with the given *gorm.DB instance for all subsequent operations.
 func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-// GetOrCreateUser gets or creates a user based on their Telegram user ID
+// GetOrCreateUser retrieves an existing user by their Telegram user ID or creates a new user record if one doesn't exist.
+// This function performs an upsert operation, updating existing user records with new information while preserving their ID.
+// It returns the updated user record and any error encountered during the operation.
 func (r *UserRepository) GetOrCreateUser(userID int64, username, firstName, lastName string, isSuperAdmin bool) (*User, error) {
 	now := time.Now().UTC()
 	user := User{
@@ -57,17 +61,22 @@ func (r *UserRepository) GetOrCreateUser(userID int64, username, firstName, last
 	return &updatedUser, nil
 }
 
-// ActivityRepository handles activity logging
+// ActivityRepository handles all database operations related to activity logging.
+// It provides methods for recording and retrieving user activities in the system.
 type ActivityRepository struct {
 	db *gorm.DB
 }
 
-// NewActivityRepository returns a new ActivityRepository using the provided GORM DB handle.
+// NewActivityRepository creates a new ActivityRepository instance with the provided database connection.
+// It initializes the repository with the given *gorm.DB instance for all subsequent operations.
 func NewActivityRepository(db *gorm.DB) *ActivityRepository {
 	return &ActivityRepository{db: db}
 }
 
-// LogActivity logs a general activity
+// LogActivity records a general activity performed by a user in the system.
+// This function creates a new ActivityLog entry with the provided details.
+// It converts the metadata map to JSON format before storing it in the database.
+// The function returns any error encountered during the database operation.
 func (r *ActivityRepository) LogActivity(userID uint, chatID int64, username string, activityType ActivityType, command string, messageThreadID int, success bool, errorMsg string, metadata map[string]interface{}) error {
 	metadataJSON, err := json.Marshal(metadata)
 	if err != nil {
@@ -90,17 +99,22 @@ func (r *ActivityRepository) LogActivity(userID uint, chatID int64, username str
 	return r.db.Create(&activity).Error
 }
 
-// TorrentRepository handles torrent activity logging
+// TorrentRepository handles all database operations related to torrent activities.
+// It provides methods for recording and retrieving torrent-specific operations.
 type TorrentRepository struct {
 	db *gorm.DB
 }
 
-// NewTorrentRepository creates and returns a TorrentRepository backed by the provided gorm.DB.
+// NewTorrentRepository creates a new TorrentRepository instance with the provided database connection.
+// It initializes the repository with the given *gorm.DB instance for all subsequent operations.
 func NewTorrentRepository(db *gorm.DB) *TorrentRepository {
 	return &TorrentRepository{db: db}
 }
 
-// LogTorrentActivity logs torrent-specific activity
+// LogTorrentActivity records a torrent-specific activity performed by a user.
+// This function creates a new TorrentActivity entry with the provided details.
+// It ensures metadata is properly formatted as JSON and provides default values for optional fields.
+// The function returns any error encountered during the database operation.
 func (r *TorrentRepository) LogTorrentActivity(userID uint, chatID int64, torrentID, torrentHash, torrentName, magnetLink, action, status string, fileSize int64, progress float64, success bool, errorMsg string, metadata map[string]interface{}) error {
 	// Ensure metadata is never nil
 	if metadata == nil {
@@ -135,7 +149,10 @@ func (r *TorrentRepository) LogTorrentActivity(userID uint, chatID int64, torren
 	return r.db.Create(&activity).Error
 }
 
-// GetTorrentActivities retrieves torrent activities with filters
+// GetTorrentActivities retrieves torrent activities from the database with optional filtering.
+// This function allows fetching torrent activities for a specific user or all users.
+// It orders results by creation time in descending order and applies a limit if specified.
+// The function returns the retrieved activities and any error encountered during the operation.
 func (r *TorrentRepository) GetTorrentActivities(userID uint, limit int) ([]TorrentActivity, error) {
 	var activities []TorrentActivity
 	query := r.db.Order("created_at DESC")
@@ -152,19 +169,22 @@ func (r *TorrentRepository) GetTorrentActivities(userID uint, limit int) ([]Torr
 	return activities, err
 }
 
-// DownloadRepository handles download activity logging
+// DownloadRepository handles all database operations related to download activities.
+// It provides methods for recording and retrieving download/unrestrict operations.
 type DownloadRepository struct {
 	db *gorm.DB
 }
 
-// NewDownloadRepository returns a DownloadRepository configured with the provided GORM database handle.
-//
-// NewDownloadRepository creates a DownloadRepository that uses the provided *gorm.DB for persistence.
+// NewDownloadRepository creates a new DownloadRepository instance with the provided database connection.
+// It initializes the repository with the given *gorm.DB instance for all subsequent operations.
 func NewDownloadRepository(db *gorm.DB) *DownloadRepository {
 	return &DownloadRepository{db: db}
 }
 
-// LogDownloadActivity logs download/unrestrict activity with optional torrent association
+// LogDownloadActivity records a download/unrestrict activity performed by a user.
+// This function creates a new DownloadActivity entry with the provided details.
+// It ensures metadata is properly formatted as JSON and handles optional torrent activity association.
+// The function returns any error encountered during the database operation.
 func (r *DownloadRepository) LogDownloadActivity(userID uint, chatID int64, downloadID, originalLink, fileName, host, action string, fileSize int64, success bool, errorMsg string, metadata map[string]interface{}, torrentActivityID *uint) error {
 	// Ensure metadata is never nil
 	if metadata == nil {
@@ -194,17 +214,22 @@ func (r *DownloadRepository) LogDownloadActivity(userID uint, chatID int64, down
 	return r.db.Create(&activity).Error
 }
 
-// CommandRepository handles command logging
+// CommandRepository handles all database operations related to command logging.
+// It provides methods for recording command executions and retrieving user statistics.
 type CommandRepository struct {
 	db *gorm.DB
 }
 
-// NewCommandRepository creates a new CommandRepository backed by the provided GORM DB handle.
+// NewCommandRepository creates a new CommandRepository instance with the provided database connection.
+// It initializes the repository with the given *gorm.DB instance for all subsequent operations.
 func NewCommandRepository(db *gorm.DB) *CommandRepository {
 	return &CommandRepository{db: db}
 }
 
-// LogCommand logs command execution and atomically increments the user's total_commands counter.
+// LogCommand logs a command execution and atomically increments the user's total_commands counter.
+// This function creates a new CommandLog entry and updates the user's command count in a single transaction.
+// It ensures data consistency by using a database transaction to perform both operations.
+// The function returns any error encountered during the transaction.
 func (r *CommandRepository) LogCommand(userID uint, chatID int64, username, command, fullCommand string, messageThreadID int, executionTime int64, success bool, errorMsg string, responseLength int) error {
 	cmdLog := CommandLog{
 		UserID:          userID,
@@ -235,12 +260,15 @@ func (r *CommandRepository) LogCommand(userID uint, chatID int64, username, comm
 	})
 }
 
-// GetUserStats retrieves user statistics
+// GetUserStats retrieves comprehensive statistics about a user's activities.
+// This function gathers information about the user's command usage, torrent activities,
+// and download operations from various tables in the database.
+// It returns a map containing the collected statistics and any error encountered during the operation.
 func (r *CommandRepository) GetUserStats(userID uint) (map[string]interface{}, error) {
 	var user User
 	err := r.db.First(&user, userID).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, errors.New("user not found") // Or a more specific error type
+		return nil, errors.New("user not found")
 	}
 	if err != nil {
 		return nil, err
