@@ -40,3 +40,7 @@ database:
   dbname: "rdctl_bot"
   # SSL mode for database connection (e.g., "disable", "require")
   sslmode: "disable"
+
+web:
+  listen_addr: ":8082"
+  api_key: "random_key"
