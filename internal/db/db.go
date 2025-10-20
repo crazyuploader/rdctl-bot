@@ -11,64 +11,63 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+// DB is the package-level database handle that will be initialized by the Init function.
+// It provides access to the database connection throughout the application.
 var DB *gorm.DB
 
-// Init initializes the global database handle using the provided DSN, configures the connection pool, and runs automatic migrations.
-// Init initializes the package-level GORM database connection using the provided PostgreSQL DSN.
-// It configures a custom GORM logger, forces UTC for timestamps, applies connection pool settings
-// (max idle connections 10, max open connections 100, connection max lifetime 1 hour), runs automatic
-// schema migrations for the application's models, assigns the configured *gorm.DB to the package-level
-// DB variable, and returns it.
-// The dsn parameter is the PostgreSQL connection string.
-// The function returns the configured *gorm.DB on success, or an error if connecting, obtaining the
-// underlying sql.DB, or running migrations fails.
+// Init initializes the database connection and performs schema migrations.
+// This function establishes a connection to a PostgreSQL database using the provided DSN,
+// configures the connection pool, sets up logging, and runs database migrations in the correct order.
+// It returns the configured *gorm.DB instance and any error encountered during the process.
 func Init(dsn string) (*gorm.DB, error) {
-	// Configure custom logger
+	// Configure custom logger for GORM
 	newLogger := logger.New(
 		log.New(os.Stdout, "\r\n", log.LstdFlags),
 		logger.Config{
-			SlowThreshold:             200 * time.Millisecond,
-			LogLevel:                  logger.Info,
-			IgnoreRecordNotFoundError: true,
-			Colorful:                  true,
+			SlowThreshold:             200 * time.Millisecond, // Log queries slower than this threshold
+			LogLevel:                  logger.Info,            // Log level (Info, Warn, Error, Silent)
+			IgnoreRecordNotFoundError: true,                   // Ignore "record not found" errors
+			Colorful:                  true,                   // Enable colored output
 		},
 	)
 
+	// Open a database connection with the provided DSN
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: newLogger,
 		NowFunc: func() time.Time {
-			return time.Now().UTC()
+			return time.Now().UTC() // Force UTC for all timestamps
 		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// Get underlying SQL DB to configure connection pool
+	// Get underlying SQL DB to configure connection pool settings
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get database instance: %w", err)
 	}
 
 	// Set connection pool settings
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
-	sqlDB.SetConnMaxLifetime(time.Hour)
+	sqlDB.SetMaxIdleConns(10)           // Maximum number of connections in the idle connection pool
+	sqlDB.SetMaxOpenConns(100)          // Maximum number of open connections to the database
+	sqlDB.SetConnMaxLifetime(time.Hour) // Maximum amount of time a connection may be reused
 
 	// Run migrations with proper ordering
 	if err := runMigrations(db); err != nil {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
+	// Assign the configured database handle to the package-level variable
 	DB = db
 	log.Println("Database connected and migrations completed successfully!")
 	return db, nil
 }
 
-// runMigrations performs automatic schema migrations for the application's models.
-// It migrates the User, ActivityLog, TorrentActivity, DownloadActivity and CommandLog
-// It returns any error encountered while migrating the User, ActivityLog, TorrentActivity, DownloadActivity, and CommandLog models.
-// CRITICAL: Tables must be migrated in dependency order (parent tables before children)
+// runMigrations performs automatic schema migrations for all application models.
+// This function migrates database tables in the correct order based on their dependencies.
+// It ensures that parent tables are migrated before child tables that reference them.
+// The function returns any error encountered during the migration process.
 func runMigrations(db *gorm.DB) error {
 	log.Println("Starting database migrations...")
 
@@ -104,9 +103,10 @@ func runMigrations(db *gorm.DB) error {
 	return nil
 }
 
-// Close closes the underlying database connection held in the package-level DB.
-// If DB is nil, Close does nothing and returns nil. Any error encountered while
-// obtaining the underlying *sql.DB or while closing it is returned.
+// Close closes the underlying database connection.
+// This function safely closes the database connection held in the package-level DB variable.
+// If DB is nil, Close does nothing and returns nil. Any error encountered while obtaining
+// the underlying *sql.DB or while closing it is returned.
 func Close() error {
 	if DB != nil {
 		sqlDB, err := DB.DB()

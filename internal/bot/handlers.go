@@ -17,7 +17,8 @@ import (
 	"github.com/go-telegram/bot/models"
 )
 
-// handleStartCommand handles the /start command
+// handleStartCommand handles the /start command.
+// It sends a welcome message to the user with basic information about the bot.
 func (b *Bot) handleStartCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
@@ -33,7 +34,7 @@ func (b *Bot) handleStartCommand(ctx context.Context, tgBot *bot.Bot, update *mo
 
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text)
 
-		// Log command
+		// Log command and activity
 		if user != nil {
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "start", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text))
 			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeCommandStart, "start", messageThreadID, true, "", nil)
@@ -41,7 +42,8 @@ func (b *Bot) handleStartCommand(ctx context.Context, tgBot *bot.Bot, update *mo
 	})
 }
 
-// handleHelpCommand handles the /help command
+// handleHelpCommand handles the /help command.
+// It sends a message with a list of all available commands and their descriptions.
 func (b *Bot) handleHelpCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
@@ -50,20 +52,20 @@ func (b *Bot) handleHelpCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		text := "<b>🧭 Available Commands</b>\n\n" +
 			"<b>🎬 Torrent Management:</b>\n" +
 			"• <code>/list</code> — List all active torrents\n" +
-			"• <code>/add &lt;magnet&gt;</code> — Add a new torrent via magnet link\n" +
-			"• <code>/info &lt;id&gt;</code> — Get detailed information about a torrent\n" +
-			"• <code>/delete &lt;id&gt;</code> — Delete a torrent <i>(superadmin only)</i>\n\n" +
+			"• <code>/add <magnet></code> — Add a new torrent via magnet link\n" +
+			"• <code>/info <id></code> — Get detailed information about a torrent\n" +
+			"• <code>/delete <id></code> — Delete a torrent <i>(superadmin only)</i>\n\n" +
 			"<b>📦 Hoster Link Management:</b>\n" +
-			"• <code>/unrestrict &lt;link&gt;</code> — Unrestrict a hoster link\n" +
+			"• <code>/unrestrict <link></code> — Unrestrict a hoster link\n" +
 			"• <code>/downloads</code> — List recent downloads\n" +
-			"• <code>/removelink &lt;id&gt;</code> — Remove a download from history <i>(superadmin only)</i>\n\n" +
+			"• <code>/removelink <id></code> — Remove a download from history <i>(superadmin only)</i>\n\n" +
 			"<b>⚙️ General Commands:</b>\n" +
 			"• <code>/status</code> — Show your Real-Debrid account status\n" +
 			"• <code>/help</code> — Display this help message"
 
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text)
 
-		// Log command
+		// Log command and activity
 		if user != nil {
 			b.commandRepo.LogCommand(user.ID, chatID, user.Username, "help", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text))
 			b.activityRepo.LogActivity(user.ID, chatID, user.Username, db.ActivityTypeCommandHelp, "help", messageThreadID, true, "", nil)
@@ -71,7 +73,8 @@ func (b *Bot) handleHelpCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 	})
 }
 
-// handleListCommand handles the /list command
+// handleListCommand handles the /list command.
+// It retrieves and displays a list of active torrents from Real-Debrid.
 func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
@@ -140,7 +143,7 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 			text.WriteString(fmt.Sprintf("<i>Showing the first %d torrents to avoid exceeding message length limits.</i>\n\n", torrentsShown))
 		}
 
-		text.WriteString("Use <code>/info &lt;id&gt;</code> for more details on a specific torrent.")
+		text.WriteString("Use <code>/info <id></code> for more details on a specific torrent.")
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String())
 
 		if user != nil {
@@ -150,7 +153,8 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 	})
 }
 
-// handleAddCommand handles the /add command
+// handleAddCommand handles the /add command.
+// It adds a new torrent to Real-Debrid using a magnet link provided by the user.
 func (b *Bot) handleAddCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
@@ -205,7 +209,8 @@ func (b *Bot) handleAddCommand(ctx context.Context, tgBot *bot.Bot, update *mode
 	})
 }
 
-// handleInfoCommand handles the /info command
+// handleInfoCommand handles the /info command.
+// It retrieves and displays detailed information about a specific torrent.
 func (b *Bot) handleInfoCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
@@ -229,7 +234,8 @@ func (b *Bot) handleInfoCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 	})
 }
 
-// sendTorrentInfo sends detailed torrent information
+// sendTorrentInfo sends detailed torrent information to the user.
+// It can either send a new message or update an existing one if messageID is provided.
 func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID int, torrentID string, user *db.User, messageID int) {
 	torrent, err := b.rdClient.GetTorrentInfo(torrentID)
 	if err != nil {
@@ -280,7 +286,8 @@ func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID
 	}
 }
 
-// handleDeleteCommand handles the /delete command
+// handleDeleteCommand handles the /delete command.
+// It deletes a torrent from Real-Debrid. Only superadmins can use this command.
 func (b *Bot) handleDeleteCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
@@ -324,7 +331,8 @@ func (b *Bot) handleDeleteCommand(ctx context.Context, tgBot *bot.Bot, update *m
 	})
 }
 
-// handleUnrestrictCommand handles the /unrestrict command
+// handleUnrestrictCommand handles the /unrestrict command.
+// It unrestricts a hoster link provided by the user.
 func (b *Bot) handleUnrestrictCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
@@ -370,7 +378,8 @@ func (b *Bot) handleUnrestrictCommand(ctx context.Context, tgBot *bot.Bot, updat
 	})
 }
 
-// handleDownloadsCommand handles the /downloads command
+// handleDownloadsCommand handles the /downloads command.
+// It retrieves and displays a list of recent downloads from Real-Debrid.
 func (b *Bot) handleDownloadsCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
@@ -421,7 +430,7 @@ func (b *Bot) handleDownloadsCommand(ctx context.Context, tgBot *bot.Bot, update
 			downloadsShown++
 		}
 
-		text.WriteString("Use <code>/removelink &lt;id&gt;</code> to remove an item from this list.")
+		text.WriteString("Use <code>/removelink <id></code> to remove an item from this list.")
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String())
 
 		if user != nil {
@@ -431,7 +440,8 @@ func (b *Bot) handleDownloadsCommand(ctx context.Context, tgBot *bot.Bot, update
 	})
 }
 
-// handleRemoveLinkCommand handles the /removelink command
+// handleRemoveLinkCommand handles the /removelink command.
+// It removes a download from Real-Debrid's history. Only superadmins can use this command.
 func (b *Bot) handleRemoveLinkCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
@@ -475,7 +485,8 @@ func (b *Bot) handleRemoveLinkCommand(ctx context.Context, tgBot *bot.Bot, updat
 	})
 }
 
-// handleStatusCommand handles the /status command
+// handleStatusCommand handles the /status command.
+// It retrieves and displays the user's Real-Debrid account status.
 func (b *Bot) handleStatusCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
@@ -521,7 +532,8 @@ func (b *Bot) handleStatusCommand(ctx context.Context, tgBot *bot.Bot, update *m
 	})
 }
 
-// handleMagnetLink handles magnet links sent as messages
+// handleMagnetLink handles magnet links sent as messages.
+// It adds the magnet link as a new torrent to Real-Debrid.
 func (b *Bot) handleMagnetLink(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
@@ -558,7 +570,8 @@ func (b *Bot) handleMagnetLink(ctx context.Context, tgBot *bot.Bot, update *mode
 	})
 }
 
-// handleHosterLink handles hoster links sent as messages
+// handleHosterLink handles hoster links sent as messages.
+// It unrestricts the hoster link using Real-Debrid.
 func (b *Bot) handleHosterLink(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
@@ -597,6 +610,7 @@ func (b *Bot) handleHosterLink(ctx context.Context, tgBot *bot.Bot, update *mode
 
 // --- Helper Functions ---
 
+// sendMessage sends a plain text message to the specified chat.
 func (b *Bot) sendMessage(ctx context.Context, chatID int64, messageThreadID int, text string) {
 	params := &bot.SendMessageParams{
 		ChatID: chatID,
@@ -613,6 +627,7 @@ func (b *Bot) sendMessage(ctx context.Context, chatID int64, messageThreadID int
 	}
 }
 
+// sendHTMLMessage sends an HTML-formatted message to the specified chat.
 func (b *Bot) sendHTMLMessage(ctx context.Context, chatID int64, messageThreadID int, text string) {
 	params := &bot.SendMessageParams{
 		ChatID:    chatID,

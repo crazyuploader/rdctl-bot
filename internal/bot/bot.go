@@ -18,43 +18,45 @@ import (
 	"gorm.io/gorm"
 )
 
-// Bot represents the Telegram bot
+// Bot represents the main Telegram bot controller that handles all interactions with the Telegram API
+// and coordinates operations with Real-Debrid and the database.
 type Bot struct {
-	api          *bot.Bot
-	rdClient     *realdebrid.Client
-	middleware   *Middleware
-	config       *config.Config
-	db           *gorm.DB
-	userRepo     *db.UserRepository
-	activityRepo *db.ActivityRepository
-	torrentRepo  *db.TorrentRepository
-	downloadRepo *db.DownloadRepository
-	commandRepo  *db.CommandRepository
+	api          *bot.Bot               // Telegram bot API client
+	rdClient     *realdebrid.Client     // Real-Debrid client for torrent operations
+	middleware   *Middleware            // Middleware for authorization and rate limiting
+	config       *config.Config         // Application configuration
+	db           *gorm.DB               // Database connection
+	userRepo     *db.UserRepository     // User repository for database operations
+	activityRepo *db.ActivityRepository // Activity repository for logging user actions
+	torrentRepo  *db.TorrentRepository  // Torrent repository for torrent-related operations
+	downloadRepo *db.DownloadRepository // Download repository for download-related operations
+	commandRepo  *db.CommandRepository  // Command repository for command logging
 }
 
-// NewBot creates and returns a fully configured Bot.
+// NewBot creates and returns a fully configured Bot instance.
+// It initializes all components including the Telegram bot, Real-Debrid client,
+// middleware, and database repositories.
 func NewBot(cfg *config.Config, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, error) {
-	// Perform IP tests first
+	// Perform IP tests to verify network configuration
 	if err := performIPTests(proxyURL, ipTestURL, ipVerifyURL); err != nil {
 		return nil, fmt.Errorf("IP test failed: %w", err)
 	}
 
-	// Create bot options
+	// Create bot options with default handler and debug mode if configured
 	opts := []bot.Option{
 		bot.WithDefaultHandler(defaultHandler),
 	}
-
 	if cfg.App.LogLevel == "debug" {
 		opts = append(opts, bot.WithDebug())
 	}
 
-	// Create Telegram bot
+	// Create Telegram bot with the provided token and options
 	api, err := bot.New(cfg.Telegram.BotToken, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bot: %w", err)
 	}
 
-	// Create Real-Debrid client
+	// Create Real-Debrid client with configuration from the config
 	rdClient := realdebrid.NewClient(
 		cfg.RealDebrid.BaseURL,
 		cfg.RealDebrid.APIToken,
@@ -62,9 +64,10 @@ func NewBot(cfg *config.Config, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, 
 		time.Duration(cfg.RealDebrid.Timeout)*time.Second,
 	)
 
-	// Create middleware
+	// Create middleware for authorization and rate limiting
 	middleware := NewMiddleware(cfg)
 
+	// Get bot information from Telegram API
 	me, err := api.GetMe(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bot info: %w", err)
@@ -72,12 +75,13 @@ func NewBot(cfg *config.Config, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, 
 
 	log.Printf("Authorized on account @%s", me.Username)
 
-	// Initialize database
+	// Initialize database connection
 	database, err := db.Init(cfg.Database.GetDSN())
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
+	// Create and return a fully configured Bot instance
 	return &Bot{
 		api:          api,
 		rdClient:     rdClient,
@@ -92,7 +96,8 @@ func NewBot(cfg *config.Config, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, 
 	}, nil
 }
 
-// Start begins processing updates
+// Start begins processing updates from the Telegram API.
+// It registers all command handlers and starts the bot's update loop.
 func (b *Bot) Start(ctx context.Context) error {
 	b.registerHandlers()
 	log.Println("Bot started. Waiting for messages...")
@@ -100,7 +105,8 @@ func (b *Bot) Start(ctx context.Context) error {
 	return nil
 }
 
-// registerHandlers sets up all command and callback handlers
+// registerHandlers sets up all command and callback handlers for the bot.
+// It registers handlers for various commands and message types that the bot will respond to.
 func (b *Bot) registerHandlers() {
 	// Command handlers
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/start", bot.MatchTypeExact, b.handleStartCommand)
@@ -121,7 +127,8 @@ func (b *Bot) registerHandlers() {
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "https://", bot.MatchTypePrefix, b.handleHosterLink)
 }
 
-// Stop gracefully stops the bot
+// Stop gracefully stops the bot and closes the database connection.
+// It performs cleanup operations to ensure resources are properly released.
 func (b *Bot) Stop() {
 	log.Println("Bot stopping...")
 	if err := db.Close(); err != nil {
@@ -130,12 +137,14 @@ func (b *Bot) Stop() {
 	log.Println("Bot stopped")
 }
 
-// defaultHandler ignores unhandled updates
+// defaultHandler ignores unhandled updates.
+// This is the default handler that will be called for any updates that don't match registered handlers.
 func defaultHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-	// Silently ignore
+	// Silently ignore unhandled updates
 }
 
-// getUserFromUpdate extracts user information from an update
+// getUserFromUpdate extracts user information from an update object.
+// It retrieves the user's ID, username, first name, last name, and chat ID from either a message or callback query.
 func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThreadID int, username, firstName, lastName string, userID int64) {
 	if update.Message != nil {
 		chatID = update.Message.Chat.ID
@@ -167,7 +176,9 @@ func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThr
 	return
 }
 
-// withAuth is a middleware to check authorization and execute the handler
+// withAuth is a middleware function that checks user authorization and executes the handler.
+// It verifies if the user is allowed to use the bot, creates or updates the user record,
+// and executes the provided handler function with the user information.
 func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User)) {
 	chatID, messageThreadID, username, firstName, lastName, userID := b.getUserFromUpdate(update)
 
@@ -201,7 +212,8 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 	handler(ctx, chatID, messageThreadID, isSuperAdmin, user)
 }
 
-// sendUnauthorizedMessage sends an unauthorized message
+// sendUnauthorizedMessage sends an unauthorized access message to the user.
+// It informs the user that they are not authorized to use the bot and provides their user ID and chat ID.
 func (b *Bot) sendUnauthorizedMessage(ctx context.Context, chatID int64, messageThreadID int, userID int64) {
 	text := fmt.Sprintf(
 		"[UNAUTHORIZED]\n\n"+
@@ -232,7 +244,8 @@ func (b *Bot) sendUnauthorizedMessage(ctx context.Context, chatID int64, message
 	}
 }
 
-// maskUsername masks the username for privacy
+// maskUsername masks the username for privacy by replacing the first 5 characters with asterisks.
+// This helps protect user privacy by not exposing their full username in logs and messages.
 func (b *Bot) maskUsername(username string) string {
 	if len(username) <= 5 {
 		return "*****"
@@ -241,7 +254,9 @@ func (b *Bot) maskUsername(username string) string {
 }
 
 // performIPTests performs IP address checks using an optional proxy and test endpoints.
-// When ipVerifyURL is provided, it verifies the primary IP (from ipTestURL or default) matches the verification endpoint and returns an error if the primary IP cannot be obtained, the verification request or response parsing fails, or the IPs do not match; it returns nil on success.
+// It verifies that the bot can reach the specified IP test URL and, if provided,
+// that the verification URL returns the same IP address. This helps ensure proper
+// network configuration and proxy settings.
 func performIPTests(proxyURL, ipTestURL, ipVerifyURL string) error {
 	var ipTestClient *http.Client
 	var primaryIP string
