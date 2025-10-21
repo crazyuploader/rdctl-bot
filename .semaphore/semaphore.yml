@@ -2,8 +2,8 @@ version: v1.0
 name: Go
 agent:
   machine:
-    type: e2-standard-2
-    os_image: ubuntu2004
+    type: e1-standard-2
+    os_image: ubuntu2404
 blocks:
   - name: Test
     task:
@@ -15,4 +15,5 @@ blocks:
             - go get ./...
             - go test ./...
             - go build -v .
+
 
