@@ -11,10 +11,10 @@ blocks:
         - name: go test
           commands:
             - checkout
-            - sem-version go 1.25
             - go get ./...
             - go test ./...
             - go build -v .
+
 
 
 
