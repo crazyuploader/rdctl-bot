@@ -94,7 +94,11 @@ func (c *Client) doRequest(method, endpoint string, body interface{}, queryParam
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			fmt.Printf("Warning: failed to close response body: %v\n", cerr)
+		}
+	}()
 
 	// Read response
 	respBody, err := io.ReadAll(resp.Body)
@@ -150,7 +154,11 @@ func (c *Client) POSTForm(endpoint string, formData map[string]string) ([]byte, 
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			fmt.Printf("Warning: failed to close form response body: %v\n", cerr)
+		}
+	}()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
