@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
@@ -16,12 +17,12 @@ import (
 var DB *gorm.DB
 
 // Init initializes the global database handle using the provided DSN, configures the connection pool, and runs automatic migrations.
-// Init initializes the package-level GORM database connection using the provided PostgreSQL DSN.
+// Init initializes the package-level GORM database connection using either PostgreSQL or SQLite based on the configuration.
 // It configures a custom GORM logger, forces UTC for timestamps, applies connection pool settings
 // (max idle connections 10, max open connections 100, connection max lifetime 1 hour), runs automatic
 // schema migrations for the application's models, assigns the configured *gorm.DB to the package-level
 // DB variable, and returns it.
-// The dsn parameter is the PostgreSQL connection string.
+// The dsn parameter is either the PostgreSQL connection string or SQLite file path.
 // The function returns the configured *gorm.DB on success, or an error if connecting, obtaining the
 // underlying sql.DB, or running migrations fails.
 func Init(dsn string) (*gorm.DB, error) {
@@ -47,26 +48,54 @@ func Init(dsn string) (*gorm.DB, error) {
 		},
 	)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: newLogger,
-		NowFunc: func() time.Time {
-			return time.Now().UTC()
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
-	}
+	var db *gorm.DB
+	var err error
 
-	// Get underlying SQL DB to configure connection pool
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get database instance: %w", err)
-	}
+	// Check if we should use SQLite or PostgreSQL
+	if cfg != nil && cfg.Database.IsSQLite() {
+		// Use SQLite
+		db, err = gorm.Open(sqlite.Open(dsn), &gorm.Config{
+			Logger: newLogger,
+			NowFunc: func() time.Time {
+				return time.Now().UTC()
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to SQLite database: %w", err)
+		}
 
-	// Set connection pool settings
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
-	sqlDB.SetConnMaxLifetime(time.Hour)
+		// SQLite specific connection settings
+		sqlDB, err := db.DB()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get SQLite database instance: %w", err)
+		}
+
+		// SQLite connection pool settings (simpler than PostgreSQL)
+		sqlDB.SetMaxIdleConns(1)
+		sqlDB.SetMaxOpenConns(1)
+	} else {
+		// Use PostgreSQL
+		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+			Logger: newLogger,
+			NowFunc: func() time.Time {
+				return time.Now().UTC()
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to PostgreSQL database: %w", err)
+		}
+
+		// Get underlying SQL DB to configure connection pool
+		sqlDB, err := db.DB()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get PostgreSQL database instance: %w", err)
+		}
+
+		// Set connection pool settings
+		sqlDB.SetMaxIdleConns(10)
+		sqlDB.SetMaxOpenConns(100)
+		sqlDB.SetConnMaxLifetime(time.Hour)
+	}
 
 	// Run migrations with proper ordering
 	if err := runMigrations(db); err != nil {

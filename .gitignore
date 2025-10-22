@@ -38,3 +38,6 @@ rdctl-bot
 
 # Config files
 config.yaml
+
+# DB files
+*.db
