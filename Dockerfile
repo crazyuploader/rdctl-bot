@@ -22,7 +22,7 @@ COPY . .
 RUN go build -o rdctl-bot ./cmd/rdctl-bot
 
 # Stage 2: Minimal runtime image
-FROM alpine:3.22
+FROM alpine:3.23
 
 # Set working directory
 WORKDIR /app
