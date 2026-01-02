@@ -770,8 +770,16 @@ func (b *Bot) handleDashboardCommand(ctx context.Context, tgBot *bot.Bot, update
 			return
 		}
 
-		// Build the dashboard URL
-		dashboardURL := b.config.Web.DashboardURL + "?token=" + tokenID
+		// Generate a short-lived exchange code for this token
+		exchangeCode, err := b.tokenStore.GenerateExchangeCode(tokenID)
+		if err != nil {
+			text := fmt.Sprintf("<b>[ERROR]</b> Failed to generate exchange code: %s", html.EscapeString(err.Error()))
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
+			return
+		}
+
+		// Build the dashboard URL using the exchange code
+		dashboardURL := b.config.Web.DashboardURL + "?code=" + exchangeCode
 
 		var roleDesc string
 		if isSuperAdmin {

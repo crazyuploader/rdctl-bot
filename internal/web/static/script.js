@@ -15,21 +15,25 @@ let cachedDownloads = [];
 // --- Auth & Init ---
 
 function checkLogin() {
-  // First check for token in URL
+  // 1. Check for exchange code in URL
   const urlParams = new URLSearchParams(window.location.search);
-  const token = urlParams.get("token");
+  const code = urlParams.get("code");
 
-  if (token) {
-    // Token auth - store and use it
-    window.authToken = token;
+  if (code) {
+    exchangeTokenID(code);
+    return;
+  }
+
+  // 2. Check for token in sessionStorage
+  const sessionToken = sessionStorage.getItem("rdctl_auth_token");
+  if (sessionToken) {
+    window.authToken = sessionToken;
     window.authType = "token";
-    // Clean URL without reloading
-    window.history.replaceState({}, document.title, window.location.pathname);
     fetchAuthInfo().then(() => showDashboard());
     return;
   }
 
-  // Fall back to API key
+  // 3. Fall back to API key
   const key = localStorage.getItem("rdctl_api_key");
   if (key) {
     window.apiKey = key;
@@ -38,6 +42,37 @@ function checkLogin() {
     userRole = "admin";
     showDashboard();
   } else {
+    showLogin();
+  }
+}
+
+async function exchangeTokenID(code) {
+  try {
+    // Clean URL immediately to hide code
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    const response = await fetch(`${API_BASE_URL}/exchange-token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Invalid or expired exchange code");
+    }
+
+    const result = await response.json();
+    if (result.success && result.token) {
+      window.authToken = result.token;
+      window.authType = "token";
+      sessionStorage.setItem("rdctl_auth_token", result.token);
+      fetchAuthInfo().then(() => showDashboard());
+    } else {
+      throw new Error("Failed to exchange token");
+    }
+  } catch (error) {
+    console.error("Exchange error:", error);
+    showToast(error.message, "error");
     showLogin();
   }
 }
@@ -210,6 +245,7 @@ function handleLogin(e) {
 
 function logout() {
   localStorage.removeItem("rdctl_api_key");
+  sessionStorage.removeItem("rdctl_auth_token");
   window.apiKey = null;
   window.authToken = null;
   window.authType = null;

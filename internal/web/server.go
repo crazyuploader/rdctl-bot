@@ -50,7 +50,13 @@ func NewServer(deps Dependencies) *Server {
 	app.Use(cors.New())
 
 	// API group with dual auth (API key OR token)
-	api := app.Group("/api", DualAuth(deps.Config.Web.APIKey, deps.TokenStore))
+	api := app.Group("/api")
+
+	// Token exchange endpoint - NO AUTH REQUIRED
+	api.Post("/exchange-token", deps.ExchangeToken)
+
+	// Apply DualAuth to the rest of the API routes
+	api.Use(DualAuth(deps.Config.Web.APIKey, deps.TokenStore))
 
 	// Auth endpoint to get current user info
 	api.Get("/auth/me", deps.GetAuthInfo)

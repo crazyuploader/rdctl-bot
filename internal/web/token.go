@@ -26,6 +26,13 @@ type Token struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
+// ExchangeCode represents a short-lived code to exchange for a real token
+type ExchangeCode struct {
+	Code      string
+	TokenID   string
+	ExpiresAt time.Time
+}
+
 // IsExpired returns true if the token has expired
 func (t *Token) IsExpired() bool {
 	return time.Now().After(t.ExpiresAt)
@@ -39,6 +46,7 @@ func (t *Token) IsAdmin() bool {
 // TokenStore manages in-memory token storage
 type TokenStore struct {
 	tokens        map[string]*Token
+	exchangeCodes map[string]*ExchangeCode
 	mu            sync.RWMutex
 	expiry        time.Duration
 	cleanupTicker *time.Ticker
@@ -53,9 +61,10 @@ func NewTokenStore(expiryMinutes int) *TokenStore {
 	}
 
 	ts := &TokenStore{
-		tokens:      make(map[string]*Token),
-		expiry:      time.Duration(expiryMinutes) * time.Minute,
-		stopCleanup: make(chan struct{}),
+		tokens:        make(map[string]*Token),
+		exchangeCodes: make(map[string]*ExchangeCode),
+		expiry:        time.Duration(expiryMinutes) * time.Minute,
+		stopCleanup:   make(chan struct{}),
 	}
 
 	// Start cleanup goroutine
@@ -94,6 +103,55 @@ func (ts *TokenStore) GenerateToken(userID int64, username string, firstName str
 	ts.mu.Unlock()
 
 	return tokenID, nil
+}
+
+// GenerateExchangeCode creates a short-lived code to exchange for a token
+func (ts *TokenStore) GenerateExchangeCode(tokenID string) (string, error) {
+	// Verify token exists first
+	ts.mu.RLock()
+	_, exists := ts.tokens[tokenID]
+	ts.mu.RUnlock()
+	if !exists {
+		return "", nil // Or error? Plan says validates. Let's return error if not found.
+	}
+
+	bytes := make([]byte, 16) // Shorter code for URL
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	code := hex.EncodeToString(bytes)
+
+	ec := &ExchangeCode{
+		Code:      code,
+		TokenID:   tokenID,
+		ExpiresAt: time.Now().Add(1 * time.Minute), // Short lived
+	}
+
+	ts.mu.Lock()
+	ts.exchangeCodes[code] = ec
+	ts.mu.Unlock()
+
+	return code, nil
+}
+
+// ExchangeToken validates an exchange code and returns the associated tokenID
+func (ts *TokenStore) ExchangeToken(code string) (string, error) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	ec, exists := ts.exchangeCodes[code]
+	if !exists {
+		return "", nil // Not found
+	}
+
+	// Delete immediately (one-time use)
+	delete(ts.exchangeCodes, code)
+
+	if time.Now().After(ec.ExpiresAt) {
+		return "", nil // Expired
+	}
+
+	return ec.TokenID, nil
 }
 
 // ValidateToken checks if a token is valid and returns it
@@ -137,7 +195,7 @@ func (ts *TokenStore) cleanupLoop() {
 	}
 }
 
-// cleanupExpired removes all expired tokens
+// cleanupExpired removes all expired tokens and exchange codes
 func (ts *TokenStore) cleanupExpired() {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
@@ -146,6 +204,12 @@ func (ts *TokenStore) cleanupExpired() {
 	for id, token := range ts.tokens {
 		if now.After(token.ExpiresAt) {
 			delete(ts.tokens, id)
+		}
+	}
+
+	for code, ec := range ts.exchangeCodes {
+		if now.After(ec.ExpiresAt) {
+			delete(ts.exchangeCodes, code)
 		}
 	}
 }

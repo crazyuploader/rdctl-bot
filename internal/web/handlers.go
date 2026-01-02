@@ -168,3 +168,31 @@ func (d *Dependencies) GetUserStats(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"success": true, "data": stats})
 }
+
+// ExchangeToken exchanges a short-lived code for a real token
+func (d *Dependencies) ExchangeToken(c *fiber.Ctx) error {
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Invalid request body"})
+	}
+
+	if body.Code == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Exchange code is required"})
+	}
+
+	tokenID, err := d.TokenStore.ExchangeToken(body.Code)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
+	}
+
+	if tokenID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"success": false, "error": "Invalid or expired exchange code"})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"token":   tokenID,
+	})
+}
