@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"embed"
 	"log"
 	"net/http"
@@ -80,7 +81,7 @@ func (s *Server) Start() error {
 	return s.app.Listen(s.config.Web.ListenAddr)
 }
 
-// Shutdown gracefully shuts down the web server
-func (s *Server) Shutdown() error {
-	return s.app.Shutdown()
+// Shutdown gracefully shuts down the web server with context for timeout support
+func (s *Server) Shutdown(ctx context.Context) error {
+	return s.app.ShutdownWithContext(ctx)
 }

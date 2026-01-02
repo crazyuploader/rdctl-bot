@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -83,11 +85,7 @@ The bot also supports direct message handling:
 	}
 )
 
-// init registers CLI flags, binds them to viper configuration keys, and attaches subcommands.
-// It defines persistent flags for config file and debug mode, root-local flags for shutdown
-// timeout and configuration validation, binds those flags to `app.debug` and
-// init configures CLI flags, binds selected flags to viper configuration keys, and registers subcommands.
-// It defines persistent flags for config file and debug mode, local flags for shutdown timeout and config validation, binds those flags to `app.debug` and `app.shutdown_timeout`, and adds the version subcommand.
+// init configures CLI flags, binds them to viper configuration keys, and registers subcommands.
 func init() {
 	// Initialize Cobra
 	cobra.OnInitialize(initConfig)
@@ -123,8 +121,7 @@ func initConfig() {
 	}
 }
 
-// main is the program entry point for the CLI application.
-// main is the program entry point. It executes the root Cobra command and, if execution fails, writes the error to stderr and exits with status 1.
+// main is the program entry point. It executes the root Cobra command and exits with status 1 on failure.
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -132,10 +129,8 @@ func main() {
 	}
 }
 
-// runBot starts the Telegram Real‑Debrid bot: it loads and optionally validates configuration, initializes the bot, and orchestrates runtime signal- and error-driven graceful shutdown with a configurable timeout.
-// runBot executes the main lifecycle of the CLI bot: it loads configuration, optionally validates it, starts the bot, and manages graceful shutdown.
-//
-// runBot loads the application configuration (respecting an explicit config file path and debug flag), prints key configuration details when requested, initializes and starts the bot, and waits for either an OS shutdown signal or a bot error. When shutdown is triggered it attempts a graceful stop within the configured timeout and forces exit if the timeout is exceeded.
+// runBot executes the main lifecycle: loads configuration, starts the bot and web server,
+// and manages graceful shutdown with a configurable timeout.
 func runBot(cmd *cobra.Command, args []string) {
 	// Load configuration
 	cfg, err := config.Load(cfgFile)
@@ -224,19 +219,19 @@ func runBot(cmd *cobra.Command, args []string) {
 	// Initialize web server
 	webServer := web.NewServer(deps)
 
-	// Start web server in goroutine
-	go func() {
-		if err := webServer.Start(); err != nil {
-			log.Printf("Web server error: %v", err)
-		}
-	}()
-
 	// Setup graceful shutdown using context with signal notification
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// Channel to listen for errors from bot
-	errCh := make(chan error, 1)
+	// Channel to listen for errors from bot and web server
+	errCh := make(chan error, 2)
+
+	// Start web server in goroutine
+	go func() {
+		if err := webServer.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- fmt.Errorf("web server error: %w", err)
+		}
+	}()
 
 	if !webOnly {
 		// Start bot in goroutine
@@ -270,29 +265,23 @@ func runBot(cmd *cobra.Command, args []string) {
 
 	// Perform graceful shutdown
 	go func() {
-		// Wait for shutdown context to complete
 		defer close(shutdownComplete)
 		log.Println("Stopping components...")
 
-		// Shutdown web server
-		if err := webServer.Shutdown(); err != nil {
+		// Shutdown web server with context for timeout
+		if err := webServer.Shutdown(shutdownCtx); err != nil {
 			log.Printf("Error shutting down web server: %v", err)
 		} else {
 			log.Println("Web server stopped gracefully")
 		}
 
-		// Allow bot to cleanup if it was running
+		// Stop bot and close database if bot was running
 		if !webOnly && b != nil {
-			// Give a moment for inflight but mostly relying on context cancel above
-			time.Sleep(500 * time.Millisecond)
-
-			// Close database and other resources
 			b.Stop()
 			log.Println("Bot cleanup completed")
 		} else {
 			// Close database explicitly when bot is not running
-			sqlDB, err := database.DB()
-			if err == nil {
+			if sqlDB, err := database.DB(); err == nil {
 				if err := sqlDB.Close(); err != nil {
 					log.Printf("Error closing database: %v", err)
 				} else {
