@@ -3,6 +3,7 @@ package web
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -112,7 +113,7 @@ func (ts *TokenStore) GenerateExchangeCode(tokenID string) (string, error) {
 	_, exists := ts.tokens[tokenID]
 	ts.mu.RUnlock()
 	if !exists {
-		return "", nil // Or error? Plan says validates. Let's return error if not found.
+		return "", fmt.Errorf("token %s not found", tokenID)
 	}
 
 	bytes := make([]byte, 16) // Shorter code for URL
