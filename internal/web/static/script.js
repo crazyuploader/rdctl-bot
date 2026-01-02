@@ -399,12 +399,25 @@ async function fetchStatus() {
     const user = result.data;
     const container = document.getElementById("status-container");
 
+    if (!container) return;
+
     const typeClass =
       user.type === "premium"
         ? "text-green-400 bg-green-500/10"
         : "text-red-400 bg-red-500/10";
     const formattedDate = new Date(user.expiration).toLocaleDateString();
     const maskedUsername = maskUsername(user.username);
+
+    // Update Ring (safely)
+    try {
+      const expDate = new Date(user.expiration);
+      const now = new Date();
+      const diffTime = Math.abs(expDate - now);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      updatePremiumRing(diffDays);
+    } catch (e) {
+      console.error("Ring update failed:", e);
+    }
 
     container.innerHTML = `
       <span class="font-bold text-white">${maskedUsername}</span>
@@ -413,8 +426,15 @@ async function fetchStatus() {
       <span class="text-slate-400">Exp: <span class="text-slate-200">${formattedDate}</span></span>
       <span class="text-slate-400">(${user.points} pts)</span>
     `;
+
+    // Re-trigger timer update if it was wiped
+    if (window.sessionExpiresAt) updateSessionTimer();
   } catch (error) {
     console.error("Status error:", error);
+    const container = document.getElementById("status-container");
+    if (container) {
+      container.innerHTML = `<span class="text-red-400 text-xs">Failed to load status</span>`;
+    }
   }
 }
 
