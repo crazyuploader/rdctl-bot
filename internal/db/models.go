@@ -39,6 +39,7 @@ const (
 	ActivityTypeCommandStatus      ActivityType = "command_status"
 	ActivityTypeMagnetLink         ActivityType = "magnet_link"
 	ActivityTypeHosterLink         ActivityType = "hoster_link"
+	ActivityTypeCommandDashboard   ActivityType = "command_dashboard"
 	ActivityTypeUnauthorized       ActivityType = "unauthorized"
 	ActivityTypeError              ActivityType = "error"
 )

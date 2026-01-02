@@ -804,7 +804,7 @@ func (b *Bot) handleDashboardCommand(ctx context.Context, tgBot *bot.Bot, update
 			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "dashboard", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text)); err != nil {
 				log.Printf("Warning: failed to log dashboard command: %v", err)
 			}
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeCommandStatus, "dashboard", messageThreadID, true, "", map[string]any{"role": roleDesc}); err != nil {
+			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeCommandDashboard, "dashboard", messageThreadID, true, "", map[string]any{"role": roleDesc}); err != nil {
 				log.Printf("Warning: failed to log dashboard activity: %v", err)
 			}
 		}
