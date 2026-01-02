@@ -159,9 +159,10 @@ async function fetchStatus() {
     const typeClass =
       user.type === "premium" ? "status-downloaded" : "status-error";
     const formattedDate = new Date(user.expiration).toLocaleDateString();
+    const maskedUsername = maskUsername(user.username);
 
     container.innerHTML = `
-            <span>${user.username}</span>
+            <span>${maskedUsername}</span>
             <span class="status-badge ${typeClass}">${user.type}</span>
             <span style="opacity: 0.7">|</span>
             <span>Exp: ${formattedDate}</span>
@@ -171,6 +172,13 @@ async function fetchStatus() {
   } catch (error) {
     console.error("Status error:", error);
   }
+}
+
+function maskUsername(username) {
+  if (!username || username.length <= 5) {
+    return "*****";
+  }
+  return "*****" + username.substring(5);
 }
 
 async function fetchTorrents() {
