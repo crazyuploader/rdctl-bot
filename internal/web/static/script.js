@@ -289,6 +289,45 @@ function setupEventListeners() {
       toggleAutoRefresh("torrents", e.target.checked);
     });
 
+  // Accessiblity & Visual Toggle for Torrents
+  const toggleBtn = document.getElementById("toggle-auto-refresh-torrents");
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", () => {
+      const checkbox = document.getElementById("auto-refresh-torrents");
+      checkbox.checked = !checkbox.checked;
+      checkbox.dispatchEvent(new Event("change"));
+
+      // Update ARIA
+      const isChecked = checkbox.checked;
+      toggleBtn.setAttribute("aria-checked", isChecked);
+
+      // Update Visuals
+      const dot = document.getElementById("torrents-refresh-dot");
+      if (isChecked) {
+        toggleBtn.classList.remove("bg-slate-700");
+        toggleBtn.classList.add("bg-blue-600");
+        dot.classList.remove("translate-x-1");
+        dot.classList.add("translate-x-6");
+      } else {
+        toggleBtn.classList.add("bg-slate-700");
+        toggleBtn.classList.remove("bg-blue-600");
+        dot.classList.add("translate-x-1");
+        dot.classList.remove("translate-x-6");
+      }
+    });
+
+    // Initialize state based on checkbox
+    const checkbox = document.getElementById("auto-refresh-torrents");
+    if (checkbox.checked) {
+      toggleBtn.setAttribute("aria-checked", "true");
+      toggleBtn.classList.remove("bg-slate-700");
+      toggleBtn.classList.add("bg-blue-600");
+      const dot = document.getElementById("torrents-refresh-dot");
+      dot.classList.remove("translate-x-1");
+      dot.classList.add("translate-x-6");
+    }
+  }
+
   document
     .getElementById("auto-refresh-downloads")
     .addEventListener("change", (e) => {
@@ -1037,9 +1076,12 @@ async function unrestrictLink(e) {
 // --- Delete Handling ---
 
 let itemToDelete = null;
+let previousFocus = null;
 
 function confirmDelete(type, id, name) {
   itemToDelete = { type, id };
+  previousFocus = document.activeElement;
+
   const modal = document.getElementById("confirm-modal");
   document.getElementById("confirm-title").textContent =
     type === "torrent" ? "Delete Torrent?" : "Delete Download?";
@@ -1051,6 +1093,9 @@ function confirmDelete(type, id, name) {
   okBtn.onclick = performDelete;
 
   modal.classList.remove("hidden", "opacity-0", "pointer-events-none");
+  // Ensure aria-hidden is removed if we were using it, though we rely on display:none
+  modal.setAttribute("aria-hidden", "false");
+
   setTimeout(() => {
     modal.querySelector(".glass-effect")?.classList.remove("scale-95");
   }, 10);
@@ -1061,8 +1106,14 @@ function closeConfirmModal() {
   const modal = document.getElementById("confirm-modal");
   modal.classList.add("opacity-0", "pointer-events-none");
   modal.querySelector(".glass-effect")?.classList.add("scale-95");
+  modal.setAttribute("aria-hidden", "true");
+
   setTimeout(() => {
     modal.classList.add("hidden");
+    if (previousFocus) {
+      previousFocus.focus();
+      previousFocus = null;
+    }
   }, 300);
   itemToDelete = null;
 }

@@ -110,6 +110,10 @@ func (d *Dependencies) AddTorrent(c *fiber.Ctx) error {
 // DeleteTorrent deletes a torrent
 func (d *Dependencies) DeleteTorrent(c *fiber.Ctx) error {
 	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "id parameter is required"})
+	}
+
 	if err := d.RDClient.DeleteTorrent(id); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
 	}
@@ -156,6 +160,9 @@ func (d *Dependencies) UnrestrictLink(c *fiber.Ctx) error {
 // DeleteDownload deletes a download from history
 func (d *Dependencies) DeleteDownload(c *fiber.Ctx) error {
 	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "id is required"})
+	}
 	if err := d.RDClient.DeleteDownload(id); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
 	}

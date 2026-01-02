@@ -538,6 +538,9 @@
                   <span class="text-xs font-medium text-slate-500">Auto</span>
                   <button
                     id="toggle-auto-refresh-torrents"
+                    role="switch"
+                    aria-checked="false"
+                    aria-label="Auto-refresh torrents"
                     class="relative inline-flex h-6 w-11 items-center rounded-full bg-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900"
                   >
                     <span
@@ -891,6 +894,10 @@
     <!-- Confirm Modal -->
     <div
       id="confirm-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-title"
+      aria-describedby="confirm-message"
       class="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-950/80 backdrop-blur-md opacity-0 pointer-events-none transition-all duration-300 hidden"
     >
       <div
