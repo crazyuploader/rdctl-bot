@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>rdctl-bot Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="login-overlay" class="overlay">
+      <div class="login-card">
+        <h2>Welcome Back</h2>
+        <p>Enter your API Key to access the dashboard</p>
+        <form id="login-form">
+          <div class="input-group">
+            <input
+              type="password"
+              id="api-key-input"
+              placeholder="API Key"
+              required
+              autofocus
+            />
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">
+            Access Dashboard
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="app-container blur-content">
+      <header>
+        <div class="header-content">
+          <div class="logo">
+            <h1>rdctl-bot</h1>
+            <span class="badge">Dashboard</span>
+          </div>
+          <div id="status-container" class="status-pill">
+            <!-- Status injected here -->
+            <span class="loading-dots">Loading status...</span>
+          </div>
+          <button id="logout-btn" class="btn btn-secondary btn-sm">
+            Logout
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <div class="actions-section">
+          <div class="card action-card">
+            <div class="card-header">
+              <h3>Add Torrent</h3>
+            </div>
+            <form id="add-torrent-form">
+              <div class="input-wrapper">
+                <input
+                  type="text"
+                  id="magnet-link"
+                  placeholder="Paste magnet link here..."
+                  required
+                />
+                <button type="submit" class="btn btn-primary">
+                  <span class="icon">+</span> Add
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="card action-card">
+            <div class="card-header">
+              <h3>Unrestrict Link</h3>
+            </div>
+            <form id="unrestrict-link-form">
+              <div class="input-wrapper">
+                <input
+                  type="text"
+                  id="hoster-link"
+                  placeholder="Paste hoster link here..."
+                  required
+                />
+                <button type="submit" class="btn btn-accent">
+                  <span class="icon">🔓</span> Unrestrict
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div id="response-message" class="toast hidden"></div>
+
+        <div class="content-grid">
+          <section class="card list-card">
+            <div class="card-header flex-between">
+              <h2>Active Torrents</h2>
+              <div class="controls">
+                <div class="toggle-switch">
+                  <input type="checkbox" id="auto-refresh-torrents" checked />
+                  <label
+                    for="auto-refresh-torrents"
+                    title="Auto Refresh"
+                  ></label>
+                </div>
+                <button
+                  onclick="fetchTorrents()"
+                  class="btn btn-icon"
+                  title="Refresh"
+                >
+                  ↻
+                </button>
+              </div>
+            </div>
+            <div id="torrents-list" class="list-container">
+              <!-- Torrents injected here -->
+            </div>
+          </section>
+
+          <section class="card list-card">
+            <div class="card-header flex-between">
+              <h2>Recent Downloads</h2>
+              <div class="controls">
+                <div class="toggle-switch">
+                  <input type="checkbox" id="auto-refresh-downloads" checked />
+                  <label
+                    for="auto-refresh-downloads"
+                    title="Auto Refresh"
+                  ></label>
+                </div>
+                <button
+                  onclick="fetchDownloads()"
+                  class="btn btn-icon"
+                  title="Refresh"
+                >
+                  ↻
+                </button>
+              </div>
+            </div>
+            <div id="downloads-list" class="list-container">
+              <!-- Downloads injected here -->
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="overlay hidden">
+      <div class="modal-card">
+        <h3 id="confirm-title">Confirm Action</h3>
+        <p id="confirm-message">Are you sure?</p>
+        <div class="modal-actions">
+          <button id="confirm-cancel" class="btn btn-secondary">Cancel</button>
+          <button id="confirm-ok" class="btn btn-danger">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

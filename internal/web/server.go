@@ -1,14 +1,22 @@
 package web
 
 import (
+	"embed"
 	"log"
+	"net/http"
 
 	"github.com/crazyuploader/rdctl-bot/internal/config"
 	"github.com/crazyuploader/rdctl-bot/internal/db"
 	"github.com/crazyuploader/rdctl-bot/internal/realdebrid"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
 )
+
+//go:embed static/*
+var staticFiles embed.FS
 
 // Dependencies struct to hold all dependencies for the web handlers
 type Dependencies struct {
@@ -21,15 +29,29 @@ type Dependencies struct {
 	Config       *config.Config
 }
 
-// Start starts the Fiber web server
-func Start(deps Dependencies) {
-	app := fiber.New()
+// Server represents the web server instance
+type Server struct {
+	app    *fiber.App
+	config *config.Config
+}
+
+// NewServer creates a new web server instance
+func NewServer(deps Dependencies) *Server {
+	app := fiber.New(fiber.Config{
+		DisableStartupMessage: true,
+	})
 
 	// Middleware
 	app.Use(logger.New())
+	app.Use(recover.New())
+	app.Use(cors.New())
 
-	// Static files for the dashboard
-	app.Static("/", "./web/static")
+	// Embed static files
+	app.Use("/", filesystem.New(filesystem.Config{
+		Root:       http.FS(staticFiles),
+		PathPrefix: "static",
+		Browse:     false,
+	}))
 
 	// API group
 	api := app.Group("/api", APIKeyAuth(deps.Config.Web.APIKey))
@@ -45,8 +67,19 @@ func Start(deps Dependencies) {
 	api.Delete("/downloads/:id", deps.DeleteDownload)
 	api.Get("/stats/user/:id", deps.GetUserStats)
 
-	log.Printf("Starting web server on %s", deps.Config.Web.ListenAddr)
-	if err := app.Listen(deps.Config.Web.ListenAddr); err != nil {
-		log.Printf("Web server shut down or failed: %v", err)
+	return &Server{
+		app:    app,
+		config: deps.Config,
 	}
+}
+
+// Start starts the web server
+func (s *Server) Start() error {
+	log.Printf("Starting web server on %s", s.config.Web.ListenAddr)
+	return s.app.Listen(s.config.Web.ListenAddr)
+}
+
+// Shutdown gracefully shuts down the web server
+func (s *Server) Shutdown() error {
+	return s.app.Shutdown()
 }

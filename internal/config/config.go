@@ -113,30 +113,30 @@ func Load(cfgFile string) (*Config, error) {
 	}
 
 	// Validate configuration
-	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
-	}
+	// Validation is now the responsibility of the caller to allow for different modes (e.g. web-only)
 
 	return cfg, nil
 }
 
 // Validate checks if the configuration is valid
-func (c *Config) Validate() error {
+func (c *Config) Validate(webOnly bool) error {
 	// Telegram validation
-	if c.Telegram.BotToken == "" || c.Telegram.BotToken == "YOUR_TELEGRAM_BOT_TOKEN" {
-		return fmt.Errorf("telegram bot token is required")
+	if !webOnly {
+		if c.Telegram.BotToken == "" || c.Telegram.BotToken == "YOUR_TELEGRAM_BOT_TOKEN" {
+			return fmt.Errorf("telegram bot token is required")
+		}
+
+		if len(c.Telegram.AllowedChatIDs) == 0 {
+			return fmt.Errorf("at least one allowed chat ID is required")
+		}
+
+		if len(c.Telegram.SuperAdminIDs) == 0 {
+			return fmt.Errorf("at least one super admin ID is required")
+		}
 	}
 
 	if c.RealDebrid.APIToken == "" || c.RealDebrid.APIToken == "YOUR_REAL_DEBRID_API_TOKEN" {
 		return fmt.Errorf("real-debrid API token is required")
-	}
-
-	if len(c.Telegram.AllowedChatIDs) == 0 {
-		return fmt.Errorf("at least one allowed chat ID is required")
-	}
-
-	if len(c.Telegram.SuperAdminIDs) == 0 {
-		return fmt.Errorf("at least one super admin ID is required")
 	}
 
 	// RealDebrid validation
