@@ -9,4 +9,4 @@ services:
     restart: unless-stopped
     logging:
       options:
-        max-size: "512m"
+        max-size: "128m"
