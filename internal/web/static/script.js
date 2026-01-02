@@ -354,18 +354,32 @@ async function apiFetch(url, options = {}) {
 
 function showToast(message, type = "success") {
   const toast = document.getElementById("response-message");
-  toast.textContent = message;
 
-  // Set border color based on type
+  // Reset and set base classes
   toast.className = `fixed bottom-8 right-8 z-[3000] max-w-md px-6 py-4 rounded-xl glass-effect border-l-4 shadow-2xl text-white font-medium transition-all duration-300 flex items-center gap-3`;
+  toast.innerHTML = ""; // Clear existing content
+
+  // Create icon element
+  const icon = document.createElement("span");
+  icon.className = "text-xl";
 
   if (type === "error") {
     toast.classList.add("border-red-500");
-    toast.innerHTML = `<span class="text-red-400 text-xl">✕</span> <span>${message}</span>`;
+    icon.classList.add("text-red-400");
+    icon.textContent = "✕";
   } else {
     toast.classList.add("border-green-500");
-    toast.innerHTML = `<span class="text-green-400 text-xl">✓</span> <span>${message}</span>`;
+    icon.classList.add("text-green-400");
+    icon.textContent = "✓";
   }
+
+  // Create message element (safe)
+  const text = document.createElement("span");
+  text.textContent = message;
+
+  // Assembly
+  toast.appendChild(icon);
+  toast.appendChild(text);
 
   toast.classList.remove("hidden", "translate-y-20", "opacity-0");
 
