@@ -48,6 +48,18 @@ async function fetchAuthInfo() {
     userRole = result.role;
     isAdmin = result.is_admin;
 
+    // Display greeting
+    const greetingEl = document.getElementById("user-greeting");
+    if (greetingEl) {
+      if (result.first_name) {
+        greetingEl.textContent = `Hi, ${result.first_name}!`;
+      } else if (result.username) {
+        greetingEl.textContent = `Hi, ${result.username}!`;
+      } else {
+        greetingEl.textContent = "";
+      }
+    }
+
     // Store session expiry for countdown
     if (result.expires_at) {
       window.sessionExpiresAt = new Date(result.expires_at);
@@ -57,6 +69,7 @@ async function fetchAuthInfo() {
     console.log("Auth info:", {
       role: userRole,
       isAdmin,
+      first_name: result.first_name,
       expiresAt: result.expires_at,
     });
   } catch (error) {

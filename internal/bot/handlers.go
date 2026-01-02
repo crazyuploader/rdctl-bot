@@ -750,13 +750,15 @@ func (b *Bot) handleDashboardCommand(ctx context.Context, tgBot *bot.Bot, update
 
 		// Generate token
 		username := ""
+		firstName := ""
 		userID := int64(0)
 		if user != nil {
 			username = user.Username
+			firstName = user.FirstName
 			userID = user.UserID
 		}
 
-		tokenID, err := b.tokenStore.GenerateToken(userID, username, isSuperAdmin)
+		tokenID, err := b.tokenStore.GenerateToken(userID, username, firstName, isSuperAdmin)
 		if err != nil {
 			text := fmt.Sprintf("<b>[ERROR]</b> Failed to generate dashboard token: %s", html.EscapeString(err.Error()))
 			b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)

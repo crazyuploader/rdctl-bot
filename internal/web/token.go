@@ -20,6 +20,7 @@ type Token struct {
 	ID        string    `json:"id"`
 	UserID    int64     `json:"user_id"`
 	Username  string    `json:"username"`
+	FirstName string    `json:"first_name"`
 	Role      Role      `json:"role"`
 	CreatedAt time.Time `json:"created_at"`
 	ExpiresAt time.Time `json:"expires_at"`
@@ -64,7 +65,7 @@ func NewTokenStore(expiryMinutes int) *TokenStore {
 }
 
 // GenerateToken creates a new token for the given user
-func (ts *TokenStore) GenerateToken(userID int64, username string, isAdmin bool) (string, error) {
+func (ts *TokenStore) GenerateToken(userID int64, username string, firstName string, isAdmin bool) (string, error) {
 	// Generate random token ID
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
@@ -81,6 +82,7 @@ func (ts *TokenStore) GenerateToken(userID int64, username string, isAdmin bool)
 		ID:        tokenID,
 		UserID:    userID,
 		Username:  username,
+		FirstName: firstName,
 		Role:      role,
 		CreatedAt: time.Now(),
 		ExpiresAt: time.Now().Add(ts.expiry),

@@ -98,6 +98,15 @@ header {
   text-transform: uppercase;
 }
 
+.user-greeting {
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin-left: 0.5rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--border-color);
+  font-weight: 500;
+}
+
 .count-badge {
   font-size: 0.9rem;
   font-weight: 500;

@@ -24,6 +24,7 @@ func (d *Dependencies) GetAuthInfo(c *fiber.Ctx) error {
 	if token != nil {
 		response["user_id"] = token.UserID
 		response["username"] = token.Username
+		response["first_name"] = token.FirstName
 		response["expires_at"] = token.ExpiresAt
 	}
 
