@@ -154,10 +154,10 @@ func (b *Bot) registerHandlers() {
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "https://", bot.MatchTypePrefix, b.handleHosterLink)
 }
 
-// Stop gracefully stops the bot
+// Stop gracefully stops the bot and closes the database connection
 func (b *Bot) Stop() {
 	log.Println("Bot stopping...")
-	if err := db.Close(); err != nil {
+	if err := db.Close(b.db); err != nil {
 		log.Printf("Error closing database: %v", err)
 	}
 	log.Println("Bot stopped")
@@ -206,7 +206,7 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 
 	isAllowed, isSuperAdmin := b.middleware.CheckAuthorization(chatID, userID)
 
-	user, err := b.userRepo.GetOrCreateUser(userID, username, firstName, lastName, isSuperAdmin)
+	user, err := b.userRepo.GetOrCreateUser(ctx, userID, username, firstName, lastName, isSuperAdmin)
 	if err != nil {
 		log.Printf("Error getting/creating user: %v", err)
 		if chatID != 0 {
@@ -226,7 +226,7 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 		b.middleware.LogUnauthorized(username, chatID, userID)
 		b.sendUnauthorizedMessage(ctx, chatID, messageThreadID, userID)
 		if user != nil {
-			if err := b.activityRepo.LogActivity(user.ID, chatID, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil); err != nil {
+			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil); err != nil {
 				log.Printf("Warning: failed to log unauthorized activity: %v", err)
 			}
 		}

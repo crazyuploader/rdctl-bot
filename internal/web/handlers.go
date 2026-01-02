@@ -131,7 +131,7 @@ func (d *Dependencies) GetUserStats(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Invalid user ID"})
 	}
 
-	stats, err := d.CommandRepo.GetUserStats(uint(userID))
+	stats, err := d.CommandRepo.GetUserStats(c.Context(), uint(userID))
 	if err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "error": err.Error()})
 	}

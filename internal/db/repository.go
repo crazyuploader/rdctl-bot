@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"time"
@@ -20,7 +21,7 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 }
 
 // GetOrCreateUser gets or creates a user based on their Telegram user ID
-func (r *UserRepository) GetOrCreateUser(userID int64, username, firstName, lastName string, isSuperAdmin bool) (*User, error) {
+func (r *UserRepository) GetOrCreateUser(ctx context.Context, userID int64, username, firstName, lastName string, isSuperAdmin bool) (*User, error) {
 	now := time.Now().UTC()
 	user := User{
 		UserID:       userID,
@@ -33,7 +34,7 @@ func (r *UserRepository) GetOrCreateUser(userID int64, username, firstName, last
 	}
 
 	// Use clause.OnConflict to perform an upsert based on user_id
-	result := r.db.Clauses(clause.OnConflict{
+	result := r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "user_id"}},
 		DoUpdates: clause.Assignments(map[string]any{
 			"username":       username,
@@ -50,7 +51,7 @@ func (r *UserRepository) GetOrCreateUser(userID int64, username, firstName, last
 
 	// Retrieve the user to ensure all fields are current
 	var updatedUser User
-	if err := r.db.Where("user_id = ?", userID).First(&updatedUser).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&updatedUser).Error; err != nil {
 		return nil, err
 	}
 
@@ -68,7 +69,7 @@ func NewActivityRepository(db *gorm.DB) *ActivityRepository {
 }
 
 // LogActivity logs a general activity
-func (r *ActivityRepository) LogActivity(userID uint, chatID int64, username string, activityType ActivityType, command string, messageThreadID int, success bool, errorMsg string, metadata map[string]interface{}) error {
+func (r *ActivityRepository) LogActivity(ctx context.Context, userID uint, chatID int64, username string, activityType ActivityType, command string, messageThreadID int, success bool, errorMsg string, metadata map[string]interface{}) error {
 	metadataJSON, err := json.Marshal(metadata)
 	if err != nil {
 		metadataJSON = []byte("{}")
@@ -87,7 +88,7 @@ func (r *ActivityRepository) LogActivity(userID uint, chatID int64, username str
 		CreatedAt:       time.Now().UTC(),
 	}
 
-	return r.db.Create(&activity).Error
+	return r.db.WithContext(ctx).Create(&activity).Error
 }
 
 // TorrentRepository handles torrent activity logging
@@ -101,7 +102,7 @@ func NewTorrentRepository(db *gorm.DB) *TorrentRepository {
 }
 
 // LogTorrentActivity logs torrent-specific activity
-func (r *TorrentRepository) LogTorrentActivity(userID uint, chatID int64, torrentID, torrentHash, torrentName, magnetLink, action, status string, fileSize int64, progress float64, success bool, errorMsg string, metadata map[string]interface{}) error {
+func (r *TorrentRepository) LogTorrentActivity(ctx context.Context, userID uint, chatID int64, torrentID, torrentHash, torrentName, magnetLink, action, status string, fileSize int64, progress float64, success bool, errorMsg string, metadata map[string]interface{}) error {
 	// Ensure metadata is never nil
 	if metadata == nil {
 		metadata = make(map[string]interface{})
@@ -132,13 +133,13 @@ func (r *TorrentRepository) LogTorrentActivity(userID uint, chatID int64, torren
 		CreatedAt:     time.Now().UTC(),
 	}
 
-	return r.db.Create(&activity).Error
+	return r.db.WithContext(ctx).Create(&activity).Error
 }
 
 // GetTorrentActivities retrieves torrent activities with filters
-func (r *TorrentRepository) GetTorrentActivities(userID uint, limit int) ([]TorrentActivity, error) {
+func (r *TorrentRepository) GetTorrentActivities(ctx context.Context, userID uint, limit int) ([]TorrentActivity, error) {
 	var activities []TorrentActivity
-	query := r.db.Order("created_at DESC")
+	query := r.db.WithContext(ctx).Order("created_at DESC")
 
 	if userID > 0 {
 		query = query.Where("user_id = ?", userID)
@@ -157,15 +158,13 @@ type DownloadRepository struct {
 	db *gorm.DB
 }
 
-// NewDownloadRepository returns a DownloadRepository configured with the provided GORM database handle.
-//
-// NewDownloadRepository creates a DownloadRepository that uses the provided *gorm.DB for persistence.
+// NewDownloadRepository creates a DownloadRepository backed by the provided gorm.DB.
 func NewDownloadRepository(db *gorm.DB) *DownloadRepository {
 	return &DownloadRepository{db: db}
 }
 
 // LogDownloadActivity logs download/unrestrict activity with optional torrent association
-func (r *DownloadRepository) LogDownloadActivity(userID uint, chatID int64, downloadID, originalLink, fileName, host, action string, fileSize int64, success bool, errorMsg string, metadata map[string]interface{}, torrentActivityID *uint) error {
+func (r *DownloadRepository) LogDownloadActivity(ctx context.Context, userID uint, chatID int64, downloadID, originalLink, fileName, host, action string, fileSize int64, success bool, errorMsg string, metadata map[string]interface{}, torrentActivityID *uint) error {
 	// Ensure metadata is never nil
 	if metadata == nil {
 		metadata = make(map[string]interface{})
@@ -191,7 +190,7 @@ func (r *DownloadRepository) LogDownloadActivity(userID uint, chatID int64, down
 		TorrentActivityID: torrentActivityID,
 	}
 
-	return r.db.Create(&activity).Error
+	return r.db.WithContext(ctx).Create(&activity).Error
 }
 
 // CommandRepository handles command logging
@@ -205,7 +204,7 @@ func NewCommandRepository(db *gorm.DB) *CommandRepository {
 }
 
 // LogCommand logs command execution and atomically increments the user's total_commands counter.
-func (r *CommandRepository) LogCommand(userID uint, chatID int64, username, command, fullCommand string, messageThreadID int, executionTime int64, success bool, errorMsg string, responseLength int) error {
+func (r *CommandRepository) LogCommand(ctx context.Context, userID uint, chatID int64, username, command, fullCommand string, messageThreadID int, executionTime int64, success bool, errorMsg string, responseLength int) error {
 	cmdLog := CommandLog{
 		UserID:          userID,
 		ChatID:          chatID,
@@ -220,7 +219,7 @@ func (r *CommandRepository) LogCommand(userID uint, chatID int64, username, comm
 		CreatedAt:       time.Now().UTC(),
 	}
 
-	return r.db.Transaction(func(tx *gorm.DB) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Create the command log within the transaction
 		if err := tx.Create(&cmdLog).Error; err != nil {
 			return err
@@ -236,28 +235,28 @@ func (r *CommandRepository) LogCommand(userID uint, chatID int64, username, comm
 }
 
 // GetUserStats retrieves user statistics
-func (r *CommandRepository) GetUserStats(userID uint) (map[string]interface{}, error) {
+func (r *CommandRepository) GetUserStats(ctx context.Context, userID uint) (map[string]interface{}, error) {
 	var user User
-	err := r.db.First(&user, userID).Error
+	err := r.db.WithContext(ctx).First(&user, userID).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, errors.New("user not found") // Or a more specific error type
+		return nil, errors.New("user not found")
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	var totalActivities int64
-	if res := r.db.Model(&ActivityLog{}).Where("user_id = ?", userID).Count(&totalActivities); res.Error != nil {
+	if res := r.db.WithContext(ctx).Model(&ActivityLog{}).Where("user_id = ?", userID).Count(&totalActivities); res.Error != nil {
 		return nil, res.Error
 	}
 
 	var totalTorrents int64
-	if res := r.db.Model(&TorrentActivity{}).Where("user_id = ? AND action = ?", userID, "add").Count(&totalTorrents); res.Error != nil {
+	if res := r.db.WithContext(ctx).Model(&TorrentActivity{}).Where("user_id = ? AND action = ?", userID, "add").Count(&totalTorrents); res.Error != nil {
 		return nil, res.Error
 	}
 
 	var totalDownloads int64
-	if res := r.db.Model(&DownloadActivity{}).Where("user_id = ? AND action = ?", userID, "unrestrict").Count(&totalDownloads); res.Error != nil {
+	if res := r.db.WithContext(ctx).Model(&DownloadActivity{}).Where("user_id = ? AND action = ?", userID, "unrestrict").Count(&totalDownloads); res.Error != nil {
 		return nil, res.Error
 	}
 
