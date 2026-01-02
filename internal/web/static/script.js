@@ -441,8 +441,8 @@ async function fetchStatus() {
     }
 
     container.innerHTML = `
-      <span class="font-bold text-white">${maskedUsername}</span>
-      <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase ${typeClass}">${user.type}</span>
+      <span class="font-bold text-white">${escapeHtml(maskedUsername)}</span>
+      <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase ${typeClass}">${escapeHtml(user.type)}</span>
       <span class="text-slate-600">|</span>
       <span class="text-slate-400">Exp: <span class="text-slate-200">${formattedDate}</span></span>
       <span class="text-slate-400">(${user.points} pts)</span>
