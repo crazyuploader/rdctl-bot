@@ -177,7 +177,20 @@ async function fetchTorrents() {
   try {
     const result = await apiFetch(`${API_BASE_URL}/torrents?limit=50`);
     const torrents = result.data || [];
+    const totalCount = result.total_count || torrents.length;
     const list = document.getElementById("torrents-list");
+    const countBadge = document.getElementById("torrents-count");
+
+    // Update count badge - show "X of Y" if there are more items
+    if (torrents.length > 0) {
+      if (totalCount > torrents.length) {
+        countBadge.textContent = `(${torrents.length} of ${totalCount})`;
+      } else {
+        countBadge.textContent = `(${torrents.length})`;
+      }
+    } else {
+      countBadge.textContent = "";
+    }
 
     if (torrents.length === 0) {
       list.innerHTML = `<div class="item-card"><p style="text-align:center; color: var(--text-secondary)">No active torrents</p></div>`;
@@ -187,11 +200,13 @@ async function fetchTorrents() {
     const html = torrents
       .map((t) => {
         const statusClass =
-          t.status === "downloaded"
+          t.status === "Downloaded"
             ? "status-downloaded"
-            : t.status === "downloading"
+            : t.status === "Downloading"
               ? "status-downloading"
               : "status-badge";
+        
+        const addedDate = t.added ? new Date(t.added).toLocaleDateString() : '';
 
         return `
             <div class="item-card">
@@ -202,7 +217,8 @@ async function fetchTorrents() {
                             <span>${formatBytes(t.bytes)}</span>
                             <span class="status-badge ${statusClass}">${t.status}</span>
                             ${t.seeders !== undefined && t.seeders !== null ? `<span>${t.seeders} seeds</span>` : ''}
-                            ${t.speed !== undefined && t.speed !== null ? `<span>${formatBytes(t.speed)}/s</span>` : ''}
+                            ${t.speed !== undefined && t.speed !== null && t.speed > 0 ? `<span>${formatBytes(t.speed)}/s</span>` : ''}
+                            ${addedDate ? `<span title="Added date">${addedDate}</span>` : ''}
                         </div>
                     </div>
                     <button class="delete-btn" onclick="confirmDelete('torrent', '${t.id}', '${escapeHtml(t.filename)}')" title="Delete">
@@ -229,7 +245,20 @@ async function fetchDownloads() {
   try {
     const result = await apiFetch(`${API_BASE_URL}/downloads?limit=50`);
     const downloads = result.data || [];
+    const totalCount = result.total_count || downloads.length;
     const list = document.getElementById("downloads-list");
+    const countBadge = document.getElementById("downloads-count");
+
+    // Update count badge - show "X of Y" if there are more items
+    if (downloads.length > 0) {
+      if (totalCount > downloads.length) {
+        countBadge.textContent = `(${downloads.length} of ${totalCount})`;
+      } else {
+        countBadge.textContent = `(${downloads.length})`;
+      }
+    } else {
+      countBadge.textContent = "";
+    }
 
     if (downloads.length === 0) {
       list.innerHTML = `<div class="item-card"><p style="text-align:center; color: var(--text-secondary)">No recent downloads</p></div>`;

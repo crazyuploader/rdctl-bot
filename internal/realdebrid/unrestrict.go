@@ -50,8 +50,23 @@ func (c *Client) UnrestrictLink(link string) (*UnrestrictedLink, error) {
 	return &unrestricted, nil
 }
 
+// DownloadsResult wraps downloads list with pagination metadata
+type DownloadsResult struct {
+	Downloads  []Download `json:"downloads"`
+	TotalCount int        `json:"total_count"`
+}
+
 // GetDownloads retrieves download history
 func (c *Client) GetDownloads(limit, offset int) ([]Download, error) {
+	result, err := c.GetDownloadsWithCount(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	return result.Downloads, nil
+}
+
+// GetDownloadsWithCount retrieves download history with total count from X-Total-Count header
+func (c *Client) GetDownloadsWithCount(limit, offset int) (*DownloadsResult, error) {
 	params := make(map[string]string)
 	if limit > 0 {
 		params["limit"] = fmt.Sprintf("%d", limit)
@@ -60,7 +75,7 @@ func (c *Client) GetDownloads(limit, offset int) ([]Download, error) {
 		params["offset"] = fmt.Sprintf("%d", offset)
 	}
 
-	data, err := c.GET("/downloads", params)
+	data, totalCount, err := c.GETWithTotalCount("/downloads", params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get downloads: %w", err)
 	}
@@ -70,7 +85,10 @@ func (c *Client) GetDownloads(limit, offset int) ([]Download, error) {
 		return nil, fmt.Errorf("failed to parse downloads: %w", err)
 	}
 
-	return downloads, nil
+	return &DownloadsResult{
+		Downloads:  downloads,
+		TotalCount: totalCount,
+	}, nil
 }
 
 // DeleteDownload removes a download from history

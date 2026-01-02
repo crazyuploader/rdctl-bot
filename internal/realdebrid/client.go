@@ -56,8 +56,13 @@ func NewClient(baseURL, apiToken, proxyURL string, timeout time.Duration) *Clien
 	}
 }
 
-// doRequest performs an HTTP request with proper authentication
 func (c *Client) doRequest(method, endpoint string, body interface{}, queryParams map[string]string) ([]byte, error) {
+	respBody, _, err := c.doRequestWithHeaders(method, endpoint, body, queryParams)
+	return respBody, err
+}
+
+// doRequestWithHeaders performs an HTTP request and returns both body and headers
+func (c *Client) doRequestWithHeaders(method, endpoint string, body interface{}, queryParams map[string]string) ([]byte, http.Header, error) {
 	fullURL := c.baseURL + endpoint
 
 	// Add query parameters
@@ -73,14 +78,14 @@ func (c *Client) doRequest(method, endpoint string, body interface{}, queryParam
 	if body != nil {
 		jsonData, err := json.Marshal(body)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+			return nil, nil, fmt.Errorf("failed to marshal request body: %w", err)
 		}
 		reqBody = bytes.NewBuffer(jsonData)
 	}
 
 	req, err := http.NewRequest(method, fullURL, reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -92,7 +97,7 @@ func (c *Client) doRequest(method, endpoint string, body interface{}, queryParam
 	// Perform request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, nil, fmt.Errorf("request failed: %w", err)
 	}
 	defer func() {
 		if cerr := resp.Body.Close(); cerr != nil {
@@ -103,24 +108,39 @@ func (c *Client) doRequest(method, endpoint string, body interface{}, queryParam
 	// Read response
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return nil, nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
 	// Check for errors
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var apiErr APIError
 		if err := json.Unmarshal(respBody, &apiErr); err != nil {
-			return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
+			return nil, nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(respBody))
 		}
-		return nil, &apiErr
+		return nil, nil, &apiErr
 	}
 
-	return respBody, nil
+	return respBody, resp.Header, nil
 }
 
 // GET performs a GET request
 func (c *Client) GET(endpoint string, queryParams map[string]string) ([]byte, error) {
 	return c.doRequest(http.MethodGet, endpoint, nil, queryParams)
+}
+
+// GETWithTotalCount performs a GET request and returns X-Total-Count header value
+func (c *Client) GETWithTotalCount(endpoint string, queryParams map[string]string) ([]byte, int, error) {
+	respBody, headers, err := c.doRequestWithHeaders(http.MethodGet, endpoint, nil, queryParams)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	totalCount := 0
+	if tc := headers.Get("X-Total-Count"); tc != "" {
+		fmt.Sscanf(tc, "%d", &totalCount)
+	}
+
+	return respBody, totalCount, nil
 }
 
 // POST performs a POST request

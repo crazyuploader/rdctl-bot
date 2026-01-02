@@ -98,6 +98,13 @@ header {
   text-transform: uppercase;
 }
 
+.count-badge {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
 .status-pill {
   background: var(--card-bg);
   padding: 0.5rem 1rem;

@@ -22,17 +22,21 @@ func (d *Dependencies) GetTorrents(c *fiber.Ctx) error {
 	limit, _ := strconv.Atoi(c.Query("limit", "50"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
 
-	torrents, err := d.RDClient.GetTorrents(limit, offset)
+	result, err := d.RDClient.GetTorrentsWithCount(limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
 	}
 
 	// Format status and size for frontend convenience
-	for i := range torrents {
-		torrents[i].Status = realdebrid.FormatStatus(torrents[i].Status)
+	for i := range result.Torrents {
+		result.Torrents[i].Status = realdebrid.FormatStatus(result.Torrents[i].Status)
 	}
 
-	return c.JSON(fiber.Map{"success": true, "data": torrents})
+	return c.JSON(fiber.Map{
+		"success":     true,
+		"data":        result.Torrents,
+		"total_count": result.TotalCount,
+	})
 }
 
 // GetTorrentInfo retrieves detailed information about a single torrent
@@ -87,11 +91,15 @@ func (d *Dependencies) GetDownloads(c *fiber.Ctx) error {
 	limit, _ := strconv.Atoi(c.Query("limit", "50"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
 
-	downloads, err := d.RDClient.GetDownloads(limit, offset)
+	result, err := d.RDClient.GetDownloadsWithCount(limit, offset)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
 	}
-	return c.JSON(fiber.Map{"success": true, "data": downloads})
+	return c.JSON(fiber.Map{
+		"success":     true,
+		"data":        result.Downloads,
+		"total_count": result.TotalCount,
+	})
 }
 
 // UnrestrictLink unrestricts a hoster link

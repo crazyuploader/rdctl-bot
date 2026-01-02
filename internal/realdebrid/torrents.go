@@ -45,8 +45,23 @@ type AddMagnetResponse struct {
 // InstantAvailability represents instant availability check response
 type InstantAvailability map[string]interface{}
 
+// TorrentsResult wraps torrents list with pagination metadata
+type TorrentsResult struct {
+	Torrents   []Torrent `json:"torrents"`
+	TotalCount int       `json:"total_count"`
+}
+
 // GetTorrents retrieves all torrents
 func (c *Client) GetTorrents(limit, offset int) ([]Torrent, error) {
+	result, err := c.GetTorrentsWithCount(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	return result.Torrents, nil
+}
+
+// GetTorrentsWithCount retrieves all torrents with total count from X-Total-Count header
+func (c *Client) GetTorrentsWithCount(limit, offset int) (*TorrentsResult, error) {
 	params := make(map[string]string)
 	if limit > 0 {
 		params["limit"] = fmt.Sprintf("%d", limit)
@@ -55,7 +70,7 @@ func (c *Client) GetTorrents(limit, offset int) ([]Torrent, error) {
 		params["offset"] = fmt.Sprintf("%d", offset)
 	}
 
-	data, err := c.GET("/torrents", params)
+	data, totalCount, err := c.GETWithTotalCount("/torrents", params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get torrents: %w", err)
 	}
@@ -65,7 +80,10 @@ func (c *Client) GetTorrents(limit, offset int) ([]Torrent, error) {
 		return nil, fmt.Errorf("failed to parse torrents: %w", err)
 	}
 
-	return torrents, nil
+	return &TorrentsResult{
+		Torrents:   torrents,
+		TotalCount: totalCount,
+	}, nil
 }
 
 // GetTorrentInfo retrieves detailed information about a torrent
