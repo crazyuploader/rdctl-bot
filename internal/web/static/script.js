@@ -257,7 +257,7 @@ async function apiFetch(url, options = {}) {
 
   // Add auth based on type
   if (window.authType === "token" && window.authToken) {
-    headers["X-Auth-Token"] = window.authToken;
+    headers["Authorization"] = `Bearer ${window.authToken}`;
   } else if (window.apiKey) {
     headers["X-API-Key"] = window.apiKey;
   }

@@ -1,6 +1,9 @@
 package web
 
 import (
+	"crypto/subtle"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -15,11 +18,8 @@ const (
 func APIKeyAuth(apiKey string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		providedKey := c.Get("X-API-Key")
-		if providedKey == "" {
-			providedKey = c.Query("api_key")
-		}
 
-		if providedKey != apiKey {
+		if providedKey == "" || subtle.ConstantTimeCompare([]byte(providedKey), []byte(apiKey)) != 1 {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"success": false,
 				"message": "Unauthorized: Invalid or missing API Key",
@@ -32,11 +32,14 @@ func APIKeyAuth(apiKey string) fiber.Handler {
 // DualAuth is a middleware that accepts either API key or token authentication
 func DualAuth(apiKey string, tokenStore *TokenStore) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// First, check for token in URL query parameter
-		tokenID := c.Query("token")
+		// 1. Try Token Authentication via Headers
+		tokenID := c.Get("X-Auth-Token")
 		if tokenID == "" {
-			// Check header
-			tokenID = c.Get("X-Auth-Token")
+			// Try Authorization: Bearer <token>
+			authHeader := c.Get("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				tokenID = strings.TrimPrefix(authHeader, "Bearer ")
+			}
 		}
 
 		if tokenID != "" && tokenStore != nil {
@@ -56,13 +59,9 @@ func DualAuth(apiKey string, tokenStore *TokenStore) fiber.Handler {
 			})
 		}
 
-		// Fall back to API key authentication
+		// 2. Try API Key Authentication via Header (Constant Time)
 		providedKey := c.Get("X-API-Key")
-		if providedKey == "" {
-			providedKey = c.Query("api_key")
-		}
-
-		if providedKey == apiKey {
+		if providedKey != "" && subtle.ConstantTimeCompare([]byte(providedKey), []byte(apiKey)) == 1 {
 			// API key grants admin access
 			c.Locals(ContextKeyAuthType, "api_key")
 			c.Locals(ContextKeyRole, RoleAdmin)
