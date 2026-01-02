@@ -593,17 +593,30 @@
               <div
                 class="ml-auto flex items-center gap-2 pl-2 border-l border-slate-700/50"
               >
-                <label class="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    id="select-all-torrents"
-                    class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-offset-slate-800 focus:ring-blue-500 transition-all cursor-pointer"
-                  />
-                  <span
-                    class="text-xs text-slate-400 group-hover:text-blue-300 transition-colors"
-                    >Select All</span
-                  >
-                </label>
+                <button 
+                  id="select-all-btn"
+                  onclick="toggleSelectAll(!this.classList.contains('text-blue-500'))"
+                  class="flex items-center gap-2 group cursor-pointer text-slate-400 hover:text-blue-300 transition-colors"
+                >
+                  <div class="relative w-4 h-4">
+                    <!-- Unchecked Circle -->
+                    <svg class="w-4 h-4 transition-all duration-200 group-hover:scale-110" 
+                         id="select-all-unchecked"
+                         fill="none" 
+                         stroke="currentColor" 
+                         viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="9" stroke-width="2"/>
+                    </svg>
+                    <!-- Checked Circle -->
+                    <svg class="w-4 h-4 absolute top-0 left-0 text-blue-500 opacity-0 scale-50 transition-all duration-200" 
+                         id="select-all-checked"
+                         fill="currentColor" 
+                         viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                  </div>
+                  <span class="text-xs font-medium">Select All</span>
+                </button>
               </div>
             </div>
 
