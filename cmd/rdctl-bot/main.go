@@ -193,6 +193,9 @@ func runBot(cmd *cobra.Command, args []string) {
 		log.Println("Web only mode enabled. Telegram bot will NOT be started.")
 	}
 
+	// Create token store for dashboard authentication
+	tokenStore := web.NewTokenStore(cfg.Web.TokenExpiryMinutes)
+
 	// Initialize bot
 	var b *bot.Bot
 	if !webOnly {
@@ -203,6 +206,8 @@ func runBot(cmd *cobra.Command, args []string) {
 		if err != nil {
 			log.Fatalf("Failed to create bot: %v", err)
 		}
+		// Connect token store to bot for /dashboard command
+		b.SetTokenStore(tokenStore)
 	}
 
 	// Initialize dependencies for web handlers
@@ -214,6 +219,7 @@ func runBot(cmd *cobra.Command, args []string) {
 		DownloadRepo: db.NewDownloadRepository(database),
 		CommandRepo:  db.NewCommandRepository(database),
 		Config:       cfg,
+		TokenStore:   tokenStore,
 	}
 
 	// Initialize web server

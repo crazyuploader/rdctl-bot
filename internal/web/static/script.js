@@ -5,16 +5,48 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const API_BASE_URL = "/api";
 let refreshIntervals = {};
+let userRole = null; // 'admin' or 'viewer'
+let isAdmin = false;
 
 // --- Auth & Init ---
 
 function checkLogin() {
+  // First check for token in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get("token");
+
+  if (token) {
+    // Token auth - store and use it
+    window.authToken = token;
+    window.authType = "token";
+    // Clean URL without reloading
+    window.history.replaceState({}, document.title, window.location.pathname);
+    fetchAuthInfo().then(() => showDashboard());
+    return;
+  }
+
+  // Fall back to API key
   const key = localStorage.getItem("rdctl_api_key");
   if (key) {
     window.apiKey = key;
+    window.authType = "api_key";
+    isAdmin = true; // API key always has admin access
+    userRole = "admin";
     showDashboard();
   } else {
     showLogin();
+  }
+}
+
+async function fetchAuthInfo() {
+  try {
+    const result = await apiFetch(`${API_BASE_URL}/auth/me`);
+    userRole = result.role;
+    isAdmin = result.is_admin;
+    console.log("Auth info:", { role: userRole, isAdmin });
+  } catch (error) {
+    console.error("Failed to fetch auth info:", error);
+    logout();
   }
 }
 
@@ -51,6 +83,9 @@ function handleLogin(e) {
   if (key) {
     localStorage.setItem("rdctl_api_key", key);
     window.apiKey = key;
+    window.authType = "api_key";
+    isAdmin = true;
+    userRole = "admin";
     showDashboard();
   }
 }
@@ -58,6 +93,10 @@ function handleLogin(e) {
 function logout() {
   localStorage.removeItem("rdctl_api_key");
   window.apiKey = null;
+  window.authToken = null;
+  window.authType = null;
+  userRole = null;
+  isAdmin = false;
   clearInterval(refreshIntervals.torrents);
   clearInterval(refreshIntervals.downloads);
   showLogin();
@@ -112,17 +151,28 @@ function toggleAutoRefresh(type, enabled) {
 // --- API Helper ---
 
 async function apiFetch(url, options = {}) {
-  options.headers = {
+  const headers = {
     "Content-Type": "application/json",
-    "X-API-Key": window.apiKey,
     ...options.headers,
   };
+
+  // Add auth based on type
+  if (window.authType === "token" && window.authToken) {
+    headers["X-Auth-Token"] = window.authToken;
+  } else if (window.apiKey) {
+    headers["X-API-Key"] = window.apiKey;
+  }
+
+  options.headers = headers;
 
   try {
     const response = await fetch(url, options);
     if (response.status === 401) {
       logout();
       throw new Error("Unauthorized");
+    }
+    if (response.status === 403) {
+      throw new Error("Forbidden: Admin access required for this operation");
     }
     if (!response.ok) {
       const errorData = await response.json();
@@ -213,8 +263,8 @@ async function fetchTorrents() {
             : t.status === "Downloading"
               ? "status-downloading"
               : "status-badge";
-        
-        const addedDate = t.added ? new Date(t.added).toLocaleDateString() : '';
+
+        const addedDate = t.added ? new Date(t.added).toLocaleDateString() : "";
 
         return `
             <div class="item-card">
@@ -224,14 +274,18 @@ async function fetchTorrents() {
                         <div class="item-meta">
                             <span>${formatBytes(t.bytes)}</span>
                             <span class="status-badge ${statusClass}">${t.status}</span>
-                            ${t.seeders !== undefined && t.seeders !== null ? `<span>${t.seeders} seeds</span>` : ''}
-                            ${t.speed !== undefined && t.speed !== null && t.speed > 0 ? `<span>${formatBytes(t.speed)}/s</span>` : ''}
-                            ${addedDate ? `<span title="Added date">${addedDate}</span>` : ''}
+                            ${t.seeders !== undefined && t.seeders !== null ? `<span>${t.seeders} seeds</span>` : ""}
+                            ${t.speed !== undefined && t.speed !== null && t.speed > 0 ? `<span>${formatBytes(t.speed)}/s</span>` : ""}
+                            ${addedDate ? `<span title="Added date">${addedDate}</span>` : ""}
                         </div>
                     </div>
-                    <button class="delete-btn" onclick="confirmDelete('torrent', '${t.id}', '${escapeHtml(t.filename)}')" title="Delete">
+                    ${
+                      isAdmin
+                        ? `<button class="delete-btn" onclick="confirmDelete('torrent', '${t.id}', '${escapeHtml(t.filename)}')" title="Delete">
                         🗑
-                    </button>
+                    </button>`
+                        : ""
+                    }
                 </div>
                 <div class="progress-container">
                     <div class="progress-fill" style="width: ${t.progress}%"></div>
@@ -286,9 +340,13 @@ async function fetchDownloads() {
                             <span>${new Date(d.generated).toLocaleDateString()}</span>
                         </div>
                     </div>
-                    <button class="delete-btn" onclick="confirmDelete('download', '${d.id}', '${escapeHtml(d.filename)}')" title="Delete">
+                    ${
+                      isAdmin
+                        ? `<button class="delete-btn" onclick="confirmDelete('download', '${d.id}', '${escapeHtml(d.filename)}')" title="Delete">
                         🗑
-                    </button>
+                    </button>`
+                        : ""
+                    }
                 </div>
             </div>
             `;

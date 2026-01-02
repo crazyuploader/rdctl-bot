@@ -8,6 +8,28 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+// GetAuthInfo returns information about the current authenticated user
+func (d *Dependencies) GetAuthInfo(c *fiber.Ctx) error {
+	authType, _ := c.Locals(ContextKeyAuthType).(string)
+	role := GetRole(c)
+	token := GetToken(c)
+
+	response := fiber.Map{
+		"success":   true,
+		"auth_type": authType,
+		"role":      role,
+		"is_admin":  role == RoleAdmin,
+	}
+
+	if token != nil {
+		response["user_id"] = token.UserID
+		response["username"] = token.Username
+		response["expires_at"] = token.ExpiresAt
+	}
+
+	return c.JSON(response)
+}
+
 // GetStatus retrieves the Real-Debrid account status
 func (d *Dependencies) GetStatus(c *fiber.Ctx) error {
 	user, err := d.RDClient.GetUser()

@@ -21,8 +21,10 @@ type Config struct {
 
 // WebConfig holds all web server configuration
 type WebConfig struct {
-	ListenAddr string `mapstructure:"listen_addr"`
-	APIKey     string `mapstructure:"api_key"`
+	ListenAddr         string `mapstructure:"listen_addr"`
+	APIKey             string `mapstructure:"api_key"`
+	DashboardURL       string `mapstructure:"dashboard_url"`
+	TokenExpiryMinutes int    `mapstructure:"token_expiry_minutes"`
 }
 
 // TelegramConfig holds Telegram bot settings
@@ -223,6 +225,12 @@ func (c *Config) Validate(webOnly bool) error {
 	}
 	if c.Web.APIKey == "" {
 		return fmt.Errorf("web api_key is required for dashboard access")
+	}
+	if c.Web.DashboardURL == "" {
+		c.Web.DashboardURL = "http://localhost" + c.Web.ListenAddr
+	}
+	if c.Web.TokenExpiryMinutes == 0 {
+		c.Web.TokenExpiryMinutes = 60 // Default 1 hour
 	}
 
 	return nil

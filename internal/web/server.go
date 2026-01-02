@@ -28,12 +28,14 @@ type Dependencies struct {
 	DownloadRepo *db.DownloadRepository
 	CommandRepo  *db.CommandRepository
 	Config       *config.Config
+	TokenStore   *TokenStore
 }
 
 // Server represents the web server instance
 type Server struct {
-	app    *fiber.App
-	config *config.Config
+	app        *fiber.App
+	config     *config.Config
+	tokenStore *TokenStore
 }
 
 // NewServer creates a new web server instance
@@ -47,19 +49,24 @@ func NewServer(deps Dependencies) *Server {
 	app.Use(recover.New())
 	app.Use(cors.New())
 
-	// API group
-	api := app.Group("/api", APIKeyAuth(deps.Config.Web.APIKey))
+	// API group with dual auth (API key OR token)
+	api := app.Group("/api", DualAuth(deps.Config.Web.APIKey, deps.TokenStore))
 
-	// API Routes
+	// Auth endpoint to get current user info
+	api.Get("/auth/me", deps.GetAuthInfo)
+
+	// API Routes - Read operations (allowed for all authenticated users)
 	api.Get("/status", deps.GetStatus)
 	api.Get("/torrents", deps.GetTorrents)
 	api.Get("/torrents/:id", deps.GetTorrentInfo)
 	api.Post("/torrents", deps.AddTorrent)
-	api.Delete("/torrents/:id", deps.DeleteTorrent)
 	api.Get("/downloads", deps.GetDownloads)
 	api.Post("/unrestrict", deps.UnrestrictLink)
-	api.Delete("/downloads/:id", deps.DeleteDownload)
 	api.Get("/stats/user/:id", deps.GetUserStats)
+
+	// Delete operations - Admin only
+	api.Delete("/torrents/:id", AdminOnly(deps.TokenStore), deps.DeleteTorrent)
+	api.Delete("/downloads/:id", AdminOnly(deps.TokenStore), deps.DeleteDownload)
 
 	// Embed static files - Place this last to ensure API routes are matched first
 	// or properly fall through if not found.
@@ -70,8 +77,9 @@ func NewServer(deps Dependencies) *Server {
 	}))
 
 	return &Server{
-		app:    app,
-		config: deps.Config,
+		app:        app,
+		config:     deps.Config,
+		tokenStore: deps.TokenStore,
 	}
 }
 

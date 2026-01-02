@@ -15,6 +15,7 @@ import (
 	"github.com/crazyuploader/rdctl-bot/internal/config"
 	"github.com/crazyuploader/rdctl-bot/internal/db"
 	"github.com/crazyuploader/rdctl-bot/internal/realdebrid"
+	"github.com/crazyuploader/rdctl-bot/internal/web"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"gorm.io/gorm"
@@ -33,6 +34,7 @@ type Bot struct {
 	torrentRepo    *db.TorrentRepository
 	downloadRepo   *db.DownloadRepository
 	commandRepo    *db.CommandRepository
+	tokenStore     *web.TokenStore
 }
 
 // NewBot creates and returns a fully configured Bot.
@@ -147,6 +149,7 @@ func (b *Bot) registerHandlers() {
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/downloads", bot.MatchTypeExact, b.handleDownloadsCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/removelink", bot.MatchTypePrefix, b.handleRemoveLinkCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/status", bot.MatchTypeExact, b.handleStatusCommand)
+	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/dashboard", bot.MatchTypeExact, b.handleDashboardCommand)
 
 	// Message handlers for links
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "magnet:?", bot.MatchTypeContains, b.handleMagnetLink)
@@ -161,6 +164,11 @@ func (b *Bot) Stop() {
 		log.Printf("Error closing database: %v", err)
 	}
 	log.Println("Bot stopped")
+}
+
+// SetTokenStore sets the token store for dashboard access
+func (b *Bot) SetTokenStore(ts *web.TokenStore) {
+	b.tokenStore = ts
 }
 
 // defaultHandler ignores unhandled updates

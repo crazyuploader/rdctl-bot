@@ -63,6 +63,7 @@ func (b *Bot) handleHelpCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 			"• <code>/removelink &lt;id&gt;</code> — Remove a download from history <i>(superadmin only)</i>\n\n" +
 			"<b>⚙️ General Commands:</b>\n" +
 			"• <code>/status</code> — Show your Real-Debrid account status\n" +
+			"• <code>/dashboard</code> — Get a temporary link to the web dashboard\n" +
 			"• <code>/help</code> — Display this help message"
 
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
@@ -731,6 +732,78 @@ func (b *Bot) handleHosterLink(ctx context.Context, tgBot *bot.Bot, update *mode
 			}
 			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeHosterLink, "hoster_link", messageThreadID, true, "", map[string]any{"download_id": unrestricted.ID, "filename": unrestricted.Filename}); err != nil {
 				log.Printf("Warning: failed to log hoster link activity success: %v", err)
+			}
+		}
+	})
+}
+
+// handleDashboardCommand handles the /dashboard command
+func (b *Bot) handleDashboardCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
+		startTime := time.Now()
+		b.middleware.LogCommand(update, "dashboard")
+
+		if b.tokenStore == nil {
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, "<b>[ERROR]</b> Dashboard is not available. Token store not initialized.", update.Message.ID)
+			return
+		}
+
+		// Generate token
+		username := ""
+		userID := int64(0)
+		if user != nil {
+			username = user.Username
+			userID = user.UserID
+		}
+
+		tokenID, err := b.tokenStore.GenerateToken(userID, username, isSuperAdmin)
+		if err != nil {
+			text := fmt.Sprintf("<b>[ERROR]</b> Failed to generate dashboard token: %s", html.EscapeString(err.Error()))
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
+			if user != nil {
+				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "dashboard", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, err.Error(), 0); err != nil {
+					log.Printf("Warning: failed to log dashboard error command: %v", err)
+				}
+			}
+			return
+		}
+
+		// Build the dashboard URL
+		dashboardURL := b.config.Web.DashboardURL + "?token=" + tokenID
+
+		var roleDesc string
+		if isSuperAdmin {
+			roleDesc = "Admin (full access)"
+		} else {
+			roleDesc = "Viewer (read-only)"
+		}
+
+		expiryMinutes := b.config.Web.TokenExpiryMinutes
+		if expiryMinutes == 0 {
+			expiryMinutes = 60
+		}
+
+		text := fmt.Sprintf(
+			"<b>🖥️ Dashboard Access</b>\n\n"+
+				"<b>Your access link:</b>\n"+
+				"<code>%s</code>\n\n"+
+				"<b>Role:</b> %s\n"+
+				"<b>Valid for:</b> %d minutes\n\n"+
+				"<i>⚠️ This link is personal and will expire. Do not share it.</i>",
+			dashboardURL,
+			roleDesc,
+			expiryMinutes,
+		)
+
+		b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
+
+		// Log command
+		if user != nil {
+			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "dashboard", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text)); err != nil {
+				log.Printf("Warning: failed to log dashboard command: %v", err)
+			}
+			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeCommandStatus, "dashboard", messageThreadID, true, "", map[string]any{"role": roleDesc}); err != nil {
+				log.Printf("Warning: failed to log dashboard activity: %v", err)
 			}
 		}
 	})
