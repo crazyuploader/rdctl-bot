@@ -641,6 +641,11 @@ function renderTorrents(filterText = null, preserveSelection = false) {
     filteredTorrents = filteredTorrents.filter(t => t.status.toLowerCase() === 'downloading');
   } else if (activeTab === 'completed') {
     filteredTorrents = filteredTorrents.filter(t => t.status.toLowerCase() === 'downloaded');
+  } else if (activeTab === 'error') {
+    filteredTorrents = filteredTorrents.filter(t => {
+      const s = t.status.toLowerCase();
+      return s === 'error' || s === 'dead';
+    });
   }
 
   const totalCount = window.torrentsTotalCount || cachedTorrents.length;
