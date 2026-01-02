@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/crazyuploader/rdctl-bot/internal/config"
@@ -20,16 +22,17 @@ import (
 
 // Bot represents the Telegram bot
 type Bot struct {
-	api          *bot.Bot
-	rdClient     *realdebrid.Client
-	middleware   *Middleware
-	config       *config.Config
-	db           *gorm.DB
-	userRepo     *db.UserRepository
-	activityRepo *db.ActivityRepository
-	torrentRepo  *db.TorrentRepository
-	downloadRepo *db.DownloadRepository
-	commandRepo  *db.CommandRepository
+	api            *bot.Bot
+	rdClient       *realdebrid.Client
+	middleware     *Middleware
+	supportedRegex []*regexp.Regexp
+	config         *config.Config
+	db             *gorm.DB
+	userRepo       *db.UserRepository
+	activityRepo   *db.ActivityRepository
+	torrentRepo    *db.TorrentRepository
+	downloadRepo   *db.DownloadRepository
+	commandRepo    *db.CommandRepository
 }
 
 // NewBot creates and returns a fully configured Bot.
@@ -72,6 +75,35 @@ func NewBot(cfg *config.Config, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, 
 
 	log.Printf("Authorized on account @%s", me.Username)
 
+	// Fetch supported regexes
+	regexList, err := rdClient.GetSupportedRegex()
+	var supportedRegex []*regexp.Regexp
+	if err != nil {
+		log.Printf("Warning: Failed to fetch supported regexes: %v. All links will be allowed (fallback).", err)
+	} else {
+		for _, r := range regexList {
+			// Real-Debrid regexes are returned as /pattern/ strings (PCRE style)
+			// Go uses RE2 and doesn't use delimiters.
+			// We need to strip the leading/trailing slashes and handle escapes.
+			if len(r) > 2 && r[0] == '/' && r[len(r)-1] == '/' {
+				r = r[1 : len(r)-1]
+			}
+			// Unescape \/ to / because / is not a special character in Go regex
+			// format in the string is literal BACKSLASH + SLASH -> \/
+			// We want just SLASH -> /
+			// Note: The string r already has JSON string escapes removed, so it contains literal backslashes
+			r = strings.ReplaceAll(r, `\/`, `/`)
+
+			compiled, err := regexp.Compile(r)
+			if err != nil {
+				log.Printf("Warning: Failed to compile regex '%s': %v", r, err)
+				continue
+			}
+			supportedRegex = append(supportedRegex, compiled)
+		}
+		log.Printf("Loaded %d supported host regexes", len(supportedRegex))
+	}
+
 	// Initialize database
 	database, err := db.Init(cfg.Database.GetDSN())
 	if err != nil {
@@ -79,16 +111,17 @@ func NewBot(cfg *config.Config, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, 
 	}
 
 	return &Bot{
-		api:          api,
-		rdClient:     rdClient,
-		middleware:   middleware,
-		config:       cfg,
-		db:           database,
-		userRepo:     db.NewUserRepository(database),
-		activityRepo: db.NewActivityRepository(database),
-		torrentRepo:  db.NewTorrentRepository(database),
-		downloadRepo: db.NewDownloadRepository(database),
-		commandRepo:  db.NewCommandRepository(database),
+		api:            api,
+		rdClient:       rdClient,
+		middleware:     middleware,
+		supportedRegex: supportedRegex,
+		config:         cfg,
+		db:             database,
+		userRepo:       db.NewUserRepository(database),
+		activityRepo:   db.NewActivityRepository(database),
+		torrentRepo:    db.NewTorrentRepository(database),
+		downloadRepo:   db.NewDownloadRepository(database),
+		commandRepo:    db.NewCommandRepository(database),
 	}, nil
 }
 
@@ -173,7 +206,7 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 
 	isAllowed, isSuperAdmin := b.middleware.CheckAuthorization(chatID, userID)
 
-	user, err := b.userRepo.GetOrCreateUser(chatID, username, firstName, lastName, isSuperAdmin, isAllowed)
+	user, err := b.userRepo.GetOrCreateUser(userID, username, firstName, lastName, isSuperAdmin)
 	if err != nil {
 		log.Printf("Error getting/creating user: %v", err)
 		if chatID != 0 {
@@ -190,10 +223,12 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 	}
 
 	if !isAllowed {
-		b.middleware.LogUnauthorized(username, chatID)
-		b.sendUnauthorizedMessage(ctx, chatID, messageThreadID)
+		b.middleware.LogUnauthorized(username, chatID, userID)
+		b.sendUnauthorizedMessage(ctx, chatID, messageThreadID, userID)
 		if user != nil {
-			b.activityRepo.LogActivity(user.ID, chatID, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil)
+			if err := b.activityRepo.LogActivity(user.ID, chatID, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil); err != nil {
+				log.Printf("Warning: failed to log unauthorized activity: %v", err)
+			}
 		}
 		return
 	}
@@ -202,9 +237,14 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 }
 
 // sendUnauthorizedMessage sends an unauthorized message
-func (b *Bot) sendUnauthorizedMessage(ctx context.Context, chatID int64, messageThreadID int) {
+func (b *Bot) sendUnauthorizedMessage(ctx context.Context, chatID int64, messageThreadID int, userID int64) {
 	text := fmt.Sprintf(
-		"[UNAUTHORIZED]\n\nYou are not authorized to use this bot.\n\nYour Chat ID is: <code>%d</code>\n\nPlease contact the administrator for access.",
+		"[UNAUTHORIZED]\n\n"+
+			"You are not authorized to use this bot.\n\n"+
+			"Your User ID is: <code>%d</code>\n"+
+			"Chat ID: <code>%d</code>\n\n"+
+			"Please contact the administrator to add your User ID to the super admin list or add this chat to the allowed chats list.",
+		userID,
 		chatID,
 	)
 
@@ -269,7 +309,11 @@ func performIPTests(proxyURL, ipTestURL, ipVerifyURL string) error {
 	if err != nil {
 		log.Printf("Warning: Failed to perform primary IP test: %v", err)
 	} else {
-		defer resp.Body.Close()
+		defer func() {
+			if cerr := resp.Body.Close(); cerr != nil {
+				log.Printf("Warning: failed to close response body: %v", cerr)
+			}
+		}()
 		var ipResponse struct {
 			IP string `json:"ip"`
 		}
@@ -291,7 +335,11 @@ func performIPTests(proxyURL, ipTestURL, ipVerifyURL string) error {
 		if verifyErr != nil {
 			return fmt.Errorf("failed to perform IP verification test: %w", verifyErr)
 		}
-		defer verifyResp.Body.Close()
+		defer func() {
+			if cerr := verifyResp.Body.Close(); cerr != nil {
+				log.Printf("Warning: failed to close verifyResp body: %v", cerr)
+			}
+		}()
 		var verifyIpResponse struct {
 			IP string `json:"ip"`
 		}

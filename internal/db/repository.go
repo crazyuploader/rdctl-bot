@@ -19,30 +19,27 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-// GetOrCreateUser gets or creates a user, handling updates if the user already exists.
-func (r *UserRepository) GetOrCreateUser(chatID int64, username, firstName, lastName string, isSuperAdmin, isAllowed bool) (*User, error) {
+// GetOrCreateUser gets or creates a user based on their Telegram user ID
+func (r *UserRepository) GetOrCreateUser(userID int64, username, firstName, lastName string, isSuperAdmin bool) (*User, error) {
 	now := time.Now().UTC()
 	user := User{
-		ChatID:       chatID,
+		UserID:       userID,
 		Username:     username,
 		FirstName:    firstName,
 		LastName:     lastName,
 		IsSuperAdmin: isSuperAdmin,
-		IsAllowed:    isAllowed,
-		FirstSeenAt:  now, // This will only be set on creation
+		FirstSeenAt:  now,
 		LastSeenAt:   now,
 	}
 
-	// Use clause.OnConflict to perform an upsert (create or update)
-	// If a user with the same chat_id exists, update the specified fields.
+	// Use clause.OnConflict to perform an upsert based on user_id
 	result := r.db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "chat_id"}},
-		DoUpdates: clause.Assignments(map[string]interface{}{
+		Columns: []clause.Column{{Name: "user_id"}},
+		DoUpdates: clause.Assignments(map[string]any{
 			"username":       username,
 			"first_name":     firstName,
 			"last_name":      lastName,
 			"is_super_admin": isSuperAdmin,
-			"is_allowed":     isAllowed,
 			"last_seen_at":   now,
 		}),
 	}).Create(&user)
@@ -51,10 +48,9 @@ func (r *UserRepository) GetOrCreateUser(chatID int64, username, firstName, last
 		return nil, result.Error
 	}
 
-	// After upsert, retrieve the potentially updated user to ensure all fields are current
-	// This is important because Create(&user) with OnConflict might not load all updated fields back into 'user'
+	// Retrieve the user to ensure all fields are current
 	var updatedUser User
-	if err := r.db.Where("chat_id = ?", chatID).First(&updatedUser).Error; err != nil {
+	if err := r.db.Where("user_id = ?", userID).First(&updatedUser).Error; err != nil {
 		return nil, err
 	}
 

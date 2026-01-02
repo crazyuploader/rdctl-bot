@@ -31,8 +31,16 @@ func NewMiddleware(cfg *config.Config) *Middleware {
 
 // CheckAuthorization verifies if the user is allowed to use the bot
 func (m *Middleware) CheckAuthorization(chatID, userID int64) (bool, bool) {
+	// Check if user is superadmin - they can use bot anywhere
 	isSuperAdmin := m.config.IsSuperAdmin(userID)
-	isAllowed := m.config.IsAllowedChat(chatID) || isSuperAdmin
+
+	// Check if the chat itself is allowed
+	isChatAllowed := m.config.IsAllowedChat(chatID)
+
+	// User is allowed if either:
+	// 1. They are a superadmin (can use anywhere), OR
+	// 2. The chat is in the allowed list
+	isAllowed := isSuperAdmin || isChatAllowed
 
 	return isAllowed, isSuperAdmin
 }
@@ -75,7 +83,7 @@ func (m *Middleware) LogCommand(update *models.Update, command string) {
 		}
 	}
 
-	logMessage := fmt.Sprintf("[%s] User: [username=%s, id=%d] - Chat: [id=%d",
+	logMessage := fmt.Sprintf("[%s] User: [username=%s, user_id=%d] - Chat: [chat_id=%d",
 		time.Now().Format("2006-01-02 15:04:05"),
 		user,
 		userID,
@@ -94,10 +102,11 @@ func (m *Middleware) LogCommand(update *models.Update, command string) {
 }
 
 // LogUnauthorized logs unauthorized access attempts
-func (m *Middleware) LogUnauthorized(username string, chatID int64) {
-	log.Printf("[%s] UNAUTHORIZED - User: %s (ID: %d)",
+func (m *Middleware) LogUnauthorized(username string, chatID, userID int64) {
+	log.Printf("[%s] UNAUTHORIZED - User: %s (UserID: %d, ChatID: %d)",
 		time.Now().Format("2006-01-02 15:04:05"),
 		username,
+		userID,
 		chatID,
 	)
 }

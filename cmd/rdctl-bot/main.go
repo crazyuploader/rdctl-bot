@@ -97,8 +97,12 @@ func init() {
 	rootCmd.Flags().Bool("web-only", false, "enable web-only mode (disable Telegram bot)")
 
 	// Bind flags to viper
-	viper.BindPFlag("app.debug", rootCmd.PersistentFlags().Lookup("debug"))
-	viper.BindPFlag("app.shutdown_timeout", rootCmd.Flags().Lookup("shutdown-timeout"))
+	if err := viper.BindPFlag("app.debug", rootCmd.PersistentFlags().Lookup("debug")); err != nil {
+		log.Printf("Warning: failed to bind debug flag: %v", err)
+	}
+	if err := viper.BindPFlag("app.shutdown_timeout", rootCmd.Flags().Lookup("shutdown-timeout")); err != nil {
+		log.Printf("Warning: failed to bind shutdown-timeout flag: %v", err)
+	}
 
 	// Add subcommands
 	rootCmd.AddCommand(versionCmd)

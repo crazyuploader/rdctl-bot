@@ -9,24 +9,18 @@ import (
 // User represents a Telegram user
 type User struct {
 	ID            uint   `gorm:"primaryKey"`
-	ChatID        int64  `gorm:"uniqueIndex;not null"`
+	UserID        int64  `gorm:"uniqueIndex;not null"`
 	Username      string `gorm:"index"`
 	FirstName     string
 	LastName      string
 	IsSuperAdmin  bool      `gorm:"default:false"`
-	IsAllowed     bool      `gorm:"default:false"`
+	IsAllowed     bool      `gorm:"default:false"` // Not used anymore, kept for migration compatibility
 	FirstSeenAt   time.Time `gorm:"not null"`
 	LastSeenAt    time.Time `gorm:"not null"`
 	TotalCommands int       `gorm:"default:0"`
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	DeletedAt     gorm.DeletedAt `gorm:"index"`
-
-	// Relationships
-	ActivityLogs       []ActivityLog      `gorm:"foreignKey:UserID"`
-	TorrentActivities  []TorrentActivity  `gorm:"foreignKey:UserID"`
-	DownloadActivities []DownloadActivity `gorm:"foreignKey:UserID"`
-	CommandLogs        []CommandLog       `gorm:"foreignKey:UserID"`
 }
 
 // ActivityType represents the type of activity
@@ -64,7 +58,7 @@ type ActivityLog struct {
 	CreatedAt       time.Time `gorm:"index"`
 
 	// Relationships
-	User User `gorm:"foreignKey:UserID"`
+	User User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 }
 
 // TorrentActivity tracks torrent-specific activities
@@ -87,7 +81,7 @@ type TorrentActivity struct {
 	SelectedFiles string    `gorm:"type:jsonb;not null;default:'[]'"` // Stores selected files as JSON array
 
 	// Relationships
-	User               User               `gorm:"foreignKey:UserID"`
+	User               User               `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 	DownloadActivities []DownloadActivity `gorm:"foreignKey:TorrentActivityID"`
 }
 
@@ -109,8 +103,8 @@ type DownloadActivity struct {
 	TorrentActivityID *uint     `gorm:"index"` // Links to originating torrent activity
 
 	// Relationships
-	User            User             `gorm:"foreignKey:UserID"`
-	TorrentActivity *TorrentActivity `gorm:"foreignKey:TorrentActivityID"`
+	User            User             `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	TorrentActivity *TorrentActivity `gorm:"foreignKey:TorrentActivityID;constraint:OnDelete:SET NULL"`
 }
 
 // CommandLog tracks all command executions
@@ -129,7 +123,7 @@ type CommandLog struct {
 	CreatedAt       time.Time `gorm:"index"`
 
 	// Relationships
-	User User `gorm:"foreignKey:UserID"`
+	User User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 }
 
 // TableName overrides

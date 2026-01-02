@@ -41,6 +41,9 @@ database:
   # SSL mode for database connection (e.g., "disable", "require")
   sslmode: "disable"
 
+  # SQLite configuration (uncomment to use SQLite instead of PostgreSQL)
+  # sqlite_path: "rdctl_bot.db"
+
 web:
   listen_addr: ":8082"
   api_key: "random_key"

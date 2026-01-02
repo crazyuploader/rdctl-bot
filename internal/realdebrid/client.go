@@ -94,7 +94,11 @@ func (c *Client) doRequest(method, endpoint string, body interface{}, queryParam
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			fmt.Printf("Warning: failed to close response body: %v\n", cerr)
+		}
+	}()
 
 	// Read response
 	respBody, err := io.ReadAll(resp.Body)
@@ -150,7 +154,11 @@ func (c *Client) POSTForm(endpoint string, formData map[string]string) ([]byte, 
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			fmt.Printf("Warning: failed to close form response body: %v\n", cerr)
+		}
+	}()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -207,4 +215,19 @@ func (c *Client) GetUser() (*User, error) {
 	}
 
 	return &user, nil
+}
+
+// GetSupportedRegex retrieves the list of supported host regexes
+func (c *Client) GetSupportedRegex() ([]string, error) {
+	respBody, err := c.GET("/hosts/regex", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get supported regex: %w", err)
+	}
+
+	var regexList []string
+	if err := json.Unmarshal(respBody, &regexList); err != nil {
+		return nil, fmt.Errorf("failed to decode supported regex list: %w", err)
+	}
+
+	return regexList, nil
 }
