@@ -201,8 +201,8 @@ async function fetchTorrents() {
                         <div class="item-meta">
                             <span>${formatBytes(t.bytes)}</span>
                             <span class="status-badge ${statusClass}">${t.status}</span>
-                            <span>${t.seeders} seeds</span>
-                            <span>${formatBytes(t.speed)}/s</span>
+                            ${t.seeders !== undefined && t.seeders !== null ? `<span>${t.seeders} seeds</span>` : ''}
+                            ${t.speed !== undefined && t.speed !== null ? `<span>${formatBytes(t.speed)}/s</span>` : ''}
                         </div>
                     </div>
                     <button class="delete-btn" onclick="confirmDelete('torrent', '${t.id}', '${escapeHtml(t.filename)}')" title="Delete">
