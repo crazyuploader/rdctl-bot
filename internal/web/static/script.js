@@ -107,9 +107,10 @@ function updateSessionTimer() {
   if (!timerEl) {
     const statusContainer = document.getElementById("status-container");
     if (statusContainer) {
-      timerEl = document.createElement("span");
+      timerEl = document.createElement("div");
       timerEl.id = "session-timer";
-      timerEl.className = "session-timer";
+      timerEl.className =
+        "flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs font-bold";
       statusContainer.appendChild(timerEl);
     }
   }
@@ -117,7 +118,7 @@ function updateSessionTimer() {
   if (!timerEl) return;
 
   if (diff <= 0) {
-    timerEl.innerHTML = `<span class="timer-expired">⏰ Session expired</span>`;
+    timerEl.innerHTML = `<span class="text-red-400">⏰ Session expired</span>`;
     clearInterval(sessionCountdownInterval);
     setTimeout(() => {
       showToast(
@@ -132,22 +133,52 @@ function updateSessionTimer() {
   const minutes = Math.floor(diff / 60000);
   const seconds = Math.floor((diff % 60000) / 1000);
 
-  const urgencyClass =
-    minutes < 5 ? "timer-urgent" : minutes < 15 ? "timer-warning" : "";
-  timerEl.innerHTML = `<span class="timer-icon">⏱️</span><span class="${urgencyClass}">${minutes}:${seconds.toString().padStart(2, "0")}</span>`;
+  const colorClass =
+    minutes < 5
+      ? "text-red-400"
+      : minutes < 15
+        ? "text-yellow-400"
+        : "text-blue-400";
+  timerEl.innerHTML = `<span class="${colorClass}">⏱️ ${minutes}:${seconds.toString().padStart(2, "0")}</span>`;
 }
 
 function showLogin() {
-  document.getElementById("login-overlay").classList.remove("hidden");
-  document.querySelector(".app-container").classList.remove("active");
-  document.querySelector(".app-container").classList.add("blur-content");
-  document.getElementById("api-key-input").focus();
+  if (typeof window.originalShowLogin === "function") {
+    window.originalShowLogin();
+  } else {
+    // Fallback
+    const loginOverlay = document.getElementById("login-overlay");
+    const appContainer =
+      document.getElementById("app-container") ||
+      document.querySelector(".app-container");
+
+    loginOverlay.classList.remove("hidden");
+    loginOverlay.style.opacity = "1";
+    appContainer.classList.add("opacity-0", "pointer-events-none", "blur-sm");
+    document.getElementById("api-key-input")?.focus();
+  }
 }
 
 function showDashboard() {
-  document.getElementById("login-overlay").classList.add("hidden");
-  document.querySelector(".app-container").classList.remove("blur-content");
-  document.querySelector(".app-container").classList.add("active");
+  if (typeof window.originalShowDashboard === "function") {
+    window.originalShowDashboard();
+  } else {
+    // Fallback
+    const loginOverlay = document.getElementById("login-overlay");
+    const appContainer =
+      document.getElementById("app-container") ||
+      document.querySelector(".app-container");
+
+    loginOverlay.style.opacity = "0";
+    setTimeout(() => {
+      loginOverlay.classList.add("hidden");
+    }, 300);
+    appContainer.classList.remove(
+      "opacity-0",
+      "pointer-events-none",
+      "blur-sm",
+    );
+  }
 
   fetchStatus();
   fetchTorrents();
@@ -288,12 +319,25 @@ async function apiFetch(url, options = {}) {
 function showToast(message, type = "success") {
   const toast = document.getElementById("response-message");
   toast.textContent = message;
-  toast.className = `toast ${type}`;
-  toast.style.display = "block"; // Fallback
-  toast.classList.remove("hidden");
+
+  // Set border color based on type
+  toast.className = `fixed bottom-8 right-8 z-[3000] max-w-md px-6 py-4 rounded-xl glass-effect border-l-4 shadow-2xl text-white font-medium transition-all duration-300 flex items-center gap-3`;
+
+  if (type === "error") {
+    toast.classList.add("border-red-500");
+    toast.innerHTML = `<span class="text-red-400 text-xl">✕</span> <span>${message}</span>`;
+  } else {
+    toast.classList.add("border-green-500");
+    toast.innerHTML = `<span class="text-green-400 text-xl">✓</span> <span>${message}</span>`;
+  }
+
+  toast.classList.remove("hidden", "translate-y-20", "opacity-0");
 
   setTimeout(() => {
-    toast.classList.add("hidden");
+    toast.classList.add("translate-y-20", "opacity-0");
+    setTimeout(() => {
+      toast.classList.add("hidden");
+    }, 300);
   }, 3000);
 }
 
@@ -306,18 +350,19 @@ async function fetchStatus() {
     const container = document.getElementById("status-container");
 
     const typeClass =
-      user.type === "premium" ? "status-downloaded" : "status-error";
+      user.type === "premium"
+        ? "text-green-400 bg-green-500/10"
+        : "text-red-400 bg-red-500/10";
     const formattedDate = new Date(user.expiration).toLocaleDateString();
     const maskedUsername = maskUsername(user.username);
 
     container.innerHTML = `
-            <span>${maskedUsername}</span>
-            <span class="status-badge ${typeClass}">${user.type}</span>
-            <span style="opacity: 0.7">|</span>
-            <span>Exp: ${formattedDate}</span>
-            <span>(${user.points} pts)</span>
-        `;
-    container.className = "status-pill";
+      <span class="font-bold text-white">${maskedUsername}</span>
+      <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase ${typeClass}">${user.type}</span>
+      <span class="text-slate-600">|</span>
+      <span class="text-slate-400">Exp: <span class="text-slate-200">${formattedDate}</span></span>
+      <span class="text-slate-400">(${user.points} pts)</span>
+    `;
   } catch (error) {
     console.error("Status error:", error);
   }
@@ -380,17 +425,18 @@ function renderTorrents(filterText = null) {
   // Update count badge
   if (cachedTorrents.length > 0) {
     const filterInfo = filter ? ` (${filteredTorrents.length} matches)` : "";
-    if (totalCount > cachedTorrents.length) {
-      countBadge.textContent = `(${cachedTorrents.length} of ${totalCount})${filterInfo}`;
-    } else {
-      countBadge.textContent = `(${cachedTorrents.length})${filterInfo}`;
-    }
+    countBadge.textContent = `${cachedTorrents.length}${totalCount > cachedTorrents.length ? ` of ${totalCount}` : ""}${filterInfo} items`;
   } else {
-    countBadge.textContent = "";
+    countBadge.textContent = "0 items";
   }
 
   if (filteredTorrents.length === 0) {
-    list.innerHTML = `<div class="item-card"><p style="text-align:center; color: var(--text-secondary)">${filter ? "No matching torrents" : "No active torrents"}</p></div>`;
+    list.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-slate-500">
+      <svg class="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+      </svg>
+      <p class="text-sm">${filter ? "No matching torrents" : "No active torrents"}</p>
+    </div>`;
     return;
   }
 
@@ -398,50 +444,58 @@ function renderTorrents(filterText = null) {
     .map((t) => {
       const statusClass =
         t.status === "Downloaded"
-          ? "status-downloaded"
+          ? "text-green-400 bg-green-500/10"
           : t.status === "Downloading"
-            ? "status-downloading"
+            ? "text-blue-400 bg-blue-500/10"
             : t.status === "Error" || t.status === "Dead"
-              ? "status-error"
-              : "status-badge";
+              ? "text-red-400 bg-red-500/10"
+              : "text-slate-400 bg-slate-800/50";
 
-      const progressClass =
+      const progressColor =
         t.progress >= 100
-          ? "progress-complete"
+          ? "bg-green-500"
           : t.progress > 0
-            ? "progress-active"
-            : "";
+            ? "bg-blue-500"
+            : "bg-slate-700";
 
       const addedDate = t.added ? new Date(t.added).toLocaleDateString() : "";
 
       return `
-          <div class="item-card" data-filename="${escapeHtml(t.filename.toLowerCase())}">
-              <div class="item-header">
-                  <div style="flex:1">
-                      <div class="item-title" title="${escapeHtml(t.filename)}">${escapeHtml(t.filename)}</div>
-                      <div class="item-meta">
-                          <span>${formatBytes(t.bytes)}</span>
-                          <span class="status-badge ${statusClass}">${t.status}</span>
-                          ${t.seeders !== undefined && t.seeders !== null ? `<span>${t.seeders} seeds</span>` : ""}
-                          ${t.speed !== undefined && t.speed !== null && t.speed > 0 ? `<span>${formatBytes(t.speed)}/s</span>` : ""}
-                          ${addedDate ? `<span title="Added date">${addedDate}</span>` : ""}
-                      </div>
-                  </div>
-                  ${isAdmin ? `<button class="delete-btn" onclick="confirmDelete('torrent', '${t.id}', '${escapeHtml(t.filename)}')" title="Delete">🗑</button>` : ""}
+        <div class="group relative glass-effect border border-slate-700/50 rounded-xl p-4 hover:border-blue-500/40 transition-all duration-200">
+          <div class="flex justify-between items-start gap-4 mb-3">
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-semibold text-white truncate mb-1" title="${escapeHtml(t.filename)}">${escapeHtml(t.filename)}</div>
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                <span class="font-medium text-slate-300">${formatBytes(t.bytes)}</span>
+                <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase ${statusClass}">${t.status}</span>
+                ${t.seeders !== undefined && t.seeders !== null ? `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>${t.seeders} seeds</span>` : ""}
+                ${t.speed !== undefined && t.speed !== null && t.speed > 0 ? `<span>${formatBytes(t.speed)}/s</span>` : ""}
+                ${addedDate ? `<span>${addedDate}</span>` : ""}
               </div>
-              <div class="progress-container ${progressClass}">
-                  <div class="progress-fill" style="width: ${t.progress}%"></div>
-                  <span class="progress-text">${t.progress.toFixed(1)}%</span>
-              </div>
+            </div>
+            ${
+              isAdmin
+                ? `<button class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all" onclick="confirmDelete('torrent', '${t.id}', '${escapeHtml(t.filename)}')" title="Delete">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>`
+                : ""
+            }
           </div>
-          `;
+          <div class="relative h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full ${progressColor} transition-all duration-500 ${t.status === "Downloading" ? "animate-pulse" : ""}" style="width: ${t.progress}%"></div>
+          </div>
+          <div class="mt-1 text-right text-xs font-medium text-slate-500">${t.progress.toFixed(1)}%</div>
+        </div>
+      `;
     })
     .join("");
 
   // Add Load More button if there are more
   const loadMoreHtml =
     window.torrentsTotalCount > cachedTorrents.length && !filter
-      ? `<button class="btn btn-secondary btn-block load-more-btn" onclick="fetchTorrents(true)">Load More (${cachedTorrents.length}/${window.torrentsTotalCount})</button>`
+      ? `<button class="w-full py-3 rounded-xl border border-dashed border-slate-700 text-slate-400 text-sm font-medium hover:border-blue-500 hover:text-blue-400 transition-all" onclick="fetchTorrents(true)">Load More (${cachedTorrents.length}/${window.torrentsTotalCount})</button>`
       : "";
 
   list.innerHTML = html + loadMoreHtml;
@@ -449,6 +503,14 @@ function renderTorrents(filterText = null) {
 
 function filterTorrents() {
   const searchInput = document.getElementById("torrents-search");
+  const clearBtn = document.getElementById("torrents-clear-btn");
+  if (clearBtn) {
+    if (searchInput.value) {
+      clearBtn.classList.remove("opacity-0", "pointer-events-none");
+    } else {
+      clearBtn.classList.add("opacity-0", "pointer-events-none");
+    }
+  }
   renderTorrents(searchInput.value.toLowerCase());
 }
 
@@ -502,17 +564,18 @@ function renderDownloads(filterText = null) {
   // Update count badge
   if (cachedDownloads.length > 0) {
     const filterInfo = filter ? ` (${filteredDownloads.length} matches)` : "";
-    if (totalCount > cachedDownloads.length) {
-      countBadge.textContent = `(${cachedDownloads.length} of ${totalCount})${filterInfo}`;
-    } else {
-      countBadge.textContent = `(${cachedDownloads.length})${filterInfo}`;
-    }
+    countBadge.textContent = `${cachedDownloads.length}${totalCount > cachedDownloads.length ? ` of ${totalCount}` : ""}${filterInfo} items`;
   } else {
-    countBadge.textContent = "";
+    countBadge.textContent = "0 items";
   }
 
   if (filteredDownloads.length === 0) {
-    list.innerHTML = `<div class="item-card"><p style="text-align:center; color: var(--text-secondary)">${filter ? "No matching downloads" : "No recent downloads"}</p></div>`;
+    list.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-slate-500">
+      <svg class="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <p class="text-sm">${filter ? "No matching downloads" : "No recent downloads"}</p>
+    </div>`;
     return;
   }
 
@@ -520,27 +583,37 @@ function renderDownloads(filterText = null) {
     .map((d) => {
       const safeUrl = sanitizeUrl(d.download);
       return `
-          <div class="item-card" data-filename="${escapeHtml(d.filename.toLowerCase())}">
-              <div class="item-header">
-                   <div style="flex:1">
-                      <div class="item-title"><a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none">${escapeHtml(d.filename)}</a></div>
-                      <div class="item-meta">
-                          <span>${formatBytes(d.filesize)}</span>
-                          <span>${d.host}</span>
-                          <span>${new Date(d.generated).toLocaleDateString()}</span>
-                      </div>
-                  </div>
-                  ${isAdmin ? `<button class="delete-btn" onclick="confirmDelete('download', '${d.id}', '${escapeHtml(d.filename)}')" title="Delete">🗑</button>` : ""}
+        <div class="group relative glass-effect border border-slate-700/50 rounded-xl p-4 hover:border-purple-500/40 transition-all duration-200">
+          <div class="flex justify-between items-start gap-4">
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-semibold text-white truncate mb-1">
+                <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="hover:text-purple-400 transition-colors">${escapeHtml(d.filename)}</a>
               </div>
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                <span class="font-medium text-slate-300">${formatBytes(d.filesize)}</span>
+                <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase bg-slate-800/50">${d.host}</span>
+                <span>${new Date(d.generated).toLocaleDateString()}</span>
+              </div>
+            </div>
+            ${
+              isAdmin
+                ? `<button class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all" onclick="confirmDelete('download', '${d.id}', '${escapeHtml(d.filename)}')" title="Delete">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>`
+                : ""
+            }
           </div>
-          `;
+        </div>
+      `;
     })
     .join("");
 
   // Add Load More button if there are more
   const loadMoreHtml =
     window.downloadsTotalCount > cachedDownloads.length && !filter
-      ? `<button class="btn btn-secondary btn-block load-more-btn" onclick="fetchDownloads(true)">Load More (${cachedDownloads.length}/${window.downloadsTotalCount})</button>`
+      ? `<button class="w-full py-3 rounded-xl border border-dashed border-slate-700 text-slate-400 text-sm font-medium hover:border-purple-500 hover:text-purple-400 transition-all" onclick="fetchDownloads(true)">Load More (${cachedDownloads.length}/${window.downloadsTotalCount})</button>`
       : "";
 
   list.innerHTML = html + loadMoreHtml;
@@ -548,13 +621,25 @@ function renderDownloads(filterText = null) {
 
 function filterDownloads() {
   const searchInput = document.getElementById("downloads-search");
+  const clearBtn = document.getElementById("downloads-clear-btn");
+  if (clearBtn) {
+    if (searchInput.value) {
+      clearBtn.classList.remove("opacity-0", "pointer-events-none");
+    } else {
+      clearBtn.classList.add("opacity-0", "pointer-events-none");
+    }
+  }
   renderDownloads(searchInput.value.toLowerCase());
 }
 
 function clearSearch(type) {
   const input = document.getElementById(`${type}-search`);
+  const clearBtn = document.getElementById(`${type}-clear-btn`);
   if (input) {
     input.value = "";
+    if (clearBtn) {
+      clearBtn.classList.add("opacity-0", "pointer-events-none");
+    }
     if (type === "torrents") renderTorrents("");
     else renderDownloads("");
   }
@@ -595,9 +680,6 @@ async function unrestrictLink(e) {
     showToast("Link unrestricted!", "success");
     input.value = "";
     fetchDownloads();
-
-    // Optional: Open link immediately
-    // window.open(result.data.download, '_blank');
   } catch (error) {
     showToast(error.message, "error");
   }
@@ -619,12 +701,20 @@ function confirmDelete(type, id, name) {
   const okBtn = document.getElementById("confirm-ok");
   okBtn.onclick = performDelete;
 
-  modal.classList.remove("hidden");
+  modal.classList.remove("hidden", "opacity-0", "pointer-events-none");
+  setTimeout(() => {
+    modal.querySelector(".glass-effect")?.classList.remove("scale-95");
+  }, 10);
   okBtn.focus();
 }
 
 function closeConfirmModal() {
-  document.getElementById("confirm-modal").classList.add("hidden");
+  const modal = document.getElementById("confirm-modal");
+  modal.classList.add("opacity-0", "pointer-events-none");
+  modal.querySelector(".glass-effect")?.classList.add("scale-95");
+  setTimeout(() => {
+    modal.classList.add("hidden");
+  }, 300);
   itemToDelete = null;
 }
 
