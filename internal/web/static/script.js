@@ -464,7 +464,7 @@ function renderTorrents(filterText = null) {
         <div class="group relative glass-effect border border-slate-700/50 rounded-xl p-4 hover:border-blue-500/40 transition-all duration-200">
           <div class="flex justify-between items-start gap-4 mb-3">
             <div class="flex-1 min-w-0">
-              <div class="text-sm font-semibold text-white truncate mb-1" title="${escapeHtml(t.filename)}">${escapeHtml(t.filename)}</div>
+              <div class="text-sm font-semibold text-white break-all mb-1" title="${escapeHtml(t.filename)}">${escapeHtml(t.filename)}</div>
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
                 <span class="font-medium text-slate-300">${formatBytes(t.bytes)}</span>
                 <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase ${statusClass}">${t.status}</span>
@@ -586,7 +586,7 @@ function renderDownloads(filterText = null) {
         <div class="group relative glass-effect border border-slate-700/50 rounded-xl p-4 hover:border-purple-500/40 transition-all duration-200">
           <div class="flex justify-between items-start gap-4">
             <div class="flex-1 min-w-0">
-              <div class="text-sm font-semibold text-white truncate mb-1">
+              <div class="text-sm font-semibold text-white break-all mb-1">
                 <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="hover:text-purple-400 transition-colors">${escapeHtml(d.filename)}</a>
               </div>
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">

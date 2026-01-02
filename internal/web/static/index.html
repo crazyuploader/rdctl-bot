@@ -232,10 +232,10 @@
       <!-- Header -->
       <header class="mb-10">
         <div
-          class="glass-effect rounded-2xl border border-slate-700/50 p-6 shadow-xl"
+          class="glass-effect rounded-2xl border border-slate-700/50 p-4 sm:p-6 shadow-xl"
         >
           <div
-            class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6"
+            class="flex flex-col lg:flex-row items-center justify-between gap-6"
           >
             <!-- Brand -->
             <div class="flex items-center gap-4">
@@ -268,16 +268,16 @@
                   >
                     Dashboard
                   </span>
-                  <div id="user-greeting" class="text-sm text-slate-400"></div>
+                  <div id="user-greeting" class="text-sm text-slate-400 break-all"></div>
                 </div>
               </div>
             </div>
 
             <!-- Status & Actions -->
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center justify-center gap-3 w-full sm:w-auto">
               <div
                 id="status-container"
-                class="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/50 border border-slate-700"
+                class="flex flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-800/50 border border-slate-700 h-auto min-h-[42px]"
               >
                 <span
                   class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"
@@ -300,7 +300,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <!-- Add Torrent Card -->
           <div
-            class="gradient-border glass-effect rounded-2xl p-6 shadow-xl transition-all duration-300 hover:shadow-2xl"
+            class="gradient-border glass-effect rounded-2xl p-4 sm:p-6 shadow-xl transition-all duration-300 hover:shadow-2xl"
           >
             <div class="flex items-center gap-3 mb-5">
               <div
@@ -328,19 +328,19 @@
               </div>
             </div>
             <form id="add-torrent-form">
-              <div class="flex gap-3">
+              <div class="flex flex-col sm:flex-row gap-3">
                 <input
                   type="text"
                   id="magnet-link"
-                  class="flex-1 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  class="flex-1 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   placeholder="magnet:?xt=urn:btih:..."
                   required
                 />
                 <button
                   type="submit"
-                  class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-semibold transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-blue-500/25 whitespace-nowrap"
+                  class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-semibold transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-blue-500/25 whitespace-nowrap"
                 >
-                  <span class="flex items-center gap-2">
+                  <span class="flex items-center justify-center gap-2">
                     <svg
                       class="w-5 h-5"
                       fill="none"
@@ -354,7 +354,7 @@
                         d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                       />
                     </svg>
-                    Add
+                    Add Torrent
                   </span>
                 </button>
               </div>
@@ -363,7 +363,7 @@
 
           <!-- Unrestrict Link Card -->
           <div
-            class="gradient-border glass-effect rounded-2xl p-6 shadow-xl transition-all duration-300 hover:shadow-2xl"
+            class="gradient-border glass-effect rounded-2xl p-4 sm:p-6 shadow-xl transition-all duration-300 hover:shadow-2xl"
           >
             <div class="flex items-center gap-3 mb-5">
               <div
@@ -393,19 +393,19 @@
               </div>
             </div>
             <form id="unrestrict-link-form">
-              <div class="flex gap-3">
+              <div class="flex flex-col sm:flex-row gap-3">
                 <input
                   type="text"
                   id="hoster-link"
-                  class="flex-1 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  class="flex-1 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                   placeholder="https://..."
                   required
                 />
                 <button
                   type="submit"
-                  class="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-6 py-3 rounded-xl font-semibold transition-all transform hover:scale-105 active:scale-95 shadow-lg shadow-purple-500/25 whitespace-nowrap"
+                  class="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-6 py-3 rounded-xl font-semibold transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-purple-500/25 whitespace-nowrap"
                 >
-                  <span class="flex items-center gap-2">
+                  <span class="flex items-center justify-center gap-2">
                     <svg
                       class="w-5 h-5"
                       fill="none"
@@ -419,7 +419,7 @@
                         d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
                       />
                     </svg>
-                    Unlock
+                    Unlock Link
                   </span>
                 </button>
               </div>
