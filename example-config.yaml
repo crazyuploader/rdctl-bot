@@ -45,7 +45,7 @@ database:
   # sqlite_path: "rdctl_bot.db"
 
 web:
-  listen_addr: ":8082"
+  listen_addr: ":8089"
   api_key: "random_key"
-  dashboard_url: "http://localhost:8082" # Base URL for dashboard links
+  dashboard_url: "http://localhost:8089" # Base URL for dashboard links
   token_expiry_minutes: 60 # Token validity duration

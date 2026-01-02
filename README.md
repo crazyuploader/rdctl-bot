@@ -26,6 +26,31 @@ Key configuration options include:
 - `database.password`: The database password.
 - `database.dbname`: The database name.
 - `database.sslmode`: The SSL mode for the database connection (e.g., `disable`, `require`).
+- `web.listen_addr`: Address for the web server (default: `:8089`).
+- `web.dashboard_url`: Base URL for the dashboard (e.g., `http://localhost:8089`).
+- `web.token_expiry_minutes`: Dashboard session token validity (default: 60 minutes).
+
+## 🌐 Web Dashboard
+
+The bot includes a web-based dashboard for managing your Real-Debrid downloads visually.
+
+### Features
+
+- **Real-time Status**: View account status, premium days remaining, and fidelity points.
+- **Torrent Management**: View, filter, and search active torrents.
+- **File Selection**: Manage file selection for multi-file torrents.
+- **Batch Actions**: Delete multiple torrents at once or manage download links.
+- **Dark Mode UI**: Modern, responsive interface with dark mode support.
+
+### Accessing the Dashboard
+
+1. Send the `/dashboard` command to the bot in Telegram.
+2. The bot will generate a **temporary, one-time login link**.
+3. Click the link to access the dashboard.
+   - The link is valid for **60 minutes** by default (configurable).
+   - Once authenticated, your session is secure and tied to your browser.
+
+**Note**: The dashboard runs on port `8089` by default. Ensure this port is accessible or behind a reverse proxy.
 
 ## 🐳 Running with Docker Compose
 

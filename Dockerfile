@@ -32,3 +32,6 @@ COPY --from=builder /app/rdctl-bot .
 
 # Default arguments (can be overridden via CMD or entrypoint)
 CMD ["./rdctl-bot"]
+
+# Expose Web Dashboard port
+EXPOSE 8089

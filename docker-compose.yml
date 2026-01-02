@@ -4,6 +4,8 @@ services:
     container_name: rdctl-bot
     volumes:
       - ./config.yaml:/app/config.yaml
+    ports:
+      - "8089:8089"
     restart: unless-stopped
     logging:
       options:
