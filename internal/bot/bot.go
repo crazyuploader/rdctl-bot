@@ -38,7 +38,7 @@ type Bot struct {
 }
 
 // NewBot creates and returns a fully configured Bot.
-func NewBot(cfg *config.Config, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, error) {
+func NewBot(cfg *config.Config, database *gorm.DB, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, error) {
 	// Perform IP tests first
 	if err := performIPTests(proxyURL, ipTestURL, ipVerifyURL); err != nil {
 		return nil, fmt.Errorf("IP test failed: %w", err)
@@ -104,12 +104,6 @@ func NewBot(cfg *config.Config, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, 
 			supportedRegex = append(supportedRegex, compiled)
 		}
 		log.Printf("Loaded %d supported host regexes", len(supportedRegex))
-	}
-
-	// Initialize database
-	database, err := db.Init(cfg.Database.GetDSN())
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
 	return &Bot{
