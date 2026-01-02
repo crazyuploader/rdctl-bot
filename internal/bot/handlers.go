@@ -679,6 +679,22 @@ func (b *Bot) handleHosterLink(ctx context.Context, tgBot *bot.Bot, update *mode
 		b.middleware.LogCommand(update, "hoster_link")
 
 		link := update.Message.Text
+
+		// Check if link is supported
+		if len(b.supportedRegex) > 0 {
+			matched := false
+			for _, regex := range b.supportedRegex {
+				if regex.MatchString(link) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				// Silently ignore unsupported links
+				return
+			}
+		}
+
 		unrestricted, err := b.rdClient.UnrestrictLink(link)
 		if err != nil {
 			text := fmt.Sprintf("<b>[ERROR]</b> Failed to unrestrict link: %s", html.EscapeString(err.Error()))
