@@ -12,7 +12,7 @@ let isAdmin = false;
 // Cache for filtering
 let cachedTorrents = [];
 let cachedDownloads = [];
-let activeTab = 'all';
+let activeTab = "all";
 
 // --- Auth & Init ---
 
@@ -306,18 +306,23 @@ function setupEventListeners() {
 }
 
 function setupTabs() {
-    const tabs = document.querySelectorAll('#torrents-tabs button');
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            // Update UI
-            tabs.forEach(t => t.className = "px-3 py-1.5 rounded-lg bg-slate-800/50 text-slate-400 text-xs font-medium whitespace-nowrap hover:bg-slate-700/50 transition-colors");
-            tab.className = "px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-semibold whitespace-nowrap active-tab";
-            
-            // Update State
-            activeTab = tab.getAttribute('data-tab');
-            renderTorrents();
-        });
+  const tabs = document.querySelectorAll("#torrents-tabs button[data-tab]");
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      // Update UI
+      tabs.forEach(
+        (t) =>
+          (t.className =
+            "px-3 py-1.5 rounded-lg bg-slate-800/50 text-slate-400 text-xs font-medium whitespace-nowrap hover:bg-slate-700/50 transition-colors"),
+      );
+      tab.className =
+        "px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-semibold whitespace-nowrap active-tab";
+
+      // Update State
+      activeTab = tab.getAttribute("data-tab");
+      renderTorrents();
     });
+  });
 }
 
 function toggleAutoRefresh(type, enabled) {
@@ -505,121 +510,200 @@ function toggleSelection(id) {
 }
 
 function toggleSelectAll(checked) {
+  const searchInput = document.getElementById("torrents-search");
+  const filter = searchInput ? searchInput.value.toLowerCase() : "";
+
+  // Duplicate filtering logic to know what to select
+  let visibleTorrents = cachedTorrents;
+
+  if (filter) {
+    visibleTorrents = visibleTorrents.filter(
+      (t) =>
+        t.filename.toLowerCase().includes(filter) ||
+        t.status.toLowerCase().includes(filter),
+    );
+  }
+
+  if (activeTab === "downloading") {
+    visibleTorrents = visibleTorrents.filter(
+      (t) => t.status.toLowerCase() === "downloading",
+    );
+  } else if (activeTab === "completed") {
+    visibleTorrents = visibleTorrents.filter(
+      (t) => t.status.toLowerCase() === "downloaded",
+    );
+  } else if (activeTab === "error") {
+    visibleTorrents = visibleTorrents.filter((t) => {
+      const s = t.status.toLowerCase();
+      return s === "error" || s === "dead";
+    });
+  }
+
   if (checked) {
-    // Select all currently filtered/cached torrents
-    cachedTorrents.forEach(t => selectedTorrents.add(t.id));
+    // Select only visible
+    visibleTorrents.forEach((t) => selectedTorrents.add(t.id));
   } else {
-    selectedTorrents.clear();
+    // Deselect visible (keeping others if any? Standard behavior is complicated,
+    // but usually "Select All" checked -> select visible.
+    // Unchecked -> Deselect visible or Clear All?
+    // Given the UI is "Select All", unchecking usually means "Clear Selection" or "Deselect These".
+    // For simplicity and safety in batch actions, let's clear ONLY the visible ones from the set,
+    // or just clear all?
+    // The previous logic was `selectedTorrents.clear()`.
+    // If I have items selected in another tab, should I clear them?
+    // Probably yes, to avoid accidental deletions of meaningful invisible items.
+    // BUT, if I am refining "Select All" to be "Select Visible", uncheck should probably "Deselect Visible".
+    // Let's go with Deselect Visible to be safe and consistent.
+
+    // However, the user issue was "it goes back to all category".
+    // That sounds like `renderTorrents` without arguments logic? No, `renderTorrents(null, true)` is used.
+
+    // Let's stick to "Uncheck select all -> Deselect visible items".
+    visibleTorrents.forEach((t) => selectedTorrents.delete(t.id));
   }
   updateBatchDeleteButton();
   renderTorrents(null, true);
 }
 
 function updateBatchDeleteButton() {
-    const btn = document.getElementById("torrents-batch-delete-btn");
-    const selectAllBtn = document.getElementById("select-all-btn");
-    const selectAllChecked = document.getElementById("select-all-checked");
-    const selectAllUnchecked = document.getElementById("select-all-unchecked");
-    
-    // Update button visibility
-    if (selectedTorrents.size > 0) {
-        btn.classList.remove("hidden");
-        btn.innerHTML = `
+  const btn = document.getElementById("torrents-batch-delete-btn");
+  const selectAllBtn = document.getElementById("select-all-btn");
+  const selectAllChecked = document.getElementById("select-all-checked");
+  const selectAllUnchecked = document.getElementById("select-all-unchecked");
+
+  // Update button visibility
+  if (selectedTorrents.size > 0) {
+    btn.classList.remove("hidden");
+    btn.innerHTML = `
             <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
             <span class="text-xs font-bold">${selectedTorrents.size}</span>
         `;
+  } else {
+    btn.classList.add("hidden");
+  }
+
+  // Update Select All Button State
+  if (selectAllBtn && selectAllChecked && selectAllUnchecked) {
+    // --- DUPLICATE FILTERING LOGIC ---
+    // Ideally this should be a helper function `getVisibleTorrents()` but keeping it inline for minimal diffs
+    const searchInput = document.getElementById("torrents-search");
+    const filter = searchInput ? searchInput.value.toLowerCase() : "";
+    let visibleTorrents = cachedTorrents;
+    if (filter) {
+      visibleTorrents = visibleTorrents.filter(
+        (t) =>
+          t.filename.toLowerCase().includes(filter) ||
+          t.status.toLowerCase().includes(filter),
+      );
+    }
+    if (activeTab === "downloading") {
+      visibleTorrents = visibleTorrents.filter(
+        (t) => t.status.toLowerCase() === "downloading",
+      );
+    } else if (activeTab === "completed") {
+      visibleTorrents = visibleTorrents.filter(
+        (t) => t.status.toLowerCase() === "downloaded",
+      );
+    } else if (activeTab === "error") {
+      visibleTorrents = visibleTorrents.filter((t) => {
+        const s = t.status.toLowerCase();
+        return s === "error" || s === "dead";
+      });
+    }
+    // --------------------------------
+
+    const allSelected =
+      visibleTorrents.length > 0 &&
+      visibleTorrents.every((t) => selectedTorrents.has(t.id));
+    const someSelected = visibleTorrents.some((t) =>
+      selectedTorrents.has(t.id),
+    );
+
+    if (allSelected) {
+      // Full Checked State
+      selectAllBtn.classList.add("text-blue-500");
+      selectAllBtn.classList.remove("text-slate-400");
+
+      selectAllChecked.classList.remove("opacity-0", "scale-50");
+      selectAllChecked.classList.add("opacity-100", "scale-100");
+
+      selectAllUnchecked.classList.add("opacity-0", "scale-50");
+      selectAllUnchecked.classList.remove("opacity-100");
+    } else if (someSelected) {
+      // Indeterminate State (Simulated)
+      selectAllBtn.classList.remove("text-blue-500");
+      selectAllBtn.classList.add("text-slate-400");
+
+      // For indeterminate, let's just show unchecked but maybe with a different visual if we had one?
+      // Since we don't have a dash icon, standard "unchecked" is fine for "some selected"
+      // because "Select All" behavior usually is "Click to Select All" if mixed.
+
+      selectAllChecked.classList.add("opacity-0", "scale-50");
+      selectAllChecked.classList.remove("opacity-100", "scale-100");
+
+      selectAllUnchecked.classList.remove("opacity-0", "scale-50");
+      selectAllUnchecked.classList.add("opacity-100");
     } else {
-        btn.classList.add("hidden");
-    }
+      // None Selected
+      selectAllBtn.classList.remove("text-blue-500");
+      selectAllBtn.classList.add("text-slate-400");
 
-    // Update Select All Button State
-    if (selectAllBtn && selectAllChecked && selectAllUnchecked) {
-        const allSelected = cachedTorrents.length > 0 && 
-            cachedTorrents.every(t => selectedTorrents.has(t.id));
-        const someSelected = selectedTorrents.size > 0;
+      selectAllChecked.classList.add("opacity-0", "scale-50");
+      selectAllChecked.classList.remove("opacity-100", "scale-100");
 
-        if (allSelected) {
-            // Full Checked State
-            selectAllBtn.classList.add("text-blue-500");
-            selectAllBtn.classList.remove("text-slate-400");
-            
-            selectAllChecked.classList.remove("opacity-0", "scale-50");
-            selectAllChecked.classList.add("opacity-100", "scale-100");
-            
-            selectAllUnchecked.classList.add("opacity-0", "scale-50");
-            selectAllUnchecked.classList.remove("opacity-100");
-        } else if (someSelected) {
-            // Indeterminate State (Visual cue: blue but unchecked icon implies partial?)
-            // Or better: Show checked icon but maybe with opacity or different style? 
-            // For now, let's keep it simple: simpler checkmark for all, unchecked for some.
-            // Actually, typical UI shows a dash or filled square. 
-            // Let's stick to: If ANY selected, make it blue-ish to indicate activity, but strictly checked only if ALL.
-            // Or: Indeterminate is complex with just 2 icons. Let's just do Checked vs Unchecked for "All".
-             selectAllBtn.classList.remove("text-blue-500");
-             selectAllBtn.classList.add("text-slate-400");
-             
-             selectAllChecked.classList.add("opacity-0", "scale-50");
-             selectAllChecked.classList.remove("opacity-100", "scale-100");
-             
-             selectAllUnchecked.classList.remove("opacity-0", "scale-50");
-             selectAllUnchecked.classList.add("opacity-100");
-        } else {
-            // None Selected
-            selectAllBtn.classList.remove("text-blue-500");
-            selectAllBtn.classList.add("text-slate-400");
-            
-            selectAllChecked.classList.add("opacity-0", "scale-50");
-            selectAllChecked.classList.remove("opacity-100", "scale-100");
-            
-            selectAllUnchecked.classList.remove("opacity-0", "scale-50");
-            selectAllUnchecked.classList.add("opacity-100");
-        }
+      selectAllUnchecked.classList.remove("opacity-0", "scale-50");
+      selectAllUnchecked.classList.add("opacity-100");
     }
+  }
 }
 
 async function deleteSelectedTorrents() {
-    if (selectedTorrents.size === 0) return;
-    
-    if (!confirm(`Are you sure you want to delete ${selectedTorrents.size} torrents?`)) return;
+  if (selectedTorrents.size === 0) return;
 
-    let successCount = 0;
-    const errors = [];
+  if (
+    !confirm(
+      `Are you sure you want to delete ${selectedTorrents.size} torrents?`,
+    )
+  )
+    return;
 
-    // Clone set to avoid modification issues during iteration if we were removing properly
-    const idsToDelete = Array.from(selectedTorrents);
+  let successCount = 0;
+  const errors = [];
 
-    for (const id of idsToDelete) {
-        try {
-             await apiFetch(`${API_BASE_URL}/torrents/${id}`, { method: "DELETE" });
-             successCount++;
-        } catch (e) {
-            errors.push(id);
-            console.error(`Failed to delete ${id}:`, e);
-        }
+  // Clone set to avoid modification issues during iteration if we were removing properly
+  const idsToDelete = Array.from(selectedTorrents);
+
+  for (const id of idsToDelete) {
+    try {
+      await apiFetch(`${API_BASE_URL}/torrents/${id}`, { method: "DELETE" });
+      successCount++;
+    } catch (e) {
+      errors.push(id);
+      console.error(`Failed to delete ${id}:`, e);
     }
+  }
 
-    if (successCount > 0) {
-        showToast(`Deleted ${successCount} torrents successfully`, "success");
-        selectedTorrents.clear();
-        updateBatchDeleteButton();
-        fetchTorrents(); 
-    }
+  if (successCount > 0) {
+    showToast(`Deleted ${successCount} torrents successfully`, "success");
+    selectedTorrents.clear();
+    updateBatchDeleteButton();
+    fetchTorrents();
+  }
 
-    if (errors.length > 0) {
-        showToast(`Failed to delete ${errors.length} torrents`, "error");
-    }
+  if (errors.length > 0) {
+    showToast(`Failed to delete ${errors.length} torrents`, "error");
+  }
 }
-
 
 function renderTorrents(filterText = null, preserveSelection = false) {
   const list = document.getElementById("torrents-list");
   const countBadge = document.getElementById("torrents-count");
   const searchInput = document.getElementById("torrents-search");
-  
+
   // If we are just re-rendering to update checkboxes/selection UI, don't re-read search input if passed null
   // But typically renderTorrents is called with null or a value.
   // If preserveSelection is true, we assume filter hasn't ostensibly changed, but we should still respect current filter.
-  
+
   const filter =
     filterText !== null
       ? filterText
@@ -637,14 +721,18 @@ function renderTorrents(filterText = null, preserveSelection = false) {
     : cachedTorrents;
 
   // Apply Tab Filter
-  if (activeTab === 'downloading') {
-    filteredTorrents = filteredTorrents.filter(t => t.status.toLowerCase() === 'downloading');
-  } else if (activeTab === 'completed') {
-    filteredTorrents = filteredTorrents.filter(t => t.status.toLowerCase() === 'downloaded');
-  } else if (activeTab === 'error') {
-    filteredTorrents = filteredTorrents.filter(t => {
+  if (activeTab === "downloading") {
+    filteredTorrents = filteredTorrents.filter(
+      (t) => t.status.toLowerCase() === "downloading",
+    );
+  } else if (activeTab === "completed") {
+    filteredTorrents = filteredTorrents.filter(
+      (t) => t.status.toLowerCase() === "downloaded",
+    );
+  } else if (activeTab === "error") {
+    filteredTorrents = filteredTorrents.filter((t) => {
       const s = t.status.toLowerCase();
-      return s === 'error' || s === 'dead';
+      return s === "error" || s === "dead";
     });
   }
 
@@ -658,8 +746,8 @@ function renderTorrents(filterText = null, preserveSelection = false) {
     countBadge.textContent = "0 items";
   }
 
-  // Update Select All Checkbox State based on filtered view or global cache? 
-  // Typically select all applies to visible. For now sticking to simple global cache logic or filtered logic. 
+  // Update Select All Checkbox State based on filtered view or global cache?
+  // Typically select all applies to visible. For now sticking to simple global cache logic or filtered logic.
   // Let's rely on updateBatchDeleteButton which re-checks state.
   updateBatchDeleteButton();
 
@@ -698,7 +786,9 @@ function renderTorrents(filterText = null, preserveSelection = false) {
         <div class="group relative glass-effect border ${isSelected ? "border-blue-500 bg-blue-500/5" : "border-slate-700/50"} rounded-xl p-4 hover:border-blue-500/40 transition-all duration-200">
           <div class="flex justify-between items-start gap-3 mb-3">
              <!-- Selection Checkbox -->
-             ${isAdmin ? `
+             ${
+               isAdmin
+                 ? `
              <div class="pt-1 cursor-pointer" onclick="event.stopPropagation(); toggleSelection('${t.id}')">
                 <div class="relative w-5 h-5 group/checkbox">
                   <!-- Unchecked Circle -->
@@ -716,7 +806,9 @@ function renderTorrents(filterText = null, preserveSelection = false) {
                   </svg>
                 </div>
              </div>
-             ` : ""}
+             `
+                 : ""
+             }
 
             <div class="flex-1 min-w-0">
               <div class="text-sm font-semibold text-white break-all mb-1" title="${escapeHtml(t.filename)}">${escapeHtml(t.filename)}</div>
@@ -731,14 +823,14 @@ function renderTorrents(filterText = null, preserveSelection = false) {
             
             <!-- Individual Delete Action -->
              ${
-              isAdmin
-                ? `<button class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100" onclick="event.stopPropagation(); confirmDelete('torrent', '${t.id}', '${escapeHtml(t.filename)}')" title="Delete">
+               isAdmin
+                 ? `<button class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100" onclick="event.stopPropagation(); confirmDelete('torrent', '${t.id}', '${escapeHtml(t.filename)}')" title="Delete">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
               </svg>
             </button>`
-                : ""
-            }
+                 : ""
+             }
           </div>
           <div class="relative h-2 w-full bg-slate-800 rounded-full overflow-hidden">
             <div class="h-full ${progressColor} transition-all duration-500 ${t.status === "Downloading" ? "animate-pulse" : ""}" style="width: ${t.progress}%"></div>
