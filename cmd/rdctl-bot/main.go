@@ -289,8 +289,11 @@ func runBot(cmd *cobra.Command, args []string) {
 			// Ideally we should close it.
 			sqlDB, err := database.DB()
 			if err == nil {
-				sqlDB.Close()
-				log.Println("Database connection closed")
+				if err := sqlDB.Close(); err != nil {
+					log.Printf("Error closing database: %v", err)
+				} else {
+					log.Println("Database connection closed")
+				}
 			}
 		}
 
