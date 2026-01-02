@@ -39,6 +39,7 @@ const (
 	ActivityTypeCommandStatus      ActivityType = "command_status"
 	ActivityTypeMagnetLink         ActivityType = "magnet_link"
 	ActivityTypeHosterLink         ActivityType = "hoster_link"
+	ActivityTypeCommandDashboard   ActivityType = "command_dashboard"
 	ActivityTypeUnauthorized       ActivityType = "unauthorized"
 	ActivityTypeError              ActivityType = "error"
 )
@@ -54,7 +55,7 @@ type ActivityLog struct {
 	MessageThreadID int
 	Success         bool      `gorm:"default:true"`
 	ErrorMessage    string    `gorm:"type:text"`
-	Metadata        string    `gorm:"type:jsonb"` // Store additional data as JSON
+	Metadata        string    `gorm:"type:json"` // Store additional data as JSON
 	CreatedAt       time.Time `gorm:"index"`
 
 	// Relationships
@@ -76,9 +77,9 @@ type TorrentActivity struct {
 	Progress      float64
 	Success       bool      `gorm:"default:true"`
 	ErrorMessage  string    `gorm:"type:text"`
-	Metadata      string    `gorm:"type:jsonb;default:'{}'"`
+	Metadata      string    `gorm:"type:json;default:'{}'"`
 	CreatedAt     time.Time `gorm:"index"`
-	SelectedFiles string    `gorm:"type:jsonb;not null;default:'[]'"` // Stores selected files as JSON array
+	SelectedFiles string    `gorm:"type:json;not null;default:'[]'"` // Stores selected files as JSON array
 
 	// Relationships
 	User               User               `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
@@ -98,7 +99,7 @@ type DownloadActivity struct {
 	Action            string    `gorm:"index;not null"` // unrestrict, list, delete
 	Success           bool      `gorm:"default:true"`
 	ErrorMessage      string    `gorm:"type:text"`
-	Metadata          string    `gorm:"type:jsonb"`
+	Metadata          string    `gorm:"type:json"`
 	CreatedAt         time.Time `gorm:"index"`
 	TorrentActivityID *uint     `gorm:"index"` // Links to originating torrent activity
 

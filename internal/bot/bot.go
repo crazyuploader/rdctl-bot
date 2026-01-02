@@ -15,6 +15,7 @@ import (
 	"github.com/crazyuploader/rdctl-bot/internal/config"
 	"github.com/crazyuploader/rdctl-bot/internal/db"
 	"github.com/crazyuploader/rdctl-bot/internal/realdebrid"
+	"github.com/crazyuploader/rdctl-bot/internal/web"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"gorm.io/gorm"
@@ -33,10 +34,11 @@ type Bot struct {
 	torrentRepo    *db.TorrentRepository
 	downloadRepo   *db.DownloadRepository
 	commandRepo    *db.CommandRepository
+	tokenStore     *web.TokenStore
 }
 
 // NewBot creates and returns a fully configured Bot.
-func NewBot(cfg *config.Config, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, error) {
+func NewBot(cfg *config.Config, database *gorm.DB, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, error) {
 	// Perform IP tests first
 	if err := performIPTests(proxyURL, ipTestURL, ipVerifyURL); err != nil {
 		return nil, fmt.Errorf("IP test failed: %w", err)
@@ -104,12 +106,6 @@ func NewBot(cfg *config.Config, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, 
 		log.Printf("Loaded %d supported host regexes", len(supportedRegex))
 	}
 
-	// Initialize database
-	database, err := db.Init(cfg.Database.GetDSN())
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize database: %w", err)
-	}
-
 	return &Bot{
 		api:            api,
 		rdClient:       rdClient,
@@ -147,6 +143,7 @@ func (b *Bot) registerHandlers() {
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/downloads", bot.MatchTypeExact, b.handleDownloadsCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/removelink", bot.MatchTypePrefix, b.handleRemoveLinkCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/status", bot.MatchTypeExact, b.handleStatusCommand)
+	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/dashboard", bot.MatchTypeExact, b.handleDashboardCommand)
 
 	// Message handlers for links
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "magnet:?", bot.MatchTypeContains, b.handleMagnetLink)
@@ -154,13 +151,18 @@ func (b *Bot) registerHandlers() {
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "https://", bot.MatchTypePrefix, b.handleHosterLink)
 }
 
-// Stop gracefully stops the bot
+// Stop gracefully stops the bot and closes the database connection
 func (b *Bot) Stop() {
 	log.Println("Bot stopping...")
-	if err := db.Close(); err != nil {
+	if err := db.Close(b.db); err != nil {
 		log.Printf("Error closing database: %v", err)
 	}
 	log.Println("Bot stopped")
+}
+
+// SetTokenStore sets the token store for dashboard access
+func (b *Bot) SetTokenStore(ts *web.TokenStore) {
+	b.tokenStore = ts
 }
 
 // defaultHandler ignores unhandled updates
@@ -206,7 +208,7 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 
 	isAllowed, isSuperAdmin := b.middleware.CheckAuthorization(chatID, userID)
 
-	user, err := b.userRepo.GetOrCreateUser(userID, username, firstName, lastName, isSuperAdmin)
+	user, err := b.userRepo.GetOrCreateUser(ctx, userID, username, firstName, lastName, isSuperAdmin)
 	if err != nil {
 		log.Printf("Error getting/creating user: %v", err)
 		if chatID != 0 {
@@ -226,7 +228,7 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 		b.middleware.LogUnauthorized(username, chatID, userID)
 		b.sendUnauthorizedMessage(ctx, chatID, messageThreadID, userID)
 		if user != nil {
-			if err := b.activityRepo.LogActivity(user.ID, chatID, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil); err != nil {
+			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil); err != nil {
 				log.Printf("Warning: failed to log unauthorized activity: %v", err)
 			}
 		}

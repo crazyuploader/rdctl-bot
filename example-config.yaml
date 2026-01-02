@@ -28,13 +28,24 @@ app:
     burst: 5
 
 database:
-  # PostgreSQL configuration (uncomment to use PostgreSQL)
-  # host: "localhost"
-  # port: 5432
-  # user: "postgres"
-  # password: "your_password"
-  # dbname: "rdctl_bot"
-  # sslmode: "disable"
+  # Database host
+  host: "localhost"
+  # Database port
+  port: 5432
+  # Database user
+  user: "postgres"
+  # Database password
+  password: "your_password"
+  # Database name
+  dbname: "rdctl_bot"
+  # SSL mode for database connection (e.g., "disable", "require")
+  sslmode: "disable"
 
   # SQLite configuration (uncomment to use SQLite instead of PostgreSQL)
   # sqlite_path: "rdctl_bot.db"
+
+web:
+  listen_addr: ":8089"
+  api_key: "random_key"
+  dashboard_url: "http://localhost:8089" # Base URL for dashboard links
+  token_expiry_minutes: 60 # Token validity duration

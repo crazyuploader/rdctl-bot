@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,6 +13,9 @@ import (
 
 	"github.com/crazyuploader/rdctl-bot/internal/bot"
 	"github.com/crazyuploader/rdctl-bot/internal/config"
+	"github.com/crazyuploader/rdctl-bot/internal/db"
+	"github.com/crazyuploader/rdctl-bot/internal/realdebrid"
+	"github.com/crazyuploader/rdctl-bot/internal/web"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -21,7 +26,10 @@ var (
 	BuildDate = "unknown"
 	GitCommit = "unknown"
 
+	// Configuration file path
 	cfgFile string
+
+	// Root command
 	rootCmd = &cobra.Command{
 		Use:   "rdctl-bot",
 		Short: "A Telegram bot for managing Real-Debrid torrents and links",
@@ -64,6 +72,7 @@ The bot also supports direct message handling:
 		Run: runBot,
 	}
 
+	// Version command
 	versionCmd = &cobra.Command{
 		Use:   "version",
 		Short: "Print version information",
@@ -76,12 +85,9 @@ The bot also supports direct message handling:
 	}
 )
 
-// init registers CLI flags, binds them to viper configuration keys, and attaches subcommands.
-// It defines persistent flags for config file and debug mode, root-local flags for shutdown
-// timeout and configuration validation, binds those flags to `app.debug` and
-// init configures CLI flags, binds selected flags to viper configuration keys, and registers subcommands.
-// It defines persistent flags for config file and debug mode, local flags for shutdown timeout and config validation, binds those flags to `app.debug` and `app.shutdown_timeout`, and adds the version subcommand.
+// init configures CLI flags, binds them to viper configuration keys, and registers subcommands.
 func init() {
+	// Initialize Cobra
 	cobra.OnInitialize(initConfig)
 
 	// Persistent flags (available to all commands)
@@ -91,11 +97,14 @@ func init() {
 	// Local flags (only for root command)
 	rootCmd.Flags().Duration("shutdown-timeout", 10*time.Second, "timeout for graceful shutdown")
 	rootCmd.Flags().Bool("validate-config", false, "validate configuration and exit")
+	rootCmd.Flags().Bool("web-only", false, "enable web-only mode (disable Telegram bot)")
 
 	// Bind flags to viper
 	if err := viper.BindPFlag("app.debug", rootCmd.PersistentFlags().Lookup("debug")); err != nil {
 		log.Printf("Warning: failed to bind debug flag: %v", err)
 	}
+
+	// Bind flags to viper
 	if err := viper.BindPFlag("app.shutdown_timeout", rootCmd.Flags().Lookup("shutdown-timeout")); err != nil {
 		log.Printf("Warning: failed to bind shutdown-timeout flag: %v", err)
 	}
@@ -112,8 +121,7 @@ func initConfig() {
 	}
 }
 
-// main is the program entry point for the CLI application.
-// main is the program entry point. It executes the root Cobra command and, if execution fails, writes the error to stderr and exits with status 1.
+// main is the program entry point. It executes the root Cobra command and exits with status 1 on failure.
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -121,10 +129,8 @@ func main() {
 	}
 }
 
-// runBot starts the Telegram Real‑Debrid bot: it loads and optionally validates configuration, initializes the bot, and orchestrates runtime signal- and error-driven graceful shutdown with a configurable timeout.
-// runBot executes the main lifecycle of the CLI bot: it loads configuration, optionally validates it, starts the bot, and manages graceful shutdown.
-//
-// runBot loads the application configuration (respecting an explicit config file path and debug flag), prints key configuration details when requested, initializes and starts the bot, and waits for either an OS shutdown signal or a bot error. When shutdown is triggered it attempts a graceful stop within the configured timeout and forces exit if the timeout is exceeded.
+// runBot executes the main lifecycle: loads configuration, starts the bot and web server,
+// and manages graceful shutdown with a configurable timeout.
 func runBot(cmd *cobra.Command, args []string) {
 	// Load configuration
 	cfg, err := config.Load(cfgFile)
@@ -141,19 +147,34 @@ func runBot(cmd *cobra.Command, args []string) {
 	// Setup logging
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.SetOutput(os.Stdout)
-
 	log.Println("Configuration loaded successfully")
+
+	// Check web-only mode early for validation
+	webOnly, _ := cmd.Flags().GetBool("web-only")
+
+	// Validate configuration
+	if err := cfg.Validate(webOnly); err != nil {
+		log.Fatalf("Invalid configuration: %v", err)
+	}
 
 	// Validate config and exit if flag is set
 	validateOnly, _ := cmd.Flags().GetBool("validate-config")
 	if validateOnly {
 		log.Println("Configuration is valid!")
-		log.Printf("Allowed chat IDs: %v", cfg.Telegram.AllowedChatIDs)
-		log.Printf("Super admin IDs: %v", cfg.Telegram.SuperAdminIDs)
+		if !webOnly {
+			log.Printf("Allowed chat IDs: %v", cfg.Telegram.AllowedChatIDs)
+			log.Printf("Super admin IDs: %v", cfg.Telegram.SuperAdminIDs)
+		}
 		log.Printf("Database: %s@%s:%d/%s", cfg.Database.User, cfg.Database.Host, cfg.Database.Port, cfg.Database.DBName)
 		log.Printf("Real-Debrid Base URL: %s", cfg.RealDebrid.BaseURL)
 		log.Println("Exiting after validation")
 		return
+	}
+
+	// Initialize database
+	database, err := db.Init(cfg.Database.GetDSN())
+	if err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
 	// Log configuration details
@@ -162,31 +183,71 @@ func runBot(cmd *cobra.Command, args []string) {
 	log.Printf("Rate limit: %d messages/sec (burst: %d)", cfg.App.RateLimit.MessagesPerSecond, cfg.App.RateLimit.Burst)
 	log.Printf("Database: %s:%d/%s", cfg.Database.Host, cfg.Database.Port, cfg.Database.DBName)
 
+	// Log Real-Debrid configuration
 	if cfg.RealDebrid.Proxy != "" {
 		log.Printf("Using proxy: %s", cfg.RealDebrid.Proxy)
 	}
 
-	// Create bot instance
-	log.Println("Initializing bot...")
-	b, err := bot.NewBot(cfg, cfg.RealDebrid.Proxy, cfg.RealDebrid.IpTestURL, cfg.RealDebrid.IpVerifyURL)
-	if err != nil {
-		log.Fatalf("Failed to create bot: %v", err)
+	// Log web-only mode
+	if webOnly {
+		log.Println("Web only mode enabled. Telegram bot will NOT be started.")
 	}
+
+	// Create token store for dashboard authentication
+	tokenStore := web.NewTokenStore(cfg.Web.TokenExpiryMinutes)
+
+	// Initialize bot
+	var b *bot.Bot
+	if !webOnly {
+		// Create bot instance
+		log.Println("Initializing bot...")
+		var err error
+		b, err = bot.NewBot(cfg, database, cfg.RealDebrid.Proxy, cfg.RealDebrid.IpTestURL, cfg.RealDebrid.IpVerifyURL)
+		if err != nil {
+			log.Fatalf("Failed to create bot: %v", err)
+		}
+		// Connect token store to bot for /dashboard command
+		b.SetTokenStore(tokenStore)
+	}
+
+	// Initialize dependencies for web handlers
+	deps := web.Dependencies{
+		RDClient:     realdebrid.NewClient(cfg.RealDebrid.BaseURL, cfg.RealDebrid.APIToken, cfg.RealDebrid.Proxy, time.Duration(cfg.RealDebrid.Timeout)*time.Second),
+		UserRepo:     db.NewUserRepository(database),
+		ActivityRepo: db.NewActivityRepository(database),
+		TorrentRepo:  db.NewTorrentRepository(database),
+		DownloadRepo: db.NewDownloadRepository(database),
+		CommandRepo:  db.NewCommandRepository(database),
+		Config:       cfg,
+		TokenStore:   tokenStore,
+	}
+
+	// Initialize web server
+	webServer := web.NewServer(deps)
 
 	// Setup graceful shutdown using context with signal notification
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// Channel to listen for errors from bot
-	errCh := make(chan error, 1)
+	// Channel to listen for errors from bot and web server
+	errCh := make(chan error, 2)
 
-	// Start bot in goroutine
+	// Start web server in goroutine
 	go func() {
-		log.Println("Bot started successfully! Listening for messages...")
-		if err := b.Start(ctx); err != nil {
-			errCh <- fmt.Errorf("bot error: %w", err)
+		if err := webServer.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- fmt.Errorf("web server error: %w", err)
 		}
 	}()
+
+	if !webOnly {
+		// Start bot in goroutine
+		go func() {
+			log.Println("Bot started successfully! Listening for messages...")
+			if err := b.Start(ctx); err != nil {
+				errCh <- fmt.Errorf("bot error: %w", err)
+			}
+		}()
+	}
 
 	// Wait for shutdown signal or error
 	select {
@@ -197,6 +258,7 @@ func runBot(cmd *cobra.Command, args []string) {
 		log.Printf("Bot encountered an error: %v", err)
 		log.Println("Initiating shutdown due to error...")
 	}
+
 	// Get shutdown timeout from flags
 	shutdownTimeout, _ := cmd.Flags().GetDuration("shutdown-timeout")
 
@@ -210,15 +272,33 @@ func runBot(cmd *cobra.Command, args []string) {
 	// Perform graceful shutdown
 	go func() {
 		defer close(shutdownComplete)
+		log.Println("Stopping components...")
 
-		log.Println("Stopping bot...")
-		// The bot's context is already canceled by the signal handler,
-		// so we don't need to call cancel() here.
+		// Shutdown web server with context for timeout
+		if err := webServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Error shutting down web server: %v", err)
+		} else {
+			log.Println("Web server stopped gracefully")
+		}
 
-		// Allow bot to cleanup
-		time.Sleep(500 * time.Millisecond)
-
-		b.Stop() // Close database and other resources
+		// Stop bot and close database if bot was running
+		if !webOnly && b != nil {
+			b.Stop()
+			// Also stop token store cleanup
+			tokenStore.Stop()
+			log.Println("Bot cleanup completed")
+		} else {
+			// Stop token store cleanup even in web-only mode
+			tokenStore.Stop()
+			// Close database explicitly when bot is not running
+			if sqlDB, err := database.DB(); err == nil {
+				if err := sqlDB.Close(); err != nil {
+					log.Printf("Error closing database: %v", err)
+				} else {
+					log.Println("Database connection closed")
+				}
+			}
+		}
 
 		log.Println("Cleanup completed")
 	}()
@@ -226,10 +306,10 @@ func runBot(cmd *cobra.Command, args []string) {
 	// Wait for shutdown to complete or timeout
 	select {
 	case <-shutdownComplete:
-		log.Println("Bot stopped gracefully")
+		log.Println("Application stopped gracefully")
 	case <-shutdownCtx.Done():
 		log.Println("Shutdown timeout exceeded, forcing exit")
 	}
 
-	log.Println("Bot exited successfully")
+	log.Println("Exited successfully")
 }

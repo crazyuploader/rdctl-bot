@@ -16,6 +16,15 @@ type Config struct {
 	RealDebrid RealDebridConfig `mapstructure:"realdebrid"`
 	App        AppConfig        `mapstructure:"app"`
 	Database   DatabaseConfig   `mapstructure:"database"`
+	Web        WebConfig        `mapstructure:"web"`
+}
+
+// WebConfig holds all web server configuration
+type WebConfig struct {
+	ListenAddr         string `mapstructure:"listen_addr"`
+	APIKey             string `mapstructure:"api_key"`
+	DashboardURL       string `mapstructure:"dashboard_url"`
+	TokenExpiryMinutes int    `mapstructure:"token_expiry_minutes"`
 }
 
 // TelegramConfig holds Telegram bot settings
@@ -122,30 +131,30 @@ func Load(cfgFile string) (*Config, error) {
 	}
 
 	// Validate configuration
-	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
-	}
+	// Validation is now the responsibility of the caller to allow for different modes (e.g. web-only)
 
 	return cfg, nil
 }
 
 // Validate checks if the configuration is valid
-func (c *Config) Validate() error {
+func (c *Config) Validate(webOnly bool) error {
 	// Telegram validation
-	if c.Telegram.BotToken == "" || c.Telegram.BotToken == "YOUR_TELEGRAM_BOT_TOKEN" {
-		return fmt.Errorf("telegram bot token is required")
+	if !webOnly {
+		if c.Telegram.BotToken == "" || c.Telegram.BotToken == "YOUR_TELEGRAM_BOT_TOKEN" {
+			return fmt.Errorf("telegram bot token is required")
+		}
+
+		if len(c.Telegram.AllowedChatIDs) == 0 {
+			return fmt.Errorf("at least one allowed chat ID is required")
+		}
+
+		if len(c.Telegram.SuperAdminIDs) == 0 {
+			return fmt.Errorf("at least one super admin ID is required")
+		}
 	}
 
 	if c.RealDebrid.APIToken == "" || c.RealDebrid.APIToken == "YOUR_REAL_DEBRID_API_TOKEN" {
 		return fmt.Errorf("real-debrid API token is required")
-	}
-
-	if len(c.Telegram.AllowedChatIDs) == 0 {
-		return fmt.Errorf("at least one allowed chat ID is required")
-	}
-
-	if len(c.Telegram.SuperAdminIDs) == 0 {
-		return fmt.Errorf("at least one super admin ID is required")
 	}
 
 	// RealDebrid validation
@@ -209,6 +218,19 @@ func (c *Config) Validate() error {
 		if c.Database.SSLMode == "" {
 			c.Database.SSLMode = "disable"
 		}
+	}
+
+	if c.Web.ListenAddr == "" {
+		c.Web.ListenAddr = ":8080"
+	}
+	if c.Web.APIKey == "" {
+		return fmt.Errorf("web api_key is required for dashboard access")
+	}
+	if c.Web.DashboardURL == "" {
+		c.Web.DashboardURL = "http://localhost" + c.Web.ListenAddr
+	}
+	if c.Web.TokenExpiryMinutes == 0 {
+		c.Web.TokenExpiryMinutes = 60 // Default 1 hour
 	}
 
 	return nil

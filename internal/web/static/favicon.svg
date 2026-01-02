@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Background Circle (optional, leaving transparent for favicon usually better, but let's do a shape) -->
+  <!-- Robot Head -->
+  <rect x="96" y="96" width="320" height="280" rx="60" ry="60" fill="url(#grad1)" />
+  
+  <!-- Eyes Container -->
+  <rect x="144" y="176" width="224" height="80" rx="20" ry="20" fill="#1e293b" />
+  
+  <!-- Eyes -->
+  <circle cx="192" cy="216" r="24" fill="#60a5fa" />
+  <circle cx="320" cy="216" r="24" fill="#60a5fa" />
+  
+  <!-- Antenna -->
+  <rect x="240" y="32" width="32" height="64" fill="#64748b" />
+  <circle cx="256" cy="32" r="24" fill="#ef4444" />
+  
+  <!-- Ears -->
+  <rect x="64" y="196" width="32" height="80" rx="10" ry="10" fill="#64748b" />
+  <rect x="416" y="196" width="32" height="80" rx="10" ry="10" fill="#64748b" />
+
+  <!-- Mouth -->
+  <rect x="176" y="300" width="160" height="24" rx="12" ry="12" fill="#e2e8f0" />
+</svg>

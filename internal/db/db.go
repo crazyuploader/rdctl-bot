@@ -14,17 +14,8 @@ import (
 	"github.com/crazyuploader/rdctl-bot/internal/config"
 )
 
-var DB *gorm.DB
-
-// Init initializes the global database handle using the provided DSN, configures the connection pool, and runs automatic migrations.
-// Init initializes the package-level GORM database connection using either PostgreSQL or SQLite based on the configuration.
-// It configures a custom GORM logger, forces UTC for timestamps, applies connection pool settings
-// (max idle connections 10, max open connections 100, connection max lifetime 1 hour), runs automatic
-// schema migrations for the application's models, assigns the configured *gorm.DB to the package-level
-// DB variable, and returns it.
-// The dsn parameter is either the PostgreSQL connection string or SQLite file path.
-// The function returns the configured *gorm.DB on success, or an error if connecting, obtaining the
-// underlying sql.DB, or running migrations fails.
+// Init initializes the database connection using either PostgreSQL or SQLite based on config.
+// It configures logging, connection pool settings, runs migrations, and returns the *gorm.DB.
 func Init(dsn string) (*gorm.DB, error) {
 	cfg := config.Get()
 	isDebug := cfg != nil && cfg.App.LogLevel == "debug"
@@ -70,9 +61,15 @@ func Init(dsn string) (*gorm.DB, error) {
 			return nil, fmt.Errorf("failed to get SQLite database instance: %w", err)
 		}
 
+		// Verify connection is working
+		if err := sqlDB.Ping(); err != nil {
+			return nil, fmt.Errorf("failed to ping SQLite database: %w", err)
+		}
+
 		// SQLite connection pool settings (simpler than PostgreSQL)
 		sqlDB.SetMaxIdleConns(1)
 		sqlDB.SetMaxOpenConns(1)
+		sqlDB.SetConnMaxLifetime(time.Hour)
 	} else {
 		// Use PostgreSQL
 		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
@@ -91,6 +88,11 @@ func Init(dsn string) (*gorm.DB, error) {
 			return nil, fmt.Errorf("failed to get PostgreSQL database instance: %w", err)
 		}
 
+		// Verify connection is working
+		if err := sqlDB.Ping(); err != nil {
+			return nil, fmt.Errorf("failed to ping PostgreSQL database: %w", err)
+		}
+
 		// Set connection pool settings
 		sqlDB.SetMaxIdleConns(10)
 		sqlDB.SetMaxOpenConns(100)
@@ -102,15 +104,11 @@ func Init(dsn string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	DB = db
 	log.Println("Database connected and migrations completed successfully!")
 	return db, nil
 }
 
-// runMigrations performs automatic schema migrations for the application's models.
-// It migrates the User, ActivityLog, TorrentActivity, DownloadActivity and CommandLog
-// It returns any error encountered while migrating the User, ActivityLog, TorrentActivity, DownloadActivity, and CommandLog models.
-// CRITICAL: Tables must be migrated in dependency order (parent tables before children)
+// runMigrations performs automatic schema migrations in dependency order (parent tables first).
 func runMigrations(db *gorm.DB) error {
 	log.Println("Starting database migrations...")
 
@@ -146,16 +144,14 @@ func runMigrations(db *gorm.DB) error {
 	return nil
 }
 
-// Close closes the underlying database connection held in the package-level DB.
-// If DB is nil, Close does nothing and returns nil. Any error encountered while
-// obtaining the underlying *sql.DB or while closing it is returned.
-func Close() error {
-	if DB != nil {
-		sqlDB, err := DB.DB()
-		if err != nil {
-			return err
-		}
-		return sqlDB.Close()
+// Close closes the underlying database connection. Returns nil if db is nil.
+func Close(db *gorm.DB) error {
+	if db == nil {
+		return nil
 	}
-	return nil
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Close()
 }
