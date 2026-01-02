@@ -43,6 +43,7 @@ type TokenStore struct {
 	expiry        time.Duration
 	cleanupTicker *time.Ticker
 	stopCleanup   chan struct{}
+	stopOnce      sync.Once
 }
 
 // NewTokenStore creates a new token store with the specified expiry duration
@@ -151,7 +152,9 @@ func (ts *TokenStore) cleanupExpired() {
 
 // Stop stops the cleanup goroutine
 func (ts *TokenStore) Stop() {
-	close(ts.stopCleanup)
+	ts.stopOnce.Do(func() {
+		close(ts.stopCleanup)
+	})
 }
 
 // Count returns the number of active tokens

@@ -37,8 +37,8 @@ func DualAuth(apiKey string, tokenStore *TokenStore) fiber.Handler {
 		if tokenID == "" {
 			// Try Authorization: Bearer <token>
 			authHeader := c.Get("Authorization")
-			if strings.HasPrefix(authHeader, "Bearer ") {
-				tokenID = strings.TrimPrefix(authHeader, "Bearer ")
+			if after, ok := strings.CutPrefix(authHeader, "Bearer "); ok {
+				tokenID = after
 			}
 		}
 

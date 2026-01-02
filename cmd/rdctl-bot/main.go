@@ -284,8 +284,12 @@ func runBot(cmd *cobra.Command, args []string) {
 		// Stop bot and close database if bot was running
 		if !webOnly && b != nil {
 			b.Stop()
+			// Also stop token store cleanup
+			tokenStore.Stop()
 			log.Println("Bot cleanup completed")
 		} else {
+			// Stop token store cleanup even in web-only mode
+			tokenStore.Stop()
 			// Close database explicitly when bot is not running
 			if sqlDB, err := database.DB(); err == nil {
 				if err := sqlDB.Close(); err != nil {
