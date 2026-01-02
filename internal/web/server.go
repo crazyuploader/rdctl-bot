@@ -46,13 +46,6 @@ func NewServer(deps Dependencies) *Server {
 	app.Use(recover.New())
 	app.Use(cors.New())
 
-	// Embed static files
-	app.Use("/", filesystem.New(filesystem.Config{
-		Root:       http.FS(staticFiles),
-		PathPrefix: "static",
-		Browse:     false,
-	}))
-
 	// API group
 	api := app.Group("/api", APIKeyAuth(deps.Config.Web.APIKey))
 
@@ -66,6 +59,14 @@ func NewServer(deps Dependencies) *Server {
 	api.Post("/unrestrict", deps.UnrestrictLink)
 	api.Delete("/downloads/:id", deps.DeleteDownload)
 	api.Get("/stats/user/:id", deps.GetUserStats)
+
+	// Embed static files - Place this last to ensure API routes are matched first
+	// or properly fall through if not found.
+	app.Use("/", filesystem.New(filesystem.Config{
+		Root:       http.FS(staticFiles),
+		PathPrefix: "static",
+		Browse:     false,
+	}))
 
 	return &Server{
 		app:    app,
