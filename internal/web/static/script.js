@@ -8,6 +8,10 @@ let refreshIntervals = {};
 let userRole = null; // 'admin' or 'viewer'
 let isAdmin = false;
 
+// Cache for filtering
+let cachedTorrents = [];
+let cachedDownloads = [];
+
 // --- Auth & Init ---
 
 function checkLogin() {
@@ -43,11 +47,81 @@ async function fetchAuthInfo() {
     const result = await apiFetch(`${API_BASE_URL}/auth/me`);
     userRole = result.role;
     isAdmin = result.is_admin;
-    console.log("Auth info:", { role: userRole, isAdmin });
+
+    // Store session expiry for countdown
+    if (result.expires_at) {
+      window.sessionExpiresAt = new Date(result.expires_at);
+      startSessionCountdown();
+    }
+
+    console.log("Auth info:", {
+      role: userRole,
+      isAdmin,
+      expiresAt: result.expires_at,
+    });
   } catch (error) {
     console.error("Failed to fetch auth info:", error);
     logout();
   }
+}
+
+let sessionCountdownInterval = null;
+
+function startSessionCountdown() {
+  // Clear any existing countdown
+  if (sessionCountdownInterval) {
+    clearInterval(sessionCountdownInterval);
+  }
+
+  // Create or update session timer display
+  updateSessionTimer();
+
+  // Update every second
+  sessionCountdownInterval = setInterval(() => {
+    updateSessionTimer();
+  }, 1000);
+}
+
+function updateSessionTimer() {
+  const expiresAt = window.sessionExpiresAt;
+  if (!expiresAt) return;
+
+  const now = new Date();
+  const diff = expiresAt - now;
+
+  // Get or create timer element
+  let timerEl = document.getElementById("session-timer");
+  if (!timerEl) {
+    const statusContainer = document.getElementById("status-container");
+    if (statusContainer) {
+      timerEl = document.createElement("span");
+      timerEl.id = "session-timer";
+      timerEl.className = "session-timer";
+      statusContainer.appendChild(timerEl);
+    }
+  }
+
+  if (!timerEl) return;
+
+  if (diff <= 0) {
+    timerEl.innerHTML = `<span class="timer-expired">⏰ Session expired</span>`;
+    clearInterval(sessionCountdownInterval);
+    setTimeout(() => {
+      showToast(
+        "Session expired. Please request a new dashboard link.",
+        "error",
+      );
+      logout();
+    }, 2000);
+    return;
+  }
+
+  const minutes = Math.floor(diff / 60000);
+  const seconds = Math.floor((diff % 60000) / 1000);
+
+  const urgencyClass =
+    minutes < 5 ? "timer-urgent" : minutes < 15 ? "timer-warning" : "";
+  timerEl.innerHTML = `<span class="timer-icon">⏱️</span><span class="${urgencyClass}">${minutes}:${seconds.toString().padStart(2, "0")}</span>`;
 }
 
 function showLogin() {
@@ -95,10 +169,22 @@ function logout() {
   window.apiKey = null;
   window.authToken = null;
   window.authType = null;
+  window.sessionExpiresAt = null;
   userRole = null;
   isAdmin = false;
+
+  // Clear all intervals
   clearInterval(refreshIntervals.torrents);
   clearInterval(refreshIntervals.downloads);
+  if (sessionCountdownInterval) {
+    clearInterval(sessionCountdownInterval);
+    sessionCountdownInterval = null;
+  }
+
+  // Clear caches
+  cachedTorrents = [];
+  cachedDownloads = [];
+
   showLogin();
 }
 
@@ -231,133 +317,232 @@ function maskUsername(username) {
   return "*****" + username.substring(5);
 }
 
-async function fetchTorrents() {
+async function fetchTorrents(loadMore = false) {
   try {
-    const result = await apiFetch(`${API_BASE_URL}/torrents?limit=50`);
-    const torrents = result.data || [];
-    const totalCount = result.total_count || torrents.length;
-    const list = document.getElementById("torrents-list");
-    const countBadge = document.getElementById("torrents-count");
+    const offset = loadMore ? cachedTorrents.length : 0;
+    const result = await apiFetch(
+      `${API_BASE_URL}/torrents?limit=50&offset=${offset}`,
+    );
+    const newTorrents = result.data || [];
+    const totalCount = result.total_count || newTorrents.length;
 
-    // Update count badge - show "X of Y" if there are more items
-    if (torrents.length > 0) {
-      if (totalCount > torrents.length) {
-        countBadge.textContent = `(${torrents.length} of ${totalCount})`;
-      } else {
-        countBadge.textContent = `(${torrents.length})`;
-      }
+    // Update cache
+    if (loadMore) {
+      cachedTorrents = [...cachedTorrents, ...newTorrents];
     } else {
-      countBadge.textContent = "";
+      cachedTorrents = newTorrents;
     }
 
-    if (torrents.length === 0) {
-      list.innerHTML = `<div class="item-card"><p style="text-align:center; color: var(--text-secondary)">No active torrents</p></div>`;
-      return;
-    }
+    // Store total for pagination
+    window.torrentsTotalCount = totalCount;
 
-    const html = torrents
-      .map((t) => {
-        const statusClass =
-          t.status === "Downloaded"
-            ? "status-downloaded"
-            : t.status === "Downloading"
-              ? "status-downloading"
-              : "status-badge";
-
-        const addedDate = t.added ? new Date(t.added).toLocaleDateString() : "";
-
-        return `
-            <div class="item-card">
-                <div class="item-header">
-                    <div style="flex:1">
-                        <div class="item-title" title="${t.filename}">${t.filename}</div>
-                        <div class="item-meta">
-                            <span>${formatBytes(t.bytes)}</span>
-                            <span class="status-badge ${statusClass}">${t.status}</span>
-                            ${t.seeders !== undefined && t.seeders !== null ? `<span>${t.seeders} seeds</span>` : ""}
-                            ${t.speed !== undefined && t.speed !== null && t.speed > 0 ? `<span>${formatBytes(t.speed)}/s</span>` : ""}
-                            ${addedDate ? `<span title="Added date">${addedDate}</span>` : ""}
-                        </div>
-                    </div>
-                    ${
-                      isAdmin
-                        ? `<button class="delete-btn" onclick="confirmDelete('torrent', '${t.id}', '${escapeHtml(t.filename)}')" title="Delete">
-                        🗑
-                    </button>`
-                        : ""
-                    }
-                </div>
-                <div class="progress-container">
-                    <div class="progress-fill" style="width: ${t.progress}%"></div>
-                </div>
-            </div>
-            `;
-      })
-      .join("");
-
-    if (list.innerHTML !== html) {
-      list.innerHTML = html;
-    }
+    renderTorrents();
   } catch (error) {
     showToast(`Error fetching torrents: ${error.message}`, "error");
   }
 }
 
-async function fetchDownloads() {
-  try {
-    const result = await apiFetch(`${API_BASE_URL}/downloads?limit=50`);
-    const downloads = result.data || [];
-    const totalCount = result.total_count || downloads.length;
-    const list = document.getElementById("downloads-list");
-    const countBadge = document.getElementById("downloads-count");
+function renderTorrents(filterText = null) {
+  const list = document.getElementById("torrents-list");
+  const countBadge = document.getElementById("torrents-count");
+  const searchInput = document.getElementById("torrents-search");
+  const filter =
+    filterText !== null
+      ? filterText
+      : searchInput
+        ? searchInput.value.toLowerCase()
+        : "";
 
-    // Update count badge - show "X of Y" if there are more items
-    if (downloads.length > 0) {
-      if (totalCount > downloads.length) {
-        countBadge.textContent = `(${downloads.length} of ${totalCount})`;
-      } else {
-        countBadge.textContent = `(${downloads.length})`;
-      }
+  // Filter torrents
+  const filteredTorrents = filter
+    ? cachedTorrents.filter(
+        (t) =>
+          t.filename.toLowerCase().includes(filter) ||
+          t.status.toLowerCase().includes(filter),
+      )
+    : cachedTorrents;
+
+  const totalCount = window.torrentsTotalCount || cachedTorrents.length;
+
+  // Update count badge
+  if (cachedTorrents.length > 0) {
+    const filterInfo = filter ? ` (${filteredTorrents.length} matches)` : "";
+    if (totalCount > cachedTorrents.length) {
+      countBadge.textContent = `(${cachedTorrents.length} of ${totalCount})${filterInfo}`;
     } else {
-      countBadge.textContent = "";
+      countBadge.textContent = `(${cachedTorrents.length})${filterInfo}`;
+    }
+  } else {
+    countBadge.textContent = "";
+  }
+
+  if (filteredTorrents.length === 0) {
+    list.innerHTML = `<div class="item-card"><p style="text-align:center; color: var(--text-secondary)">${filter ? "No matching torrents" : "No active torrents"}</p></div>`;
+    return;
+  }
+
+  const html = filteredTorrents
+    .map((t) => {
+      const statusClass =
+        t.status === "Downloaded"
+          ? "status-downloaded"
+          : t.status === "Downloading"
+            ? "status-downloading"
+            : t.status === "Error" || t.status === "Dead"
+              ? "status-error"
+              : "status-badge";
+
+      const progressClass =
+        t.progress >= 100
+          ? "progress-complete"
+          : t.progress > 0
+            ? "progress-active"
+            : "";
+
+      const addedDate = t.added ? new Date(t.added).toLocaleDateString() : "";
+
+      return `
+          <div class="item-card" data-filename="${escapeHtml(t.filename.toLowerCase())}">
+              <div class="item-header">
+                  <div style="flex:1">
+                      <div class="item-title" title="${escapeHtml(t.filename)}">${escapeHtml(t.filename)}</div>
+                      <div class="item-meta">
+                          <span>${formatBytes(t.bytes)}</span>
+                          <span class="status-badge ${statusClass}">${t.status}</span>
+                          ${t.seeders !== undefined && t.seeders !== null ? `<span>${t.seeders} seeds</span>` : ""}
+                          ${t.speed !== undefined && t.speed !== null && t.speed > 0 ? `<span>${formatBytes(t.speed)}/s</span>` : ""}
+                          ${addedDate ? `<span title="Added date">${addedDate}</span>` : ""}
+                      </div>
+                  </div>
+                  ${isAdmin ? `<button class="delete-btn" onclick="confirmDelete('torrent', '${t.id}', '${escapeHtml(t.filename)}')" title="Delete">🗑</button>` : ""}
+              </div>
+              <div class="progress-container ${progressClass}">
+                  <div class="progress-fill" style="width: ${t.progress}%"></div>
+                  <span class="progress-text">${t.progress.toFixed(1)}%</span>
+              </div>
+          </div>
+          `;
+    })
+    .join("");
+
+  // Add Load More button if there are more
+  const loadMoreHtml =
+    window.torrentsTotalCount > cachedTorrents.length && !filter
+      ? `<button class="btn btn-secondary btn-block load-more-btn" onclick="fetchTorrents(true)">Load More (${cachedTorrents.length}/${window.torrentsTotalCount})</button>`
+      : "";
+
+  list.innerHTML = html + loadMoreHtml;
+}
+
+function filterTorrents() {
+  const searchInput = document.getElementById("torrents-search");
+  renderTorrents(searchInput.value.toLowerCase());
+}
+
+async function fetchDownloads(loadMore = false) {
+  try {
+    const offset = loadMore ? cachedDownloads.length : 0;
+    const result = await apiFetch(
+      `${API_BASE_URL}/downloads?limit=50&offset=${offset}`,
+    );
+    const newDownloads = result.data || [];
+    const totalCount = result.total_count || newDownloads.length;
+
+    // Update cache
+    if (loadMore) {
+      cachedDownloads = [...cachedDownloads, ...newDownloads];
+    } else {
+      cachedDownloads = newDownloads;
     }
 
-    if (downloads.length === 0) {
-      list.innerHTML = `<div class="item-card"><p style="text-align:center; color: var(--text-secondary)">No recent downloads</p></div>`;
-      return;
-    }
+    // Store total for pagination
+    window.downloadsTotalCount = totalCount;
 
-    const html = downloads
-      .map((d) => {
-        return `
-            <div class="item-card">
-                <div class="item-header">
-                     <div style="flex:1">
-                        <div class="item-title"><a href="${d.download}" target="_blank" style="color:inherit;text-decoration:none">${d.filename}</a></div>
-                        <div class="item-meta">
-                            <span>${formatBytes(d.filesize)}</span>
-                            <span>${d.host}</span>
-                            <span>${new Date(d.generated).toLocaleDateString()}</span>
-                        </div>
-                    </div>
-                    ${
-                      isAdmin
-                        ? `<button class="delete-btn" onclick="confirmDelete('download', '${d.id}', '${escapeHtml(d.filename)}')" title="Delete">
-                        🗑
-                    </button>`
-                        : ""
-                    }
-                </div>
-            </div>
-            `;
-      })
-      .join("");
-
-    if (list.innerHTML !== html) {
-      list.innerHTML = html;
-    }
+    renderDownloads();
   } catch (error) {
     showToast(`Error fetching downloads: ${error.message}`, "error");
+  }
+}
+
+function renderDownloads(filterText = null) {
+  const list = document.getElementById("downloads-list");
+  const countBadge = document.getElementById("downloads-count");
+  const searchInput = document.getElementById("downloads-search");
+  const filter =
+    filterText !== null
+      ? filterText
+      : searchInput
+        ? searchInput.value.toLowerCase()
+        : "";
+
+  // Filter downloads
+  const filteredDownloads = filter
+    ? cachedDownloads.filter(
+        (d) =>
+          d.filename.toLowerCase().includes(filter) ||
+          d.host.toLowerCase().includes(filter),
+      )
+    : cachedDownloads;
+
+  const totalCount = window.downloadsTotalCount || cachedDownloads.length;
+
+  // Update count badge
+  if (cachedDownloads.length > 0) {
+    const filterInfo = filter ? ` (${filteredDownloads.length} matches)` : "";
+    if (totalCount > cachedDownloads.length) {
+      countBadge.textContent = `(${cachedDownloads.length} of ${totalCount})${filterInfo}`;
+    } else {
+      countBadge.textContent = `(${cachedDownloads.length})${filterInfo}`;
+    }
+  } else {
+    countBadge.textContent = "";
+  }
+
+  if (filteredDownloads.length === 0) {
+    list.innerHTML = `<div class="item-card"><p style="text-align:center; color: var(--text-secondary)">${filter ? "No matching downloads" : "No recent downloads"}</p></div>`;
+    return;
+  }
+
+  const html = filteredDownloads
+    .map((d) => {
+      return `
+          <div class="item-card" data-filename="${escapeHtml(d.filename.toLowerCase())}">
+              <div class="item-header">
+                   <div style="flex:1">
+                      <div class="item-title"><a href="${d.download}" target="_blank" style="color:inherit;text-decoration:none">${escapeHtml(d.filename)}</a></div>
+                      <div class="item-meta">
+                          <span>${formatBytes(d.filesize)}</span>
+                          <span>${d.host}</span>
+                          <span>${new Date(d.generated).toLocaleDateString()}</span>
+                      </div>
+                  </div>
+                  ${isAdmin ? `<button class="delete-btn" onclick="confirmDelete('download', '${d.id}', '${escapeHtml(d.filename)}')" title="Delete">🗑</button>` : ""}
+              </div>
+          </div>
+          `;
+    })
+    .join("");
+
+  // Add Load More button if there are more
+  const loadMoreHtml =
+    window.downloadsTotalCount > cachedDownloads.length && !filter
+      ? `<button class="btn btn-secondary btn-block load-more-btn" onclick="fetchDownloads(true)">Load More (${cachedDownloads.length}/${window.downloadsTotalCount})</button>`
+      : "";
+
+  list.innerHTML = html + loadMoreHtml;
+}
+
+function filterDownloads() {
+  const searchInput = document.getElementById("downloads-search");
+  renderDownloads(searchInput.value.toLowerCase());
+}
+
+function clearSearch(type) {
+  const input = document.getElementById(`${type}-search`);
+  if (input) {
+    input.value = "";
+    if (type === "torrents") renderTorrents("");
+    else renderDownloads("");
   }
 }
 

@@ -137,6 +137,82 @@ header {
   margin-bottom: 1rem;
 }
 
+.search-box {
+  margin-bottom: 1.25rem;
+}
+
+.search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-box input {
+  width: 100%;
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.search-box input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  background: var(--card-bg);
+  box-shadow:
+    0 0 0 4px rgba(59, 130, 246, 0.15),
+    inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.search-box input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  font-size: 0.9rem;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.clear-search {
+  position: absolute;
+  right: 0.75rem;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+  width: 20px;
+  height: 20px;
+}
+
+.search-wrapper input:not(:placeholder-shown) + .clear-search {
+  opacity: 0.6;
+  visibility: visible;
+}
+
+.clear-search:hover {
+  opacity: 1 !important;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
 .card-header h3 {
   font-weight: 600;
   color: var(--text-primary);
@@ -335,37 +411,146 @@ input:focus {
 }
 
 .progress-container {
-  height: 6px;
+  height: 8px;
   background: var(--border-color);
-  border-radius: 3px;
+  border-radius: 4px;
   width: 100%;
   margin-top: 0.5rem;
   overflow: hidden;
+  position: relative;
 }
 
 .progress-fill {
   height: 100%;
-  background: var(--accent-color);
-  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent-color), #60a5fa);
+  border-radius: 4px;
   transition: width 0.5s ease;
+  position: relative;
 }
 
+.progress-active .progress-fill {
+  animation: progressPulse 2s ease-in-out infinite;
+}
+
+.progress-complete .progress-fill {
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+@keyframes progressPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.progress-text {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.item-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.copy-btn,
 .delete-btn {
   background: transparent;
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 1.2rem;
-  padding: 0.25rem;
-  border-radius: 4px;
+  font-size: 1.1rem;
+  padding: 0.35rem;
+  border-radius: 6px;
   opacity: 0.7;
   transition: all 0.2s;
+}
+
+.copy-btn:hover {
+  color: var(--accent-color);
+  background: rgba(59, 130, 246, 0.1);
+  opacity: 1;
+}
+
+.copy-btn.copied {
+  color: #10b981;
+  opacity: 1;
 }
 
 .delete-btn:hover {
   color: var(--danger-color);
   background: rgba(239, 68, 68, 0.1);
   opacity: 1;
+}
+
+/* Load More Button */
+.load-more-btn {
+  width: 100%;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--card-bg);
+  border: 1px dashed var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.load-more-btn:hover {
+  background: var(--input-bg);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+/* Session Timer */
+.session-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-left: 0.75rem;
+}
+
+.timer-icon {
+  font-size: 0.9rem;
+}
+
+.timer-warning {
+  color: #f59e0b;
+}
+
+.timer-urgent {
+  color: #ef4444;
+  animation: timerBlink 1s ease-in-out infinite;
+}
+
+.timer-expired {
+  color: #ef4444;
+}
+
+@keyframes timerBlink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* Overlays */

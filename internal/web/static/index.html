@@ -118,6 +118,24 @@
                 </button>
               </div>
             </div>
+            <div class="search-box">
+              <div class="search-wrapper">
+                <span class="search-icon">🔍</span>
+                <input
+                  type="text"
+                  id="torrents-search"
+                  placeholder="Filter by name or status..."
+                  oninput="filterTorrents()"
+                />
+                <button
+                  class="clear-search"
+                  onclick="clearSearch('torrents')"
+                  title="Clear"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
             <div id="torrents-list" class="list-container">
               <!-- Torrents injected here -->
             </div>
@@ -143,6 +161,24 @@
                   title="Refresh"
                 >
                   ↻
+                </button>
+              </div>
+            </div>
+            <div class="search-box">
+              <div class="search-wrapper">
+                <span class="search-icon">🔍</span>
+                <input
+                  type="text"
+                  id="downloads-search"
+                  placeholder="Filter by name or host..."
+                  oninput="filterDownloads()"
+                />
+                <button
+                  class="clear-search"
+                  onclick="clearSearch('downloads')"
+                  title="Clear"
+                >
+                  ✕
                 </button>
               </div>
             </div>
