@@ -24,7 +24,10 @@ var (
 	BuildDate = "unknown"
 	GitCommit = "unknown"
 
+	// Configuration file path
 	cfgFile string
+
+	// Root command
 	rootCmd = &cobra.Command{
 		Use:   "rdctl-bot",
 		Short: "A Telegram bot for managing Real-Debrid torrents and links",
@@ -67,6 +70,7 @@ The bot also supports direct message handling:
 		Run: runBot,
 	}
 
+	// Version command
 	versionCmd = &cobra.Command{
 		Use:   "version",
 		Short: "Print version information",
@@ -85,6 +89,7 @@ The bot also supports direct message handling:
 // init configures CLI flags, binds selected flags to viper configuration keys, and registers subcommands.
 // It defines persistent flags for config file and debug mode, local flags for shutdown timeout and config validation, binds those flags to `app.debug` and `app.shutdown_timeout`, and adds the version subcommand.
 func init() {
+	// Initialize Cobra
 	cobra.OnInitialize(initConfig)
 
 	// Persistent flags (available to all commands)
@@ -100,6 +105,8 @@ func init() {
 	if err := viper.BindPFlag("app.debug", rootCmd.PersistentFlags().Lookup("debug")); err != nil {
 		log.Printf("Warning: failed to bind debug flag: %v", err)
 	}
+
+	// Bind flags to viper
 	if err := viper.BindPFlag("app.shutdown_timeout", rootCmd.Flags().Lookup("shutdown-timeout")); err != nil {
 		log.Printf("Warning: failed to bind shutdown-timeout flag: %v", err)
 	}
@@ -145,7 +152,6 @@ func runBot(cmd *cobra.Command, args []string) {
 	// Setup logging
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.SetOutput(os.Stdout)
-
 	log.Println("Configuration loaded successfully")
 
 	// Check web-only mode early for validation
@@ -182,14 +188,17 @@ func runBot(cmd *cobra.Command, args []string) {
 	log.Printf("Rate limit: %d messages/sec (burst: %d)", cfg.App.RateLimit.MessagesPerSecond, cfg.App.RateLimit.Burst)
 	log.Printf("Database: %s:%d/%s", cfg.Database.Host, cfg.Database.Port, cfg.Database.DBName)
 
+	// Log Real-Debrid configuration
 	if cfg.RealDebrid.Proxy != "" {
 		log.Printf("Using proxy: %s", cfg.RealDebrid.Proxy)
 	}
 
+	// Log web-only mode
 	if webOnly {
 		log.Println("Web only mode enabled. Telegram bot will NOT be started.")
 	}
 
+	// Initialize bot
 	var b *bot.Bot
 	if !webOnly {
 		// Create bot instance
@@ -248,6 +257,7 @@ func runBot(cmd *cobra.Command, args []string) {
 		log.Printf("Bot encountered an error: %v", err)
 		log.Println("Initiating shutdown due to error...")
 	}
+
 	// Get shutdown timeout from flags
 	shutdownTimeout, _ := cmd.Flags().GetDuration("shutdown-timeout")
 
@@ -260,8 +270,8 @@ func runBot(cmd *cobra.Command, args []string) {
 
 	// Perform graceful shutdown
 	go func() {
+		// Wait for shutdown context to complete
 		defer close(shutdownComplete)
-
 		log.Println("Stopping components...")
 
 		// Shutdown web server
@@ -273,20 +283,14 @@ func runBot(cmd *cobra.Command, args []string) {
 
 		// Allow bot to cleanup if it was running
 		if !webOnly && b != nil {
-			time.Sleep(500 * time.Millisecond) // Give a moment for inflight but mostly relying on context cancel above
+			// Give a moment for inflight but mostly relying on context cancel above
+			time.Sleep(500 * time.Millisecond)
 
-			b.Stop() // Close database and other resources (bot specific)
+			// Close database and other resources
+			b.Stop()
 			log.Println("Bot cleanup completed")
 		} else {
-			// If bot wasn't running, we still might want to close DB if bot.Stop() did that.
-			// Currently bot.Stop() closes DB. If we prefer, we can close DB explicitly here if b is nil.
-			// However, looking at bot code (implied), it likely owns DB closing.
-			// For web-only, we should ensure DB is closed.
-			// Assuming db.Init returned a handle that we can't easily close unless we keep it or bot.Stop does it.
-			// Let's assume for now we might need to expose DB Close if bot is not handling it.
-			// But for now, we rely on OS cleanup or add explicit DB close if needed.
-			// Looking at imports, `database` variable is available.
-			// Ideally we should close it.
+			// Close database explicitly when bot is not running
 			sqlDB, err := database.DB()
 			if err == nil {
 				if err := sqlDB.Close(); err != nil {
