@@ -1,6 +1,7 @@
 package web
 
 import (
+	"crypto/sha256"
 	"crypto/subtle"
 	"strings"
 
@@ -16,10 +17,12 @@ const (
 
 // APIKeyAuth is a middleware for simple API key authentication (legacy, kept for compatibility)
 func APIKeyAuth(apiKey string) fiber.Handler {
+	apiKeyHash := sha256.Sum256([]byte(apiKey))
 	return func(c *fiber.Ctx) error {
 		providedKey := c.Get("X-API-Key")
+		providedKeyHash := sha256.Sum256([]byte(providedKey))
 
-		if providedKey == "" || subtle.ConstantTimeCompare([]byte(providedKey), []byte(apiKey)) != 1 {
+		if subtle.ConstantTimeCompare(providedKeyHash[:], apiKeyHash[:]) != 1 {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"success": false,
 				"message": "Unauthorized: Invalid or missing API Key",
@@ -61,7 +64,10 @@ func DualAuth(apiKey string, tokenStore *TokenStore) fiber.Handler {
 
 		// 2. Try API Key Authentication via Header (Constant Time)
 		providedKey := c.Get("X-API-Key")
-		if providedKey != "" && subtle.ConstantTimeCompare([]byte(providedKey), []byte(apiKey)) == 1 {
+		apiKeyHash := sha256.Sum256([]byte(apiKey))
+		providedKeyHash := sha256.Sum256([]byte(providedKey))
+
+		if subtle.ConstantTimeCompare(providedKeyHash[:], apiKeyHash[:]) == 1 {
 			// API key grants admin access
 			c.Locals(ContextKeyAuthType, "api_key")
 			c.Locals(ContextKeyRole, RoleAdmin)
