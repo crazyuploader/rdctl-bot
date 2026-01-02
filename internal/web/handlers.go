@@ -66,6 +66,12 @@ func (d *Dependencies) GetTorrents(c *fiber.Ctx) error {
 // GetTorrentInfo retrieves detailed information about a single torrent
 func (d *Dependencies) GetTorrentInfo(c *fiber.Ctx) error {
 	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"error":   "Torrent ID is required",
+		})
+	}
 	torrent, err := d.RDClient.GetTorrentInfo(id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
