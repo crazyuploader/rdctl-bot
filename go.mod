@@ -4,7 +4,7 @@ go 1.25.3
 
 require (
 	github.com/go-telegram/bot v1.17.0
-	github.com/gofiber/fiber/v2 v2.52.9
+	github.com/gofiber/fiber/v2 v2.52.10
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	golang.org/x/text v0.32.0
