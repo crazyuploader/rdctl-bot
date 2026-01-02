@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -137,7 +138,9 @@ func (c *Client) GETWithTotalCount(endpoint string, queryParams map[string]strin
 
 	totalCount := 0
 	if tc := headers.Get("X-Total-Count"); tc != "" {
-		fmt.Sscanf(tc, "%d", &totalCount)
+		if count, err := strconv.Atoi(tc); err == nil {
+			totalCount = count
+		}
 	}
 
 	return respBody, totalCount, nil
