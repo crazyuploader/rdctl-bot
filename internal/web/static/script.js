@@ -518,11 +518,12 @@ function renderDownloads(filterText = null) {
 
   const html = filteredDownloads
     .map((d) => {
+      const safeUrl = sanitizeUrl(d.download);
       return `
           <div class="item-card" data-filename="${escapeHtml(d.filename.toLowerCase())}">
               <div class="item-header">
                    <div style="flex:1">
-                      <div class="item-title"><a href="${d.download}" target="_blank" style="color:inherit;text-decoration:none">${escapeHtml(d.filename)}</a></div>
+                      <div class="item-title"><a href="${safeUrl}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none">${escapeHtml(d.filename)}</a></div>
                       <div class="item-meta">
                           <span>${formatBytes(d.filesize)}</span>
                           <span>${d.host}</span>
@@ -668,4 +669,17 @@ function escapeHtml(text) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function sanitizeUrl(urlString) {
+  if (!urlString) return "#";
+  try {
+    const url = new URL(urlString, window.location.origin);
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return urlString;
+    }
+    return "#";
+  } catch (e) {
+    return "#";
+  }
 }
