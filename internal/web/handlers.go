@@ -3,6 +3,7 @@ package web
 import (
 	"log"
 	"strconv"
+	"strings"
 
 	"github.com/crazyuploader/rdctl-bot/internal/realdebrid"
 	"github.com/gofiber/fiber/v2"
@@ -164,7 +165,10 @@ func (d *Dependencies) GetUserStats(c *fiber.Ctx) error {
 
 	stats, err := d.CommandRepo.GetUserStats(c.Context(), uint(userID))
 	if err != nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "error": err.Error()})
+		if strings.Contains(err.Error(), "not found") {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "error": err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
 	}
 	return c.JSON(fiber.Map{"success": true, "data": stats})
 }
