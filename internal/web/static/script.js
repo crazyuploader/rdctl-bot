@@ -168,7 +168,7 @@ function updateSessionTimer() {
     setTimeout(() => {
       showToast(
         "Session expired. Please request a new dashboard link.",
-        "error",
+        "error"
       );
       logout();
     }, 2000);
@@ -182,9 +182,11 @@ function updateSessionTimer() {
     minutes < 5
       ? "text-red-400"
       : minutes < 15
-        ? "text-yellow-400"
-        : "text-blue-400";
-  timerEl.innerHTML = `<span class="${colorClass}">⏱️ ${minutes}:${seconds.toString().padStart(2, "0")}</span>`;
+      ? "text-yellow-400"
+      : "text-blue-400";
+  timerEl.innerHTML = `<span class="${colorClass}">⏱️ ${minutes}:${seconds
+    .toString()
+    .padStart(2, "0")}</span>`;
 }
 
 function showLogin() {
@@ -221,7 +223,7 @@ function showDashboard() {
     appContainer.classList.remove(
       "opacity-0",
       "pointer-events-none",
-      "blur-sm",
+      "blur-sm"
     );
   }
 
@@ -232,11 +234,11 @@ function showDashboard() {
   // Setup auto-refresh
   toggleAutoRefresh(
     "torrents",
-    document.getElementById("auto-refresh-torrents").checked,
+    document.getElementById("auto-refresh-torrents").checked
   );
   toggleAutoRefresh(
     "downloads",
-    document.getElementById("auto-refresh-downloads").checked,
+    document.getElementById("auto-refresh-downloads").checked
   );
 }
 
@@ -371,7 +373,7 @@ function setupTabs() {
       tabs.forEach(
         (t) =>
           (t.className =
-            "px-3 py-1.5 rounded-lg bg-slate-800/50 text-slate-400 text-xs font-medium whitespace-nowrap hover:bg-slate-700/50 transition-colors"),
+            "px-3 py-1.5 rounded-lg bg-slate-800/50 text-slate-400 text-xs font-medium whitespace-nowrap hover:bg-slate-700/50 transition-colors")
       );
       tab.className =
         "px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-semibold whitespace-nowrap active-tab";
@@ -510,7 +512,9 @@ async function fetchStatus() {
 
     container.innerHTML = `
       <span class="font-bold text-white">${escapeHtml(maskedUsername)}</span>
-      <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase ${typeClass}">${escapeHtml(user.type)}</span>
+      <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase ${typeClass}">${escapeHtml(
+      user.type
+    )}</span>
       <span class="text-slate-600">|</span>
       <span class="text-slate-400">Exp: <span class="text-slate-200">${formattedDate}</span></span>
       <span class="text-slate-400">(${user.points} pts)</span>
@@ -538,7 +542,7 @@ async function fetchTorrents(loadMore = false) {
   try {
     const offset = loadMore ? cachedTorrents.length : 0;
     const result = await apiFetch(
-      `${API_BASE_URL}/torrents?limit=50&offset=${offset}`,
+      `${API_BASE_URL}/torrents?limit=50&offset=${offset}`
     );
     const newTorrents = result.data || [];
     const totalCount = result.total_count || newTorrents.length;
@@ -583,17 +587,17 @@ function toggleSelectAll(checked) {
     visibleTorrents = visibleTorrents.filter(
       (t) =>
         t.filename.toLowerCase().includes(filter) ||
-        t.status.toLowerCase().includes(filter),
+        t.status.toLowerCase().includes(filter)
     );
   }
 
   if (activeTab === "downloading") {
     visibleTorrents = visibleTorrents.filter(
-      (t) => t.status.toLowerCase() === "downloading",
+      (t) => t.status.toLowerCase() === "downloading"
     );
   } else if (activeTab === "completed") {
     visibleTorrents = visibleTorrents.filter(
-      (t) => t.status.toLowerCase() === "downloaded",
+      (t) => t.status.toLowerCase() === "downloaded"
     );
   } else if (activeTab === "error") {
     visibleTorrents = visibleTorrents.filter((t) => {
@@ -656,16 +660,16 @@ function updateBatchDeleteButton() {
       visibleTorrents = visibleTorrents.filter(
         (t) =>
           t.filename.toLowerCase().includes(filter) ||
-          t.status.toLowerCase().includes(filter),
+          t.status.toLowerCase().includes(filter)
       );
     }
     if (activeTab === "downloading") {
       visibleTorrents = visibleTorrents.filter(
-        (t) => t.status.toLowerCase() === "downloading",
+        (t) => t.status.toLowerCase() === "downloading"
       );
     } else if (activeTab === "completed") {
       visibleTorrents = visibleTorrents.filter(
-        (t) => t.status.toLowerCase() === "downloaded",
+        (t) => t.status.toLowerCase() === "downloaded"
       );
     } else if (activeTab === "error") {
       visibleTorrents = visibleTorrents.filter((t) => {
@@ -679,7 +683,7 @@ function updateBatchDeleteButton() {
       visibleTorrents.length > 0 &&
       visibleTorrents.every((t) => selectedTorrents.has(t.id));
     const someSelected = visibleTorrents.some((t) =>
-      selectedTorrents.has(t.id),
+      selectedTorrents.has(t.id)
     );
 
     if (allSelected) {
@@ -725,7 +729,7 @@ async function deleteSelectedTorrents() {
 
   if (
     !confirm(
-      `Are you sure you want to delete ${selectedTorrents.size} torrents?`,
+      `Are you sure you want to delete ${selectedTorrents.size} torrents?`
     )
   )
     return;
@@ -771,26 +775,26 @@ function renderTorrents(filterText = null, preserveSelection = false) {
     filterText !== null
       ? filterText
       : searchInput
-        ? searchInput.value.toLowerCase()
-        : "";
+      ? searchInput.value.toLowerCase()
+      : "";
 
   // Filter torrents
   let filteredTorrents = filter
     ? cachedTorrents.filter(
         (t) =>
           t.filename.toLowerCase().includes(filter) ||
-          t.status.toLowerCase().includes(filter),
+          t.status.toLowerCase().includes(filter)
       )
     : cachedTorrents;
 
   // Apply Tab Filter
   if (activeTab === "downloading") {
     filteredTorrents = filteredTorrents.filter(
-      (t) => t.status.toLowerCase() === "downloading",
+      (t) => t.status.toLowerCase() === "downloading"
     );
   } else if (activeTab === "completed") {
     filteredTorrents = filteredTorrents.filter(
-      (t) => t.status.toLowerCase() === "downloaded",
+      (t) => t.status.toLowerCase() === "downloaded"
     );
   } else if (activeTab === "error") {
     filteredTorrents = filteredTorrents.filter((t) => {
@@ -804,7 +808,9 @@ function renderTorrents(filterText = null, preserveSelection = false) {
   // Update count badge
   if (cachedTorrents.length > 0) {
     const filterInfo = filter ? ` (${filteredTorrents.length} matches)` : "";
-    countBadge.textContent = `${cachedTorrents.length}${totalCount > cachedTorrents.length ? ` of ${totalCount}` : ""}${filterInfo} items`;
+    countBadge.textContent = `${cachedTorrents.length}${
+      totalCount > cachedTorrents.length ? ` of ${totalCount}` : ""
+    }${filterInfo} items`;
   } else {
     countBadge.textContent = "0 items";
   }
@@ -819,7 +825,9 @@ function renderTorrents(filterText = null, preserveSelection = false) {
       <svg class="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
       </svg>
-      <p class="text-sm">${filter ? "No matching torrents" : "No active torrents"}</p>
+      <p class="text-sm">${
+        filter ? "No matching torrents" : "No active torrents"
+      }</p>
     </div>`;
     return;
   }
@@ -831,38 +839,46 @@ function renderTorrents(filterText = null, preserveSelection = false) {
         t.status === "Downloaded"
           ? "text-green-400 bg-green-500/10"
           : t.status === "Downloading"
-            ? "text-blue-400 bg-blue-500/10"
-            : t.status === "Error" || t.status === "Dead"
-              ? "text-red-400 bg-red-500/10"
-              : "text-slate-400 bg-slate-800/50";
+          ? "text-blue-400 bg-blue-500/10"
+          : t.status === "Error" || t.status === "Dead"
+          ? "text-red-400 bg-red-500/10"
+          : "text-slate-400 bg-slate-800/50";
 
       const progressColor =
         t.progress >= 100
           ? "bg-green-500"
           : t.progress > 0
-            ? "bg-blue-500"
-            : "bg-slate-700";
+          ? "bg-blue-500"
+          : "bg-slate-700";
 
       const addedDate = t.added ? new Date(t.added).toLocaleDateString() : "";
 
       return `
-        <div class="group relative glass-effect border ${isSelected ? "border-blue-500 bg-blue-500/5" : "border-slate-700/50"} rounded-xl p-4 hover:border-blue-500/40 transition-all duration-200">
+        <div class="group relative glass-effect border ${
+          isSelected ? "border-blue-500 bg-blue-500/5" : "border-slate-700/50"
+        } rounded-xl p-4 hover:border-blue-500/40 transition-all duration-200">
           <div class="flex justify-between items-start gap-3 mb-3">
              <!-- Selection Checkbox -->
              ${
                isAdmin
                  ? `
-             <div class="pt-1 cursor-pointer" onclick="event.stopPropagation(); toggleSelection('${t.id}')">
+             <div class="pt-1 cursor-pointer" onclick="event.stopPropagation(); toggleSelection('${
+               t.id
+             }')">
                 <div class="relative w-5 h-5 group/checkbox">
                   <!-- Unchecked Circle -->
-                  <svg class="w-5 h-5 text-slate-500 transition-all duration-200 group-hover/checkbox:text-blue-400 group-hover/checkbox:scale-110 ${isSelected ? "opacity-0" : "opacity-100"}" 
+                  <svg class="w-5 h-5 text-slate-500 transition-all duration-200 group-hover/checkbox:text-blue-400 group-hover/checkbox:scale-110 ${
+                    isSelected ? "opacity-0" : "opacity-100"
+                  }" 
                        fill="none" 
                        stroke="currentColor" 
                        viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="9" stroke-width="2"/>
                   </svg>
                   <!-- Checked Circle -->
-                  <svg class="w-5 h-5 absolute top-0 left-0 text-blue-500 transition-all duration-200 ${isSelected ? "opacity-100 scale-100" : "opacity-0 scale-50"}" 
+                  <svg class="w-5 h-5 absolute top-0 left-0 text-blue-500 transition-all duration-200 ${
+                    isSelected ? "opacity-100 scale-100" : "opacity-0 scale-50"
+                  }" 
                        fill="currentColor" 
                        viewBox="0 0 24 24">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
@@ -874,12 +890,26 @@ function renderTorrents(filterText = null, preserveSelection = false) {
              }
 
             <div class="flex-1 min-w-0">
-              <div class="text-sm font-semibold text-white break-all mb-1" title="${escapeHtml(t.filename)}">${escapeHtml(t.filename)}</div>
+              <div class="text-sm font-semibold text-white break-all mb-1" title="${escapeHtml(
+                t.filename
+              )}">${escapeHtml(t.filename)}</div>
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-                <span class="font-medium text-slate-300">${formatBytes(t.bytes)}</span>
-                <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase ${statusClass}">${t.status}</span>
-                ${t.seeders !== undefined && t.seeders !== null ? `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>${t.seeders} seeds</span>` : ""}
-                ${t.speed !== undefined && t.speed !== null && t.speed > 0 ? `<span>${formatBytes(t.speed)}/s</span>` : ""}
+                <span class="font-medium text-slate-300">${formatBytes(
+                  t.bytes
+                )}</span>
+                <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase ${statusClass}">${
+        t.status
+      }</span>
+                ${
+                  t.seeders !== undefined && t.seeders !== null
+                    ? `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>${t.seeders} seeds</span>`
+                    : ""
+                }
+                ${
+                  t.speed !== undefined && t.speed !== null && t.speed > 0
+                    ? `<span>${formatBytes(t.speed)}/s</span>`
+                    : ""
+                }
                 ${addedDate ? `<span>${addedDate}</span>` : ""}
               </div>
             </div>
@@ -887,7 +917,9 @@ function renderTorrents(filterText = null, preserveSelection = false) {
             <!-- Individual Delete Action -->
              ${
                isAdmin
-                 ? `<button class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100" onclick="event.stopPropagation(); confirmDelete('torrent', '${t.id}', '${escapeHtml(t.filename)}')" title="Delete">
+                 ? `<button class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100" onclick="event.stopPropagation(); confirmDelete('torrent', '${
+                     t.id
+                   }', '${escapeHtml(t.filename)}')" title="Delete">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
               </svg>
@@ -896,9 +928,13 @@ function renderTorrents(filterText = null, preserveSelection = false) {
              }
           </div>
           <div class="relative h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-            <div class="h-full ${progressColor} transition-all duration-500 ${t.status === "Downloading" ? "animate-pulse" : ""}" style="width: ${t.progress}%"></div>
+            <div class="h-full ${progressColor} transition-all duration-500 ${
+        t.status === "Downloading" ? "animate-pulse" : ""
+      }" style="width: ${t.progress}%"></div>
           </div>
-          <div class="mt-1 text-right text-xs font-medium text-slate-500">${t.progress.toFixed(1)}%</div>
+          <div class="mt-1 text-right text-xs font-medium text-slate-500">${t.progress.toFixed(
+            1
+          )}%</div>
         </div>
       `;
     })
@@ -930,7 +966,7 @@ async function fetchDownloads(loadMore = false) {
   try {
     const offset = loadMore ? cachedDownloads.length : 0;
     const result = await apiFetch(
-      `${API_BASE_URL}/downloads?limit=50&offset=${offset}`,
+      `${API_BASE_URL}/downloads?limit=50&offset=${offset}`
     );
     const newDownloads = result.data || [];
     const totalCount = result.total_count || newDownloads.length;
@@ -959,15 +995,15 @@ function renderDownloads(filterText = null) {
     filterText !== null
       ? filterText
       : searchInput
-        ? searchInput.value.toLowerCase()
-        : "";
+      ? searchInput.value.toLowerCase()
+      : "";
 
   // Filter downloads
   const filteredDownloads = filter
     ? cachedDownloads.filter(
         (d) =>
           d.filename.toLowerCase().includes(filter) ||
-          d.host.toLowerCase().includes(filter),
+          d.host.toLowerCase().includes(filter)
       )
     : cachedDownloads;
 
@@ -976,7 +1012,9 @@ function renderDownloads(filterText = null) {
   // Update count badge
   if (cachedDownloads.length > 0) {
     const filterInfo = filter ? ` (${filteredDownloads.length} matches)` : "";
-    countBadge.textContent = `${cachedDownloads.length}${totalCount > cachedDownloads.length ? ` of ${totalCount}` : ""}${filterInfo} items`;
+    countBadge.textContent = `${cachedDownloads.length}${
+      totalCount > cachedDownloads.length ? ` of ${totalCount}` : ""
+    }${filterInfo} items`;
   } else {
     countBadge.textContent = "0 items";
   }
@@ -986,7 +1024,9 @@ function renderDownloads(filterText = null) {
       <svg class="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
       </svg>
-      <p class="text-sm">${filter ? "No matching downloads" : "No recent downloads"}</p>
+      <p class="text-sm">${
+        filter ? "No matching downloads" : "No recent downloads"
+      }</p>
     </div>`;
     return;
   }
@@ -999,17 +1039,25 @@ function renderDownloads(filterText = null) {
           <div class="flex justify-between items-start gap-4">
             <div class="flex-1 min-w-0">
               <div class="text-sm font-semibold text-white break-all mb-1">
-                <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="hover:text-purple-400 transition-colors">${escapeHtml(d.filename)}</a>
+                <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="hover:text-purple-400 transition-colors">${escapeHtml(
+        d.filename
+      )}</a>
               </div>
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-                <span class="font-medium text-slate-300">${formatBytes(d.filesize)}</span>
-                <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase bg-slate-800/50">${d.host}</span>
+                <span class="font-medium text-slate-300">${formatBytes(
+                  d.filesize
+                )}</span>
+                <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase bg-slate-800/50">${
+                  d.host
+                }</span>
                 <span>${new Date(d.generated).toLocaleDateString()}</span>
               </div>
             </div>
             ${
               isAdmin
-                ? `<button class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all" onclick="confirmDelete('download', '${d.id}', '${escapeHtml(d.filename)}')" title="Delete">
+                ? `<button class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all" onclick="confirmDelete('download', '${
+                    d.id
+                  }', '${escapeHtml(d.filename)}')" title="Delete">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
               </svg>
@@ -1109,8 +1157,9 @@ function confirmDelete(type, id, name) {
   const modal = document.getElementById("confirm-modal");
   document.getElementById("confirm-title").textContent =
     type === "torrent" ? "Delete Torrent?" : "Delete Download?";
-  document.getElementById("confirm-message").textContent =
-    `Are you sure you want to remove "${name}"?`;
+  document.getElementById(
+    "confirm-message"
+  ).textContent = `Are you sure you want to remove "${name}"?`;
 
   // Quick action handler setup
   const okBtn = document.getElementById("confirm-ok");
@@ -1152,7 +1201,7 @@ async function performDelete() {
     await apiFetch(`${API_BASE_URL}${endpoint}`, { method: "DELETE" });
     showToast(
       `${type === "torrent" ? "Torrent" : "Download"} deleted`,
-      "success",
+      "success"
     );
 
     if (type === "torrent") fetchTorrents();
@@ -1162,6 +1211,43 @@ async function performDelete() {
   }
 
   closeConfirmModal();
+}
+
+// --- Premium Ring ---
+
+function updatePremiumRing(daysRemaining) {
+  const container = document.getElementById("premium-ring-container");
+  if (!container) return;
+
+  container.classList.remove("hidden");
+
+  // Calculate percentage (assuming 365 days is 100%)
+  const maxDays = 365;
+  const percentage = Math.min(100, (daysRemaining / maxDays) * 100);
+  const circumference = 2 * Math.PI * 18; // radius = 18
+  const offset = circumference - (percentage / 100) * circumference;
+
+  // Color based on days remaining
+  let strokeColor = "#22c55e"; // green
+  if (daysRemaining < 30) {
+    strokeColor = "#ef4444"; // red
+  } else if (daysRemaining < 90) {
+    strokeColor = "#eab308"; // yellow
+  }
+
+  container.innerHTML = `
+    <svg class="w-10 h-10 -rotate-90" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="18" stroke="#334155" stroke-width="3" fill="none"/>
+      <circle cx="20" cy="20" r="18" stroke="${strokeColor}" stroke-width="3" fill="none"
+        stroke-dasharray="${circumference}"
+        stroke-dashoffset="${offset}"
+        stroke-linecap="round"/>
+    </svg>
+    <div class="flex flex-col">
+      <span class="text-sm font-bold text-white">${daysRemaining}</span>
+      <span class="text-[10px] text-slate-400 -mt-1">days</span>
+    </div>
+  `;
 }
 
 // --- Utils ---
