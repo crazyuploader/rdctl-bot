@@ -18,8 +18,12 @@ RUN go mod download
 # Copy source code
 COPY . .
 
+# Install UPX
+RUN apk add --no-cache upx
+
 # Download dependencies and build the binary
-RUN go build -o rdctl-bot ./cmd/rdctl-bot
+RUN go build -ldflags="-s -w" -o rdctl-bot ./cmd/rdctl-bot && \
+    upx --best rdctl-bot
 
 # Stage 2: Minimal runtime image
 FROM alpine:3.23
