@@ -48,7 +48,7 @@ func NewRDCollector(deps Dependencies) *RDCollector {
 		),
 		torrentsSizeDesc: prometheus.NewDesc(
 			"rdctl_torrents_total_size_bytes",
-			"Total size of recent torrents in bytes (approximate from last 100)",
+			"Total size of all torrents in bytes",
 			nil, nil,
 		),
 		userPointsDesc: prometheus.NewDesc(
@@ -95,19 +95,35 @@ func (c *RDCollector) scrape() {
 	log.Println("Scraping Real-Debrid metrics (refreshing cache)...")
 
 	// 1. Torrents
-	// Limit to 100 to calculate size, also gets total count
-	torrentsResult, err := c.deps.RDClient.GetTorrentsWithCount(100, 0)
-	if err == nil {
-		c.cachedTorrentCount = float64(torrentsResult.TotalCount)
+	// Pagination loop to fetch ALL torrents for total size
+	var totalSize int64
+	var totalCount int
+	limit := 100
+	offset := 0
 
-		var totalSize int64
+	for {
+		torrentsResult, err := c.deps.RDClient.GetTorrentsWithCount(limit, offset)
+		if err != nil {
+			log.Printf("Error scraping torrents (offset %d): %v", offset, err)
+			break
+		}
+
+		if offset == 0 {
+			totalCount = torrentsResult.TotalCount
+		}
+
 		for _, t := range torrentsResult.Torrents {
 			totalSize += t.Bytes
 		}
-		c.cachedTotalSize = float64(totalSize)
-	} else {
-		log.Printf("Error scraping torrents: %v", err)
+
+		if len(torrentsResult.Torrents) < limit {
+			break
+		}
+		offset += limit
 	}
+
+	c.cachedTorrentCount = float64(totalCount)
+	c.cachedTotalSize = float64(totalSize)
 
 	// 2. Downloads
 	downloadsResult, err := c.deps.RDClient.GetDownloadsWithCount(1, 0)
