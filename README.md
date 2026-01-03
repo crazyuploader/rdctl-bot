@@ -52,6 +52,37 @@ The bot includes a web-based dashboard for managing your Real-Debrid downloads v
 
 **Note**: The dashboard runs on port `8089` by default. Ensure this port is accessible or behind a reverse proxy.
 
+### 🛡️ Reverse Proxy Setup
+
+If you are running the bot behind a reverse proxy like **Nginx**, **Caddy**, or **Cloudflare**, follow these steps to ensure the dashboard loads correctly:
+
+1.  **Set `web.dashboard_url`**: In your `config.yaml`, set this to your public domain (e.g., `https://bot.example.com`).
+2.  **Pass Proxy Headers**: Ensure your proxy is configured to pass standard headers (`X-Forwarded-For`, `X-Forwarded-Proto`).
+
+#### Nginx Example
+
+```nginx
+location / {
+    proxy_pass http://localhost:8089;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+#### Caddy Example
+
+```caddy
+bot.example.com {
+    reverse_proxy localhost:8089
+}
+```
+
+#### Cloudflare Note
+
+If using Cloudflare, ensure your **SSL/TLS encryption mode** is set to **Full** or **Full (strict)** to avoid "Too many redirects" or Mixed Content errors.
+
 ## 🐳 Running with Docker Compose
 
 You can easily run the bot using **Docker Compose**, which automatically handles deployment configuration and environment variables.

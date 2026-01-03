@@ -42,6 +42,7 @@ type Server struct {
 func NewServer(deps Dependencies) *Server {
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
+		ProxyHeader:           "X-Forwarded-For", // Standard proxy header
 	})
 
 	// Middleware
