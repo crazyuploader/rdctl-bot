@@ -51,6 +51,27 @@ type TorrentsResult struct {
 	TotalCount int       `json:"total_count"`
 }
 
+// ActiveCount represents the number of active torrents
+type ActiveCount struct {
+	Nb    int `json:"nb"`
+	Limit int `json:"limit"`
+}
+
+// GetActiveCount retrieves the number of active torrents
+func (c *Client) GetActiveCount() (*ActiveCount, error) {
+	data, err := c.GET("/torrents/activeCount", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active count: %w", err)
+	}
+
+	var result ActiveCount
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse active count: %w", err)
+	}
+
+	return &result, nil
+}
+
 // GetTorrents retrieves all torrents
 func (c *Client) GetTorrents(limit, offset int) ([]Torrent, error) {
 	result, err := c.GetTorrentsWithCount(limit, offset)

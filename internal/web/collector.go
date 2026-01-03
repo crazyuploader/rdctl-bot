@@ -21,6 +21,7 @@ type RDCollector struct {
 	cachedTotalSize      float64
 	cachedUserPoints     float64
 	cachedPremiumSeconds float64
+	cachedActiveCount    float64
 
 	// Descriptors
 	torrentsCountDesc  *prometheus.Desc
@@ -28,6 +29,7 @@ type RDCollector struct {
 	torrentsSizeDesc   *prometheus.Desc
 	userPointsDesc     *prometheus.Desc
 	premiumSecondsDesc *prometheus.Desc
+	activeCountDesc    *prometheus.Desc
 }
 
 // NewRDCollector creates a new RDCollector
@@ -61,6 +63,11 @@ func NewRDCollector(deps Dependencies) *RDCollector {
 			"Seconds remaining of premium status",
 			nil, nil,
 		),
+		activeCountDesc: prometheus.NewDesc(
+			"rdctl_torrents_active_count",
+			"Number of currently active torrents",
+			nil, nil,
+		),
 	}
 }
 
@@ -71,6 +78,7 @@ func (c *RDCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.torrentsSizeDesc
 	ch <- c.userPointsDesc
 	ch <- c.premiumSecondsDesc
+	ch <- c.activeCountDesc
 }
 
 // Collect is called by the Prometheus registry when collecting metrics
@@ -89,6 +97,7 @@ func (c *RDCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(c.torrentsSizeDesc, prometheus.GaugeValue, c.cachedTotalSize)
 	ch <- prometheus.MustNewConstMetric(c.userPointsDesc, prometheus.GaugeValue, c.cachedUserPoints)
 	ch <- prometheus.MustNewConstMetric(c.premiumSecondsDesc, prometheus.GaugeValue, c.cachedPremiumSeconds)
+	ch <- prometheus.MustNewConstMetric(c.activeCountDesc, prometheus.GaugeValue, c.cachedActiveCount)
 }
 
 func (c *RDCollector) scrape() {
@@ -98,7 +107,7 @@ func (c *RDCollector) scrape() {
 	// Pagination loop to fetch ALL torrents for total size
 	var totalSize int64
 	var totalCount int
-	limit := 100
+	limit := 5000 // Optimization: Fetch up to 5000 torrents per call to minimize API requests
 	offset := 0
 
 	for {
@@ -140,6 +149,14 @@ func (c *RDCollector) scrape() {
 		c.cachedPremiumSeconds = float64(user.Premium)
 	} else {
 		log.Printf("Error scraping user: %v", err)
+	}
+
+	// 4. Active Count
+	activeCount, err := c.deps.RDClient.GetActiveCount()
+	if err == nil {
+		c.cachedActiveCount = float64(activeCount.Nb)
+	} else {
+		log.Printf("Error scraping active count: %v", err)
 	}
 
 	c.lastScrape = time.Now()
