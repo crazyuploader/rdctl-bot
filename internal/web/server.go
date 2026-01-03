@@ -69,7 +69,7 @@ func NewServer(deps Dependencies) *Server {
 			log.Printf("Web Error [%d]: %v", code, err)
 
 			// Sanitize error message for the client
-			message := "An unexpected error occurred"
+			var message string
 			if code < 500 || rdErr != nil {
 				// Show message for client errors (< 500) or upstream API errors
 				message = err.Error()
