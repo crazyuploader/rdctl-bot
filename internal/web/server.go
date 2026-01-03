@@ -17,6 +17,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/earlydata"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
+	"github.com/gofiber/fiber/v2/middleware/healthcheck"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
@@ -94,6 +95,7 @@ func NewServer(deps Dependencies) *Server {
 			URL:  "/favicon.svg",
 		},
 	))
+	app.Use(healthcheck.New())
 	app.Use(logger.New())
 	app.Use(recover.New())
 	app.Use(cors.New())
@@ -104,6 +106,11 @@ func NewServer(deps Dependencies) *Server {
 		deps.Config.Web.Limiter.AuthFailLimit,
 		deps.Config.Web.Limiter.AuthFailWindow,
 	)
+
+	// Health check endpoint
+	app.Get("/health", func(c *fiber.Ctx) error {
+		return c.SendString("OK")
+	})
 
 	// API group with dual auth (API key OR token)
 	api := app.Group("/api")
