@@ -109,11 +109,13 @@ func (c *RDCollector) scrape() {
 	var totalCount int
 	limit := 5000 // Optimization: Fetch up to 5000 torrents per call to minimize API requests
 	offset := 0
+	scrapeSuccess := true
 
 	for {
 		torrentsResult, err := c.deps.RDClient.GetTorrentsWithCount(limit, offset)
 		if err != nil {
 			log.Printf("Error scraping torrents (offset %d): %v", offset, err)
+			scrapeSuccess = false
 			break
 		}
 
@@ -131,8 +133,10 @@ func (c *RDCollector) scrape() {
 		offset += limit
 	}
 
-	c.cachedTorrentCount = float64(totalCount)
-	c.cachedTotalSize = float64(totalSize)
+	if scrapeSuccess {
+		c.cachedTorrentCount = float64(totalCount)
+		c.cachedTotalSize = float64(totalSize)
+	}
 
 	// 2. Downloads
 	downloadsResult, err := c.deps.RDClient.GetDownloadsWithCount(1, 0)
