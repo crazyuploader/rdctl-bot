@@ -10,7 +10,11 @@ import (
 	"github.com/crazyuploader/rdctl-bot/internal/db"
 	"github.com/crazyuploader/rdctl-bot/internal/realdebrid"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/csrf"
+	"github.com/gofiber/fiber/v2/middleware/earlydata"
+	"github.com/gofiber/fiber/v2/middleware/favicon"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
@@ -46,6 +50,15 @@ func NewServer(deps Dependencies) *Server {
 	})
 
 	// Middleware
+	app.Use(compress.New())
+	app.Use(csrf.New())
+	app.Use(earlydata.New())
+	app.Use(favicon.New(
+		favicon.Config{
+			File: "./internal/web/static/favicon.svg",
+			URL:  "/favicon.svg",
+		},
+	))
 	app.Use(logger.New())
 	app.Use(recover.New())
 	app.Use(cors.New())
