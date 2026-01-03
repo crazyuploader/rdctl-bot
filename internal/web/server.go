@@ -98,10 +98,20 @@ func NewServer(deps Dependencies) *Server {
 	app.Use(recover.New())
 	app.Use(cors.New())
 
+	// Initialize IP Manager for security
+	ipManager := NewIPManager(
+		deps.Config.Web.Limiter.BanDurationSeconds,
+		deps.Config.Web.Limiter.AuthFailLimit,
+		deps.Config.Web.Limiter.AuthFailWindow,
+	)
+
 	// API group with dual auth (API key OR token)
 	api := app.Group("/api")
 
-	// Rate limiting
+	// 1. IP Ban check first
+	api.Use(ipManager.Middleware())
+
+	// 2. Rate limiting second
 	if deps.Config.Web.Limiter.Enabled {
 		api.Use(limiter.New(limiter.Config{
 			Max:               deps.Config.Web.Limiter.Max,
@@ -120,7 +130,7 @@ func NewServer(deps Dependencies) *Server {
 	api.Post("/exchange-token", deps.ExchangeToken)
 
 	// Apply DualAuth to the rest of the API routes
-	api.Use(DualAuth(deps.Config.Web.APIKey, deps.TokenStore))
+	api.Use(DualAuth(deps.Config.Web.APIKey, deps.TokenStore, ipManager))
 
 	// Auth endpoint to get current user info
 	api.Get("/auth/me", deps.GetAuthInfo)
@@ -135,8 +145,8 @@ func NewServer(deps Dependencies) *Server {
 	api.Get("/stats/user/:id", deps.GetUserStats)
 
 	// Delete operations - Admin only
-	api.Delete("/torrents/:id", AdminOnly(deps.TokenStore), deps.DeleteTorrent)
-	api.Delete("/downloads/:id", AdminOnly(deps.TokenStore), deps.DeleteDownload)
+	api.Delete("/torrents/:id", AdminOnly(deps.TokenStore, ipManager), deps.DeleteTorrent)
+	api.Delete("/downloads/:id", AdminOnly(deps.TokenStore, ipManager), deps.DeleteDownload)
 
 	// Embed static files - Place this last to ensure API routes are matched first
 	// or properly fall through if not found.

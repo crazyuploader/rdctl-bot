@@ -33,6 +33,10 @@ type LimiterConfig struct {
 	Enabled           bool `mapstructure:"enabled"`
 	Max               int  `mapstructure:"max"`
 	ExpirationSeconds int  `mapstructure:"expiration_seconds"`
+	// Security settings
+	BanDurationSeconds int `mapstructure:"ban_duration_seconds"`
+	AuthFailLimit      int `mapstructure:"auth_fail_limit"`
+	AuthFailWindow     int `mapstructure:"auth_fail_window"`
 }
 
 // TelegramConfig holds Telegram bot settings
@@ -243,10 +247,20 @@ func (c *Config) Validate(webOnly bool) error {
 
 	// Limiter defaults
 	if c.Web.Limiter.Max == 0 {
-		c.Web.Limiter.Max = 60
+		c.Web.Limiter.Max = 3 // Strict default: 3 RPS
 	}
 	if c.Web.Limiter.ExpirationSeconds == 0 {
-		c.Web.Limiter.ExpirationSeconds = 60
+		c.Web.Limiter.ExpirationSeconds = 1
+	}
+	// Security defaults
+	if c.Web.Limiter.BanDurationSeconds == 0 {
+		c.Web.Limiter.BanDurationSeconds = 3600 // 1 hour
+	}
+	if c.Web.Limiter.AuthFailLimit == 0 {
+		c.Web.Limiter.AuthFailLimit = 10 // 10 failures
+	}
+	if c.Web.Limiter.AuthFailWindow == 0 {
+		c.Web.Limiter.AuthFailWindow = 60 // per 60 seconds
 	}
 
 	return nil

@@ -30,7 +30,7 @@ func APIKeyAuth(apiKey string) fiber.Handler {
 }
 
 // DualAuth is a middleware that accepts either API key or token authentication
-func DualAuth(apiKey string, tokenStore *TokenStore) fiber.Handler {
+func DualAuth(apiKey string, tokenStore *TokenStore, ipManager *IPManager) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// 1. Try Token Authentication via Headers
 		tokenID := c.Get("X-Auth-Token")
@@ -53,6 +53,7 @@ func DualAuth(apiKey string, tokenStore *TokenStore) fiber.Handler {
 				return c.Next()
 			}
 			// Token provided but invalid
+			ipManager.RegisterAuthFailure(c.IP())
 			return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized: Invalid or expired token")
 		}
 
@@ -68,12 +69,15 @@ func DualAuth(apiKey string, tokenStore *TokenStore) fiber.Handler {
 			return c.Next()
 		}
 
+		// Only register failure if BOTH methods fail and at least one was attempted/missing
+		// Note: A missing header counts as a failure if we reach here
+		ipManager.RegisterAuthFailure(c.IP())
 		return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized: Invalid or missing credentials")
 	}
 }
 
 // AdminOnly is a middleware that restricts access to admin users only
-func AdminOnly(tokenStore *TokenStore) fiber.Handler {
+func AdminOnly(tokenStore *TokenStore, ipManager *IPManager) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		role, ok := c.Locals(ContextKeyRole).(Role)
 		if !ok {
@@ -82,10 +86,15 @@ func AdminOnly(tokenStore *TokenStore) fiber.Handler {
 			if authType == "api_key" {
 				return c.Next()
 			}
+			// Should be caught by DualAuth first, but safe to log here too for deeper layers
+			ipManager.RegisterAuthFailure(c.IP())
 			return fiber.NewError(fiber.StatusForbidden, "Forbidden: Admin access required")
 		}
 
 		if role != RoleAdmin {
+			// User is authenticated but not authorized for this resource.
+			// This is NOT an auth failure (bad password) but a permission issue.
+			// We DO NOT ban for permission issues normally, only for failed logins.
 			return fiber.NewError(fiber.StatusForbidden, "Forbidden: Admin access required for this operation")
 		}
 

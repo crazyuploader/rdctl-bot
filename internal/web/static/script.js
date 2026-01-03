@@ -342,11 +342,22 @@ function setupEventListeners() {
       toggleAutoRefresh("downloads", e.target.checked);
     });
 
-  // Modal listeners
-  document
-    .getElementById("confirm-cancel")
-    .addEventListener("click", closeConfirmModal);
+  // Search Listener
+  const searchInput = document.getElementById("torrents-search");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      renderTorrents(e.target.value.toLowerCase());
+    });
+  }
 
+  const downloadsSearchInput = document.getElementById("downloads-search");
+  if (downloadsSearchInput) {
+    downloadsSearchInput.addEventListener("input", (e) => {
+      renderDownloads(e.target.value.toLowerCase());
+    });
+  }
+
+  // Modal listeners
   document
     .getElementById("confirm-cancel")
     .addEventListener("click", closeConfirmModal);
@@ -379,11 +390,11 @@ function toggleAutoRefresh(type, enabled) {
   }
 
   if (enabled) {
-    // Refresh every 5 seconds
+    // Refresh every 2 seconds (was 5s, changed to match 3 RPS limit safely)
     refreshIntervals[type] = setInterval(() => {
       if (type === "torrents") fetchTorrents();
       else fetchDownloads();
-    }, 5000);
+    }, 2000); // 2000ms = 0.5 RPS per client per tab. Safe for 3 RPS limit.
   }
 }
 
