@@ -26,6 +26,7 @@ type WebConfig struct {
 	DashboardURL       string        `mapstructure:"dashboard_url"`
 	TokenExpiryMinutes int           `mapstructure:"token_expiry_minutes"`
 	Limiter            LimiterConfig `mapstructure:"limiter"`
+	Metrics            MetricsConfig `mapstructure:"metrics"`
 }
 
 // LimiterConfig holds web server rate limiting settings
@@ -37,6 +38,13 @@ type LimiterConfig struct {
 	BanDurationSeconds int `mapstructure:"ban_duration_seconds"`
 	AuthFailLimit      int `mapstructure:"auth_fail_limit"`
 	AuthFailWindow     int `mapstructure:"auth_fail_window"`
+}
+
+// MetricsConfig holds prometheus metrics settings
+type MetricsConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	User     string `mapstructure:"user"`
+	Password string `mapstructure:"password"`
 }
 
 // TelegramConfig holds Telegram bot settings
@@ -261,6 +269,13 @@ func (c *Config) Validate(webOnly bool) error {
 	}
 	if c.Web.Limiter.AuthFailWindow == 0 {
 		c.Web.Limiter.AuthFailWindow = 60 // per 60 seconds
+	}
+
+	// Metrics defaults
+	if c.Web.Metrics.Enabled {
+		if c.Web.Metrics.User == "" || c.Web.Metrics.Password == "" {
+			return fmt.Errorf("web metrics user and password are required when enabled")
+		}
 	}
 
 	return nil
