@@ -29,6 +29,11 @@ builds:
       - -X main.BuildDate={{.Date}}
     flags:
       - -trimpath
+    hooks:
+      post:
+        # Use shell conditional to only run UPX on Linux builds
+        # This avoids failures on macOS (unsupported) and issues on Windows
+        - cmd: /bin/sh -c 'if [ "{{ .Os }}" = "linux" ]; then upx --best --lzma "{{ .Path }}"; fi'
 
 archives:
   - id: cli
