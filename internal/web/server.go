@@ -14,7 +14,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/csrf"
 	"github.com/gofiber/fiber/v2/middleware/earlydata"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
@@ -82,7 +81,6 @@ func NewServer(deps Dependencies) *Server {
 
 	// Middleware
 	app.Use(compress.New())
-	app.Use(csrf.New())
 	app.Use(earlydata.New())
 	app.Use(favicon.New(
 		favicon.Config{
@@ -105,7 +103,8 @@ func NewServer(deps Dependencies) *Server {
 			LimiterMiddleware: limiter.SlidingWindow{},
 			LimitReached: func(c *fiber.Ctx) error {
 				return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-					"error": "Too many requests, please try again later.",
+					"success": false,
+					"error":   "Too many requests, please try again later.",
 				})
 			},
 		}))
