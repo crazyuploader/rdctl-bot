@@ -74,6 +74,11 @@ func NewServer(deps Dependencies) *Server {
 			Max:               deps.Config.Web.Limiter.Max,
 			Expiration:        time.Duration(deps.Config.Web.Limiter.ExpirationSeconds) * time.Second,
 			LimiterMiddleware: limiter.SlidingWindow{},
+			LimitReached: func(c *fiber.Ctx) error {
+				return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+					"error": "Too many requests, please try again later.",
+				})
+			},
 		}))
 	}
 
