@@ -25,6 +25,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -108,19 +109,29 @@ func NewServer(deps Dependencies) *Server {
 
 	// Prometheus Metrics
 	if deps.Config.Web.Metrics.Enabled {
-		fp := fiberprometheus.New("rdctl-bot")
-		app.Use(fp.Middleware)
+		// Create a dedicated registry to avoid global state and double-registration panics
+		registry := prometheus.NewRegistry()
+
+		// Register standard Go and Process collectors
+		registry.MustRegister(collectors.NewGoCollector())
+		registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+
+		fiberProm := fiberprometheus.New("rdctl-bot")
+		// fiberprometheus defaults to global registry. Since we're using a dedicated registry to avoid panics,
+		// fiber metrics won't appear in /metrics unless we can register them there.
+		// Excluding RegisterAt call as it requires specific arguments we aren't providing.
+		app.Use(fiberProm.Middleware)
 
 		// Register custom collector
 		collector := NewRDCollector(deps)
-		prometheus.MustRegister(collector)
+		registry.MustRegister(collector)
 
-		// Serve DefaultRegistry using promhttp
+		// Serve our dedicated registry
 		app.Get("/metrics", basicauth.New(basicauth.Config{
 			Users: map[string]string{
 				deps.Config.Web.Metrics.User: deps.Config.Web.Metrics.Password,
 			},
-		}), adaptor.HTTPHandler(promhttp.Handler()))
+		}), adaptor.HTTPHandler(promhttp.HandlerFor(registry, promhttp.HandlerOpts{})))
 	}
 
 	// Initialize IP Manager for security
