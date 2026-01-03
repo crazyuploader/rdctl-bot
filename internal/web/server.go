@@ -8,10 +8,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/crazyuploader/rdctl-bot/internal/config"
 	"github.com/crazyuploader/rdctl-bot/internal/db"
 	"github.com/crazyuploader/rdctl-bot/internal/realdebrid"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/adaptor"
+	"github.com/gofiber/fiber/v2/middleware/basicauth"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/earlydata"
@@ -21,6 +24,8 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 //go:embed static/*
@@ -91,14 +96,32 @@ func NewServer(deps Dependencies) *Server {
 	app.Use(earlydata.New())
 	app.Use(favicon.New(
 		favicon.Config{
-			File: "./internal/web/static/favicon.svg",
-			URL:  "/favicon.svg",
+			FileSystem: http.FS(staticFiles),
+			File:       "static/favicon.svg",
+			URL:        "/favicon.svg",
 		},
 	))
 	app.Use(healthcheck.New())
 	app.Use(logger.New())
 	app.Use(recover.New())
 	app.Use(cors.New())
+
+	// Prometheus Metrics
+	if deps.Config.Web.Metrics.Enabled {
+		fp := fiberprometheus.New("rdctl-bot")
+		app.Use(fp.Middleware)
+
+		// Register custom collector
+		collector := NewRDCollector(deps)
+		prometheus.MustRegister(collector)
+
+		// Serve DefaultRegistry using promhttp
+		app.Get("/metrics", basicauth.New(basicauth.Config{
+			Users: map[string]string{
+				deps.Config.Web.Metrics.User: deps.Config.Web.Metrics.Password,
+			},
+		}), adaptor.HTTPHandler(promhttp.Handler()))
+	}
 
 	// Initialize IP Manager for security
 	ipManager := NewIPManager(

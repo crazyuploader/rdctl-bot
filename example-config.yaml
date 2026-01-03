@@ -58,3 +58,9 @@ web:
     ban_duration_seconds: 3600 # Ban IP for 1 hour after excessive failures
     auth_fail_limit: 10 # Allow 10 failures...
     auth_fail_window: 60 # ...in 60 seconds before banning
+
+  # Prometheus Metrics Configuration
+  metrics:
+    enabled: true
+    user: "admin"
+    password: "securepassword"
