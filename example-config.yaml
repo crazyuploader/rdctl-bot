@@ -50,6 +50,11 @@ web:
   dashboard_url: "http://localhost:8089" # Base URL for dashboard links
   token_expiry_minutes: 60 # Token validity duration
   limiter:
-    enabled: false # Set to true to enable rate limiting
-    max: 60 # Max requests per expiration period
-    expiration_seconds: 60 # Expiration period in seconds
+    enabled: true # Recommended: Set to true to enable rate limiting
+    max: 3 # Max requests per expiration period (strict 3 RPS recommended)
+    expiration_seconds: 1 # Expiration period in seconds
+
+    # Security: IP Banning Settings
+    ban_duration_seconds: 3600 # Ban IP for 1 hour after excessive failures
+    auth_fail_limit: 10 # Allow 10 failures...
+    auth_fail_window: 60 # ...in 60 seconds before banning
