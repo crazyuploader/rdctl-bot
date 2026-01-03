@@ -23,10 +23,7 @@ func APIKeyAuth(apiKey string) fiber.Handler {
 		providedKeyHash := sha256.Sum256([]byte(providedKey))
 
 		if subtle.ConstantTimeCompare(providedKeyHash[:], apiKeyHash[:]) != 1 {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"success": false,
-				"message": "Unauthorized: Invalid or missing API Key",
-			})
+			return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized: Invalid or missing API Key")
 		}
 		return c.Next()
 	}
@@ -56,10 +53,7 @@ func DualAuth(apiKey string, tokenStore *TokenStore) fiber.Handler {
 				return c.Next()
 			}
 			// Token provided but invalid
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"success": false,
-				"message": "Unauthorized: Invalid or expired token",
-			})
+			return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized: Invalid or expired token")
 		}
 
 		// 2. Try API Key Authentication via Header (Constant Time)
@@ -74,10 +68,7 @@ func DualAuth(apiKey string, tokenStore *TokenStore) fiber.Handler {
 			return c.Next()
 		}
 
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"success": false,
-			"message": "Unauthorized: Invalid or missing credentials",
-		})
+		return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized: Invalid or missing credentials")
 	}
 }
 
@@ -91,17 +82,11 @@ func AdminOnly(tokenStore *TokenStore) fiber.Handler {
 			if authType == "api_key" {
 				return c.Next()
 			}
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"success": false,
-				"message": "Forbidden: Admin access required",
-			})
+			return fiber.NewError(fiber.StatusForbidden, "Forbidden: Admin access required")
 		}
 
 		if role != RoleAdmin {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"success": false,
-				"message": "Forbidden: Admin access required for this operation",
-			})
+			return fiber.NewError(fiber.StatusForbidden, "Forbidden: Admin access required for this operation")
 		}
 
 		return c.Next()

@@ -36,7 +36,7 @@ func (d *Dependencies) GetAuthInfo(c *fiber.Ctx) error {
 func (d *Dependencies) GetStatus(c *fiber.Ctx) error {
 	user, err := d.RDClient.GetUser()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
+		return err
 	}
 	return c.JSON(fiber.Map{"success": true, "data": user})
 }
@@ -48,7 +48,7 @@ func (d *Dependencies) GetTorrents(c *fiber.Ctx) error {
 
 	result, err := d.RDClient.GetTorrentsWithCount(limit, offset)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
+		return err
 	}
 
 	// Format status and size for frontend convenience
@@ -67,14 +67,11 @@ func (d *Dependencies) GetTorrents(c *fiber.Ctx) error {
 func (d *Dependencies) GetTorrentInfo(c *fiber.Ctx) error {
 	id := c.Params("id")
 	if id == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"success": false,
-			"error":   "Torrent ID is required",
-		})
+		return fiber.NewError(fiber.StatusBadRequest, "Torrent ID is required")
 	}
 	torrent, err := d.RDClient.GetTorrentInfo(id)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
+		return err
 	}
 	torrent.Status = realdebrid.FormatStatus(torrent.Status)
 	return c.JSON(fiber.Map{"success": true, "data": torrent})
@@ -86,16 +83,16 @@ func (d *Dependencies) AddTorrent(c *fiber.Ctx) error {
 		Magnet string `json:"magnet"`
 	}
 	if err := c.BodyParser(&body); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Invalid request body"})
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
 	}
 
 	if body.Magnet == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Magnet link is required"})
+		return fiber.NewError(fiber.StatusBadRequest, "Magnet link is required")
 	}
 
 	resp, err := d.RDClient.AddMagnet(body.Magnet)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
+		return err
 	}
 
 	// Automatically select all files
@@ -111,11 +108,11 @@ func (d *Dependencies) AddTorrent(c *fiber.Ctx) error {
 func (d *Dependencies) DeleteTorrent(c *fiber.Ctx) error {
 	id := c.Params("id")
 	if id == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "id parameter is required"})
+		return fiber.NewError(fiber.StatusBadRequest, "id parameter is required")
 	}
 
 	if err := d.RDClient.DeleteTorrent(id); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
+		return err
 	}
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"success": true, "message": "Torrent deleted successfully"})
 }
@@ -127,7 +124,7 @@ func (d *Dependencies) GetDownloads(c *fiber.Ctx) error {
 
 	result, err := d.RDClient.GetDownloadsWithCount(limit, offset)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
+		return err
 	}
 	return c.JSON(fiber.Map{
 		"success":     true,
@@ -142,16 +139,16 @@ func (d *Dependencies) UnrestrictLink(c *fiber.Ctx) error {
 		Link string `json:"link"`
 	}
 	if err := c.BodyParser(&body); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Invalid request body"})
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
 	}
 
 	if body.Link == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Link is required"})
+		return fiber.NewError(fiber.StatusBadRequest, "Link is required")
 	}
 
 	unrestricted, err := d.RDClient.UnrestrictLink(body.Link)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
+		return err
 	}
 
 	return c.JSON(fiber.Map{"success": true, "data": unrestricted})
@@ -161,10 +158,10 @@ func (d *Dependencies) UnrestrictLink(c *fiber.Ctx) error {
 func (d *Dependencies) DeleteDownload(c *fiber.Ctx) error {
 	id := c.Params("id")
 	if id == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "id is required"})
+		return fiber.NewError(fiber.StatusBadRequest, "id is required")
 	}
 	if err := d.RDClient.DeleteDownload(id); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
+		return err
 	}
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"success": true, "message": "Download link removed successfully"})
 }
@@ -173,15 +170,15 @@ func (d *Dependencies) DeleteDownload(c *fiber.Ctx) error {
 func (d *Dependencies) GetUserStats(c *fiber.Ctx) error {
 	userID, err := strconv.ParseUint(c.Params("id"), 10, 64)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Invalid user ID"})
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid user ID")
 	}
 
 	stats, err := d.CommandRepo.GetUserStats(c.Context(), uint(userID))
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "error": err.Error()})
+			return fiber.NewError(fiber.StatusNotFound, "User stats not found")
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
+		return err
 	}
 	return c.JSON(fiber.Map{"success": true, "data": stats})
 }
@@ -192,20 +189,20 @@ func (d *Dependencies) ExchangeToken(c *fiber.Ctx) error {
 		Code string `json:"code"`
 	}
 	if err := c.BodyParser(&body); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Invalid request body"})
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
 	}
 
 	if body.Code == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "error": "Exchange code is required"})
+		return fiber.NewError(fiber.StatusBadRequest, "Exchange code is required")
 	}
 
 	tokenID, err := d.TokenStore.ExchangeToken(body.Code)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "error": err.Error()})
+		return err
 	}
 
 	if tokenID == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"success": false, "error": "Invalid or expired exchange code"})
+		return fiber.NewError(fiber.StatusUnauthorized, "Invalid or expired exchange code")
 	}
 
 	return c.JSON(fiber.Map{

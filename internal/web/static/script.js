@@ -60,7 +60,15 @@ async function exchangeTokenID(code) {
     });
 
     if (!response.ok) {
-      throw new Error("Invalid or expired exchange code");
+      let errorMsg = "Invalid or expired exchange code";
+      try {
+        const errorData = await response.json();
+        errorMsg =
+          errorData.message || errorData.error || errorData.message || errorMsg;
+      } catch (e) {
+        // Fallback to default msg if not JSON
+      }
+      throw new Error(errorMsg);
     }
 
     const result = await response.json();
@@ -406,10 +414,15 @@ async function apiFetch(url, options = {}) {
       throw new Error("Forbidden: Admin access required for this operation");
     }
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        errorData.message || errorData.error || "An API error occurred",
-      );
+      let errorMsg = "An API error occurred";
+      try {
+        const errorData = await response.json();
+        errorMsg = errorData.message || errorData.error || errorMsg;
+      } catch (e) {
+        // Handle non-JSON error responses (like 404 from proxy or server crashing)
+        errorMsg = `Error ${response.status}: ${response.statusText}`;
+      }
+      throw new Error(errorMsg);
     }
     return response.json();
   } catch (error) {

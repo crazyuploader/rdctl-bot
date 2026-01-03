@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"embed"
+	"errors"
 	"log"
 	"net/http"
 	"time"
@@ -49,6 +50,34 @@ func NewServer(deps Dependencies) *Server {
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
 		ProxyHeader:           "X-Forwarded-For", // Standard proxy header
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			// Status code defaults to 500
+			code := fiber.StatusInternalServerError
+
+			// Retrieve the custom status code if it's a *fiber.Error
+			var e *fiber.Error
+			if errors.As(err, &e) {
+				code = e.Code
+			}
+
+			// Log the error internally
+			log.Printf("Web Error [%d]: %v", code, err)
+
+			// Sanitize error message for the client
+			message := "An unexpected error occurred"
+			if code < 500 {
+				message = err.Error()
+			} else {
+				// For 500+ errors, we don't want to leak internal details
+				// except maybe some generic "Internal Server Error"
+				message = "Internal Server Error"
+			}
+
+			return c.Status(code).JSON(fiber.Map{
+				"success": false,
+				"error":   message,
+			})
+		},
 	})
 
 	// Middleware
