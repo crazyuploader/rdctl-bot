@@ -116,10 +116,8 @@ func NewServer(deps Dependencies) *Server {
 		registry.MustRegister(collectors.NewGoCollector())
 		registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
-		fiberProm := fiberprometheus.New("rdctl-bot")
-		// fiberprometheus defaults to global registry. Since we're using a dedicated registry to avoid panics,
-		// fiber metrics won't appear in /metrics unless we can register them there.
-		// Excluding RegisterAt call as it requires specific arguments we aren't providing.
+		// Use NewWithRegistry to register fiber metrics to our dedicated registry
+		fiberProm := fiberprometheus.NewWithRegistry(registry, "rdctl-bot", "", "", nil)
 		app.Use(fiberProm.Middleware)
 
 		// Register custom collector
