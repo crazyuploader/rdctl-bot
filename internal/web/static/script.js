@@ -168,7 +168,7 @@ function updateSessionTimer() {
     setTimeout(() => {
       showToast(
         "Session expired. Please request a new dashboard link.",
-        "error"
+        "error",
       );
       logout();
     }, 2000);
@@ -182,8 +182,8 @@ function updateSessionTimer() {
     minutes < 5
       ? "text-red-400"
       : minutes < 15
-      ? "text-yellow-400"
-      : "text-blue-400";
+        ? "text-yellow-400"
+        : "text-blue-400";
   timerEl.innerHTML = `<span class="${colorClass}">⏱️ ${minutes}:${seconds
     .toString()
     .padStart(2, "0")}</span>`;
@@ -223,7 +223,7 @@ function showDashboard() {
     appContainer.classList.remove(
       "opacity-0",
       "pointer-events-none",
-      "blur-sm"
+      "blur-sm",
     );
   }
 
@@ -234,11 +234,11 @@ function showDashboard() {
   // Setup auto-refresh
   toggleAutoRefresh(
     "torrents",
-    document.getElementById("auto-refresh-torrents").checked
+    document.getElementById("auto-refresh-torrents").checked,
   );
   toggleAutoRefresh(
     "downloads",
-    document.getElementById("auto-refresh-downloads").checked
+    document.getElementById("auto-refresh-downloads").checked,
   );
 }
 
@@ -299,45 +299,6 @@ function setupEventListeners() {
       toggleAutoRefresh("torrents", e.target.checked);
     });
 
-  // Accessiblity & Visual Toggle for Torrents
-  const toggleBtn = document.getElementById("toggle-auto-refresh-torrents");
-  if (toggleBtn) {
-    toggleBtn.addEventListener("click", () => {
-      const checkbox = document.getElementById("auto-refresh-torrents");
-      checkbox.checked = !checkbox.checked;
-      checkbox.dispatchEvent(new Event("change"));
-
-      // Update ARIA
-      const isChecked = checkbox.checked;
-      toggleBtn.setAttribute("aria-checked", isChecked);
-
-      // Update Visuals
-      const dot = document.getElementById("torrents-refresh-dot");
-      if (isChecked) {
-        toggleBtn.classList.remove("bg-slate-700");
-        toggleBtn.classList.add("bg-blue-600");
-        dot.classList.remove("translate-x-1");
-        dot.classList.add("translate-x-6");
-      } else {
-        toggleBtn.classList.add("bg-slate-700");
-        toggleBtn.classList.remove("bg-blue-600");
-        dot.classList.add("translate-x-1");
-        dot.classList.remove("translate-x-6");
-      }
-    });
-
-    // Initialize state based on checkbox
-    const checkbox = document.getElementById("auto-refresh-torrents");
-    if (checkbox.checked) {
-      toggleBtn.setAttribute("aria-checked", "true");
-      toggleBtn.classList.remove("bg-slate-700");
-      toggleBtn.classList.add("bg-blue-600");
-      const dot = document.getElementById("torrents-refresh-dot");
-      dot.classList.remove("translate-x-1");
-      dot.classList.add("translate-x-6");
-    }
-  }
-
   document
     .getElementById("auto-refresh-downloads")
     .addEventListener("change", (e) => {
@@ -373,7 +334,7 @@ function setupTabs() {
       tabs.forEach(
         (t) =>
           (t.className =
-            "px-3 py-1.5 rounded-lg bg-slate-800/50 text-slate-400 text-xs font-medium whitespace-nowrap hover:bg-slate-700/50 transition-colors")
+            "px-3 py-1.5 rounded-lg bg-slate-800/50 text-slate-400 text-xs font-medium whitespace-nowrap hover:bg-slate-700/50 transition-colors"),
       );
       tab.className =
         "px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-xs font-semibold whitespace-nowrap active-tab";
@@ -513,8 +474,8 @@ async function fetchStatus() {
     container.innerHTML = `
       <span class="font-bold text-white">${escapeHtml(maskedUsername)}</span>
       <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase ${typeClass}">${escapeHtml(
-      user.type
-    )}</span>
+        user.type,
+      )}</span>
       <span class="text-slate-600">|</span>
       <span class="text-slate-400">Exp: <span class="text-slate-200">${formattedDate}</span></span>
       <span class="text-slate-400">(${user.points} pts)</span>
@@ -542,7 +503,7 @@ async function fetchTorrents(loadMore = false) {
   try {
     const offset = loadMore ? cachedTorrents.length : 0;
     const result = await apiFetch(
-      `${API_BASE_URL}/torrents?limit=50&offset=${offset}`
+      `${API_BASE_URL}/torrents?limit=50&offset=${offset}`,
     );
     const newTorrents = result.data || [];
     const totalCount = result.total_count || newTorrents.length;
@@ -587,17 +548,17 @@ function toggleSelectAll(checked) {
     visibleTorrents = visibleTorrents.filter(
       (t) =>
         t.filename.toLowerCase().includes(filter) ||
-        t.status.toLowerCase().includes(filter)
+        t.status.toLowerCase().includes(filter),
     );
   }
 
   if (activeTab === "downloading") {
     visibleTorrents = visibleTorrents.filter(
-      (t) => t.status.toLowerCase() === "downloading"
+      (t) => t.status.toLowerCase() === "downloading",
     );
   } else if (activeTab === "completed") {
     visibleTorrents = visibleTorrents.filter(
-      (t) => t.status.toLowerCase() === "downloaded"
+      (t) => t.status.toLowerCase() === "downloaded",
     );
   } else if (activeTab === "error") {
     visibleTorrents = visibleTorrents.filter((t) => {
@@ -660,16 +621,16 @@ function updateBatchDeleteButton() {
       visibleTorrents = visibleTorrents.filter(
         (t) =>
           t.filename.toLowerCase().includes(filter) ||
-          t.status.toLowerCase().includes(filter)
+          t.status.toLowerCase().includes(filter),
       );
     }
     if (activeTab === "downloading") {
       visibleTorrents = visibleTorrents.filter(
-        (t) => t.status.toLowerCase() === "downloading"
+        (t) => t.status.toLowerCase() === "downloading",
       );
     } else if (activeTab === "completed") {
       visibleTorrents = visibleTorrents.filter(
-        (t) => t.status.toLowerCase() === "downloaded"
+        (t) => t.status.toLowerCase() === "downloaded",
       );
     } else if (activeTab === "error") {
       visibleTorrents = visibleTorrents.filter((t) => {
@@ -683,7 +644,7 @@ function updateBatchDeleteButton() {
       visibleTorrents.length > 0 &&
       visibleTorrents.every((t) => selectedTorrents.has(t.id));
     const someSelected = visibleTorrents.some((t) =>
-      selectedTorrents.has(t.id)
+      selectedTorrents.has(t.id),
     );
 
     if (allSelected) {
@@ -729,7 +690,7 @@ async function deleteSelectedTorrents() {
 
   if (
     !confirm(
-      `Are you sure you want to delete ${selectedTorrents.size} torrents?`
+      `Are you sure you want to delete ${selectedTorrents.size} torrents?`,
     )
   )
     return;
@@ -775,26 +736,26 @@ function renderTorrents(filterText = null, preserveSelection = false) {
     filterText !== null
       ? filterText
       : searchInput
-      ? searchInput.value.toLowerCase()
-      : "";
+        ? searchInput.value.toLowerCase()
+        : "";
 
   // Filter torrents
   let filteredTorrents = filter
     ? cachedTorrents.filter(
         (t) =>
           t.filename.toLowerCase().includes(filter) ||
-          t.status.toLowerCase().includes(filter)
+          t.status.toLowerCase().includes(filter),
       )
     : cachedTorrents;
 
   // Apply Tab Filter
   if (activeTab === "downloading") {
     filteredTorrents = filteredTorrents.filter(
-      (t) => t.status.toLowerCase() === "downloading"
+      (t) => t.status.toLowerCase() === "downloading",
     );
   } else if (activeTab === "completed") {
     filteredTorrents = filteredTorrents.filter(
-      (t) => t.status.toLowerCase() === "downloaded"
+      (t) => t.status.toLowerCase() === "downloaded",
     );
   } else if (activeTab === "error") {
     filteredTorrents = filteredTorrents.filter((t) => {
@@ -839,17 +800,17 @@ function renderTorrents(filterText = null, preserveSelection = false) {
         t.status === "Downloaded"
           ? "text-green-400 bg-green-500/10"
           : t.status === "Downloading"
-          ? "text-blue-400 bg-blue-500/10"
-          : t.status === "Error" || t.status === "Dead"
-          ? "text-red-400 bg-red-500/10"
-          : "text-slate-400 bg-slate-800/50";
+            ? "text-blue-400 bg-blue-500/10"
+            : t.status === "Error" || t.status === "Dead"
+              ? "text-red-400 bg-red-500/10"
+              : "text-slate-400 bg-slate-800/50";
 
       const progressColor =
         t.progress >= 100
           ? "bg-green-500"
           : t.progress > 0
-          ? "bg-blue-500"
-          : "bg-slate-700";
+            ? "bg-blue-500"
+            : "bg-slate-700";
 
       const addedDate = t.added ? new Date(t.added).toLocaleDateString() : "";
 
@@ -891,15 +852,15 @@ function renderTorrents(filterText = null, preserveSelection = false) {
 
             <div class="flex-1 min-w-0">
               <div class="text-sm font-semibold text-white break-all mb-1" title="${escapeHtml(
-                t.filename
+                t.filename,
               )}">${escapeHtml(t.filename)}</div>
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
                 <span class="font-medium text-slate-300">${formatBytes(
-                  t.bytes
+                  t.bytes,
                 )}</span>
                 <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase ${statusClass}">${
-        t.status
-      }</span>
+                  t.status
+                }</span>
                 ${
                   t.seeders !== undefined && t.seeders !== null
                     ? `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>${t.seeders} seeds</span>`
@@ -929,11 +890,11 @@ function renderTorrents(filterText = null, preserveSelection = false) {
           </div>
           <div class="relative h-2 w-full bg-slate-800 rounded-full overflow-hidden">
             <div class="h-full ${progressColor} transition-all duration-500 ${
-        t.status === "Downloading" ? "animate-pulse" : ""
-      }" style="width: ${t.progress}%"></div>
+              t.status === "Downloading" ? "animate-pulse" : ""
+            }" style="width: ${t.progress}%"></div>
           </div>
           <div class="mt-1 text-right text-xs font-medium text-slate-500">${t.progress.toFixed(
-            1
+            1,
           )}%</div>
         </div>
       `;
@@ -966,7 +927,7 @@ async function fetchDownloads(loadMore = false) {
   try {
     const offset = loadMore ? cachedDownloads.length : 0;
     const result = await apiFetch(
-      `${API_BASE_URL}/downloads?limit=50&offset=${offset}`
+      `${API_BASE_URL}/downloads?limit=50&offset=${offset}`,
     );
     const newDownloads = result.data || [];
     const totalCount = result.total_count || newDownloads.length;
@@ -995,15 +956,15 @@ function renderDownloads(filterText = null) {
     filterText !== null
       ? filterText
       : searchInput
-      ? searchInput.value.toLowerCase()
-      : "";
+        ? searchInput.value.toLowerCase()
+        : "";
 
   // Filter downloads
   const filteredDownloads = filter
     ? cachedDownloads.filter(
         (d) =>
           d.filename.toLowerCase().includes(filter) ||
-          d.host.toLowerCase().includes(filter)
+          d.host.toLowerCase().includes(filter),
       )
     : cachedDownloads;
 
@@ -1040,12 +1001,12 @@ function renderDownloads(filterText = null) {
             <div class="flex-1 min-w-0">
               <div class="text-sm font-semibold text-white break-all mb-1">
                 <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="hover:text-purple-400 transition-colors">${escapeHtml(
-        d.filename
-      )}</a>
+                  d.filename,
+                )}</a>
               </div>
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
                 <span class="font-medium text-slate-300">${formatBytes(
-                  d.filesize
+                  d.filesize,
                 )}</span>
                 <span class="px-2 py-0.5 rounded-md text-xs font-bold uppercase bg-slate-800/50">${
                   d.host
@@ -1157,9 +1118,8 @@ function confirmDelete(type, id, name) {
   const modal = document.getElementById("confirm-modal");
   document.getElementById("confirm-title").textContent =
     type === "torrent" ? "Delete Torrent?" : "Delete Download?";
-  document.getElementById(
-    "confirm-message"
-  ).textContent = `Are you sure you want to remove "${name}"?`;
+  document.getElementById("confirm-message").textContent =
+    `Are you sure you want to remove "${name}"?`;
 
   // Quick action handler setup
   const okBtn = document.getElementById("confirm-ok");
@@ -1201,7 +1161,7 @@ async function performDelete() {
     await apiFetch(`${API_BASE_URL}${endpoint}`, { method: "DELETE" });
     showToast(
       `${type === "torrent" ? "Torrent" : "Download"} deleted`,
-      "success"
+      "success",
     );
 
     if (type === "torrent") fetchTorrents();
