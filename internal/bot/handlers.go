@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html"
 	"log"
+	"regexp"
 	"strings"
 	"time"
 
@@ -34,14 +35,8 @@ func (b *Bot) handleStartCommand(ctx context.Context, tgBot *bot.Bot, update *mo
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
 
 		// Log command
-		if user != nil {
-			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "start", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text)); err != nil {
-				log.Printf("Warning: failed to log command: %v", err)
-			}
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeCommandStart, "start", messageThreadID, true, "", nil); err != nil {
-				log.Printf("Warning: failed to log activity: %v", err)
-			}
-		}
+		b.logCommandHelper(ctx, user, chatID, messageThreadID, "start", update.Message.Text, startTime, true, "", len(text))
+		b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeCommandStart, "start", true, "", nil)
 	})
 }
 
@@ -69,14 +64,10 @@ func (b *Bot) handleHelpCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
 
 		// Log command
-		if user != nil {
-			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "help", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text)); err != nil {
-				log.Printf("Warning: failed to log help command: %v", err)
-			}
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeCommandHelp, "help", messageThreadID, true, "", nil); err != nil {
-				log.Printf("Warning: failed to log help activity: %v", err)
-			}
-		}
+
+		// Log command
+		b.logCommandHelper(ctx, user, chatID, messageThreadID, "help", update.Message.Text, startTime, true, "", len(text))
+		b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeCommandHelp, "help", true, "", nil)
 	})
 }
 
@@ -90,27 +81,16 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		if err != nil {
 			text := fmt.Sprintf("<b>[ERROR]</b> Failed to retrieve torrents: %s", html.EscapeString(err.Error()))
 			b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
-			if user != nil {
-				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "list", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, err.Error(), 0); err != nil {
-					log.Printf("Warning: failed to log list command error: %v", err)
-				}
-				if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeTorrentList, "list", messageThreadID, false, err.Error(), nil); err != nil {
-					log.Printf("Warning: failed to log list activity error: %v", err)
-				}
-			}
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
+			b.logCommandHelper(ctx, user, chatID, messageThreadID, "list", update.Message.Text, startTime, false, err.Error(), 0)
+			b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeTorrentList, "list", false, err.Error(), nil)
 			return
 		}
 
 		if len(torrents) == 0 {
 			b.sendHTMLMessage(ctx, chatID, messageThreadID, "No torrents found.", update.Message.ID)
-			if user != nil {
-				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "list", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0); err != nil {
-					log.Printf("Warning: failed to log list command success: %v", err)
-				}
-				if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeTorrentList, "list", messageThreadID, true, "", map[string]any{"torrent_count": 0}); err != nil {
-					log.Printf("Warning: failed to log list activity success: %v", err)
-				}
-			}
+			b.logCommandHelper(ctx, user, chatID, messageThreadID, "list", update.Message.Text, startTime, true, "", 0)
+			b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeTorrentList, "list", true, "", map[string]any{"torrent_count": 0})
 			return
 		}
 
@@ -162,12 +142,8 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
 
 		if user != nil {
-			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "list", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text.String())); err != nil {
-				log.Printf("Warning: failed to log list summary command: %v", err)
-			}
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeTorrentList, "list", messageThreadID, true, "", map[string]any{"torrent_count": len(torrents)}); err != nil {
-				log.Printf("Warning: failed to log list activity summary: %v", err)
-			}
+			b.logCommandHelper(ctx, user, chatID, messageThreadID, "list", update.Message.Text, startTime, true, "", len(text.String()))
+			b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeTorrentList, "list", true, "", map[string]any{"torrent_count": len(torrents)})
 		}
 	})
 }
@@ -181,11 +157,7 @@ func (b *Bot) handleAddCommand(ctx context.Context, tgBot *bot.Bot, update *mode
 		parts := strings.Fields(update.Message.Text)
 		if len(parts) < 2 {
 			b.sendHTMLMessage(ctx, chatID, messageThreadID, "<b>Usage:</b> /add &lt;magnet_link&gt;", update.Message.ID)
-			if user != nil {
-				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "add", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, "Missing arguments", 0); err != nil {
-					log.Printf("Warning: failed to log add command missing args: %v", err)
-				}
-			}
+			b.logCommandHelper(ctx, user, chatID, messageThreadID, "add", update.Message.Text, startTime, false, "Missing arguments", 0)
 			return
 		}
 
@@ -368,12 +340,8 @@ func (b *Bot) handleDeleteCommand(ctx context.Context, tgBot *bot.Bot, update *m
 			if err := b.torrentRepo.LogTorrentActivity(ctx, user.ID, chatID, torrentID, "", "", "", "delete", "deleted", 0, 0, true, "", nil); err != nil {
 				log.Printf("Warning: failed to log torrent delete success: %v", err)
 			}
-			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "delete", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text)); err != nil {
-				log.Printf("Warning: failed to log delete command: %v", err)
-			}
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeTorrentDelete, "delete", messageThreadID, true, "", map[string]any{"torrent_id": torrentID}); err != nil {
-				log.Printf("Warning: failed to log delete activity: %v", err)
-			}
+			b.logCommandHelper(ctx, user, chatID, messageThreadID, "delete", update.Message.Text, startTime, true, "", len(text))
+			b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeTorrentDelete, "delete", true, "", map[string]any{"torrent_id": torrentID})
 		}
 	})
 }
@@ -427,12 +395,8 @@ func (b *Bot) handleUnrestrictCommand(ctx context.Context, tgBot *bot.Bot, updat
 			if err := b.downloadRepo.LogDownloadActivity(ctx, user.ID, chatID, unrestricted.ID, link, unrestricted.Filename, unrestricted.Host, "unrestrict", unrestricted.Filesize, true, "", nil, nil); err != nil {
 				log.Printf("Warning: failed to log successful unrestrict download: %v", err)
 			}
-			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "unrestrict", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text)); err != nil {
-				log.Printf("Warning: failed to log unrestrict success command: %v", err)
-			}
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeDownloadUnrestrict, "unrestrict", messageThreadID, true, "", map[string]any{"download_id": unrestricted.ID, "filename": unrestricted.Filename}); err != nil {
-				log.Printf("Warning: failed to log download unrestrict activity: %v", err)
-			}
+			b.logCommandHelper(ctx, user, chatID, messageThreadID, "unrestrict", update.Message.Text, startTime, true, "", len(text))
+			b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeDownloadUnrestrict, "unrestrict", true, "", map[string]any{"download_id": unrestricted.ID, "filename": unrestricted.Filename})
 		}
 	})
 }
@@ -501,12 +465,8 @@ func (b *Bot) handleDownloadsCommand(ctx context.Context, tgBot *bot.Bot, update
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
 
 		if user != nil {
-			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "downloads", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text.String())); err != nil {
-				log.Printf("Warning: failed to log downloads success command: %v", err)
-			}
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeDownloadList, "downloads", messageThreadID, true, "", map[string]any{"download_count": len(downloads)}); err != nil {
-				log.Printf("Warning: failed to log downloads activity success: %v", err)
-			}
+			b.logCommandHelper(ctx, user, chatID, messageThreadID, "downloads", update.Message.Text, startTime, true, "", len(text.String()))
+			b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeDownloadList, "downloads", true, "", map[string]any{"download_count": len(downloads)})
 		}
 	})
 }
@@ -560,12 +520,8 @@ func (b *Bot) handleRemoveLinkCommand(ctx context.Context, tgBot *bot.Bot, updat
 			if err := b.downloadRepo.LogDownloadActivity(ctx, user.ID, chatID, downloadID, "", "", "", "delete", 0, true, "", nil, nil); err != nil {
 				log.Printf("Warning: failed to log delete download success: %v", err)
 			}
-			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "removelink", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text)); err != nil {
-				log.Printf("Warning: failed to log removelink success command: %v", err)
-			}
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeDownloadDelete, "removelink", messageThreadID, true, "", map[string]any{"download_id": downloadID}); err != nil {
-				log.Printf("Warning: failed to log download delete activity: %v", err)
-			}
+			b.logCommandHelper(ctx, user, chatID, messageThreadID, "removelink", update.Message.Text, startTime, true, "", len(text))
+			b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeDownloadDelete, "removelink", true, "", map[string]any{"download_id": downloadID})
 		}
 	})
 }
@@ -615,12 +571,8 @@ func (b *Bot) handleStatusCommand(ctx context.Context, tgBot *bot.Bot, update *m
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
 
 		if user != nil {
-			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "status", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text.String())); err != nil {
-				log.Printf("Warning: failed to log status command success: %v", err)
-			}
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeCommandStatus, "status", messageThreadID, true, "", nil); err != nil {
-				log.Printf("Warning: failed to log status command success activity: %v", err)
-			}
+			b.logCommandHelper(ctx, user, chatID, messageThreadID, "status", update.Message.Text, startTime, true, "", len(text.String()))
+			b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeCommandStatus, "status", true, "", nil)
 		}
 	})
 }
@@ -632,6 +584,17 @@ func (b *Bot) handleMagnetLink(ctx context.Context, tgBot *bot.Bot, update *mode
 		b.middleware.LogCommand(update, "magnet_link")
 
 		magnetLink := update.Message.Text
+		// Extract magnet link if it's not the exact message
+		if !strings.HasPrefix(magnetLink, "magnet:?") || strings.Contains(magnetLink, "\n") || strings.Contains(magnetLink, " ") {
+			re := regexp.MustCompile(`magnet:\?xt=urn:btih:[a-zA-Z0-9]+.*`)
+			match := re.FindString(magnetLink)
+			if match != "" {
+				magnetLink = match
+				if idx := strings.IndexAny(magnetLink, " \n\t"); idx != -1 {
+					magnetLink = magnetLink[:idx]
+				}
+			}
+		}
 		response, err := b.rdClient.AddMagnet(magnetLink)
 		if err != nil {
 			text := fmt.Sprintf("<b>[ERROR]</b> Failed to add torrent: %s", html.EscapeString(err.Error()))
@@ -663,12 +626,8 @@ func (b *Bot) handleMagnetLink(ctx context.Context, tgBot *bot.Bot, update *mode
 			if err := b.torrentRepo.LogTorrentActivity(ctx, user.ID, chatID, response.ID, "", "", magnetLink, "add", "waiting_files_selection", 0, 0, true, "", nil); err != nil {
 				log.Printf("Warning: failed to log magnet link success: %v", err)
 			}
-			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "magnet_link", magnetLink, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text)); err != nil {
-				log.Printf("Warning: failed to log magnet link command: %v", err)
-			}
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeMagnetLink, "magnet_link", messageThreadID, true, "", map[string]any{"torrent_id": response.ID}); err != nil {
-				log.Printf("Warning: failed to log magnet link success activity: %v", err)
-			}
+			b.logCommandHelper(ctx, user, chatID, messageThreadID, "magnet_link", magnetLink, startTime, true, "", len(text))
+			b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeMagnetLink, "magnet_link", true, "", map[string]any{"torrent_id": response.ID})
 		}
 	})
 }
@@ -727,12 +686,8 @@ func (b *Bot) handleHosterLink(ctx context.Context, tgBot *bot.Bot, update *mode
 			if err := b.downloadRepo.LogDownloadActivity(ctx, user.ID, chatID, unrestricted.ID, link, unrestricted.Filename, unrestricted.Host, "unrestrict", unrestricted.Filesize, true, "", nil, nil); err != nil {
 				log.Printf("Warning: failed to log hoster unrestrict success: %v", err)
 			}
-			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "hoster_link", link, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text)); err != nil {
-				log.Printf("Warning: failed to log hoster link command: %v", err)
-			}
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeHosterLink, "hoster_link", messageThreadID, true, "", map[string]any{"download_id": unrestricted.ID, "filename": unrestricted.Filename}); err != nil {
-				log.Printf("Warning: failed to log hoster link activity success: %v", err)
-			}
+			b.logCommandHelper(ctx, user, chatID, messageThreadID, "hoster_link", link, startTime, true, "", len(text))
+			b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeHosterLink, "hoster_link", true, "", map[string]any{"download_id": unrestricted.ID, "filename": unrestricted.Filename})
 		}
 	})
 }
@@ -808,14 +763,8 @@ func (b *Bot) handleDashboardCommand(ctx context.Context, tgBot *bot.Bot, update
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
 
 		// Log command
-		if user != nil {
-			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "dashboard", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", len(text)); err != nil {
-				log.Printf("Warning: failed to log dashboard command: %v", err)
-			}
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeCommandDashboard, "dashboard", messageThreadID, true, "", map[string]any{"role": roleDesc}); err != nil {
-				log.Printf("Warning: failed to log dashboard activity: %v", err)
-			}
-		}
+		b.logCommandHelper(ctx, user, chatID, messageThreadID, "dashboard", update.Message.Text, startTime, true, "", len(text))
+		b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeCommandDashboard, "dashboard", true, "", map[string]any{"role": roleDesc})
 	})
 }
 
@@ -843,10 +792,22 @@ func (b *Bot) sendHTMLMessage(ctx context.Context, chatID int64, messageThreadID
 	}
 }
 
-// min returns the smaller of a and b.
-func min(a, b int) int {
-	if a < b {
-		return a
+// logCommandHelper logs a command to the command repo
+func (b *Bot) logCommandHelper(ctx context.Context, user *db.User, chatID int64, messageThreadID int, command, fullCommand string, startTime time.Time, success bool, errorMsg string, responseLength int) {
+	if user == nil {
+		return
 	}
-	return b
+	if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, command, fullCommand, messageThreadID, time.Since(startTime).Milliseconds(), success, errorMsg, responseLength); err != nil {
+		log.Printf("Warning: failed to log command %s: %v", command, err)
+	}
+}
+
+// logActivityHelper logs a general activity to the activity repo
+func (b *Bot) logActivityHelper(ctx context.Context, user *db.User, chatID int64, messageThreadID int, activityType db.ActivityType, command string, success bool, errorMsg string, metadata map[string]interface{}) {
+	if user == nil {
+		return
+	}
+	if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, activityType, command, messageThreadID, success, errorMsg, metadata); err != nil {
+		log.Printf("Warning: failed to log activity %s: %v", activityType, err)
+	}
 }
