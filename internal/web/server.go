@@ -55,8 +55,14 @@ func NewServer(deps Dependencies) *Server {
 
 			// Retrieve the custom status code if it's a *fiber.Error
 			var e *fiber.Error
+			var rdErr *realdebrid.APIError
+
 			if errors.As(err, &e) {
 				code = e.Code
+			} else if errors.As(err, &rdErr) {
+				// Map Real-Debrid API errors to 502 (Bad Gateway) to distinguish from internal server errors
+				// forcing the message to be shown below
+				code = fiber.StatusBadGateway
 			}
 
 			// Log the error internally
@@ -64,11 +70,11 @@ func NewServer(deps Dependencies) *Server {
 
 			// Sanitize error message for the client
 			message := "An unexpected error occurred"
-			if code < 500 {
+			if code < 500 || rdErr != nil {
+				// Show message for client errors (< 500) or upstream API errors
 				message = err.Error()
 			} else {
-				// For 500+ errors, we don't want to leak internal details
-				// except maybe some generic "Internal Server Error"
+				// For 500+ errors (excluding upstream API errors), we don't want to leak internal details
 				message = "Internal Server Error"
 			}
 
