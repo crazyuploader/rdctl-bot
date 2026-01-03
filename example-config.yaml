@@ -49,3 +49,7 @@ web:
   api_key: "random_key"
   dashboard_url: "http://localhost:8089" # Base URL for dashboard links
   token_expiry_minutes: 60 # Token validity duration
+  limiter:
+    enabled: false # Set to true to enable rate limiting
+    max: 60 # Max requests per expiration period
+    expiration_seconds: 60 # Expiration period in seconds

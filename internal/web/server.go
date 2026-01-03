@@ -5,6 +5,7 @@ import (
 	"embed"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/crazyuploader/rdctl-bot/internal/config"
 	"github.com/crazyuploader/rdctl-bot/internal/db"
@@ -16,6 +17,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/earlydata"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 )
@@ -65,6 +67,15 @@ func NewServer(deps Dependencies) *Server {
 
 	// API group with dual auth (API key OR token)
 	api := app.Group("/api")
+
+	// Rate limiting
+	if deps.Config.Web.Limiter.Enabled {
+		api.Use(limiter.New(limiter.Config{
+			Max:               deps.Config.Web.Limiter.Max,
+			Expiration:        time.Duration(deps.Config.Web.Limiter.ExpirationSeconds) * time.Second,
+			LimiterMiddleware: limiter.SlidingWindow{},
+		}))
+	}
 
 	// Token exchange endpoint - NO AUTH REQUIRED
 	api.Post("/exchange-token", deps.ExchangeToken)

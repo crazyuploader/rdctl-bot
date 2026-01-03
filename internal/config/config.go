@@ -21,10 +21,18 @@ type Config struct {
 
 // WebConfig holds all web server configuration
 type WebConfig struct {
-	ListenAddr         string `mapstructure:"listen_addr"`
-	APIKey             string `mapstructure:"api_key"`
-	DashboardURL       string `mapstructure:"dashboard_url"`
-	TokenExpiryMinutes int    `mapstructure:"token_expiry_minutes"`
+	ListenAddr         string        `mapstructure:"listen_addr"`
+	APIKey             string        `mapstructure:"api_key"`
+	DashboardURL       string        `mapstructure:"dashboard_url"`
+	TokenExpiryMinutes int           `mapstructure:"token_expiry_minutes"`
+	Limiter            LimiterConfig `mapstructure:"limiter"`
+}
+
+// LimiterConfig holds web server rate limiting settings
+type LimiterConfig struct {
+	Enabled           bool `mapstructure:"enabled"`
+	Max               int  `mapstructure:"max"`
+	ExpirationSeconds int  `mapstructure:"expiration_seconds"`
 }
 
 // TelegramConfig holds Telegram bot settings
@@ -231,6 +239,14 @@ func (c *Config) Validate(webOnly bool) error {
 	}
 	if c.Web.TokenExpiryMinutes == 0 {
 		c.Web.TokenExpiryMinutes = 60 // Default 1 hour
+	}
+
+	// Limiter defaults
+	if c.Web.Limiter.Max == 0 {
+		c.Web.Limiter.Max = 60
+	}
+	if c.Web.Limiter.ExpirationSeconds == 0 {
+		c.Web.Limiter.ExpirationSeconds = 60
 	}
 
 	return nil
