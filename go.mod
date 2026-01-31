@@ -5,7 +5,7 @@ go 1.25.3
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.15.0
 	github.com/go-telegram/bot v1.18.0
-	github.com/gofiber/fiber/v2 v2.52.10
+	github.com/gofiber/fiber/v2 v2.52.11
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
