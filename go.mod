@@ -3,7 +3,7 @@ module github.com/crazyuploader/rdctl-bot
 go 1.25.3
 
 require (
-	github.com/ansrivas/fiberprometheus/v2 v2.15.0
+	github.com/ansrivas/fiberprometheus/v2 v2.16.0
 	github.com/go-telegram/bot v1.18.0
 	github.com/gofiber/fiber/v2 v2.52.11
 	github.com/prometheus/client_golang v1.23.2
@@ -51,12 +51,12 @@ require (
 	github.com/tinylib/msgp v1.2.5 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.69.0 // indirect
-	go.opentelemetry.io/otel v1.39.0 // indirect
-	go.opentelemetry.io/otel/trace v1.39.0 // indirect
+	go.opentelemetry.io/otel v1.40.0 // indirect
+	go.opentelemetry.io/otel/trace v1.40.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
 	google.golang.org/protobuf v1.36.8 // indirect
 )
