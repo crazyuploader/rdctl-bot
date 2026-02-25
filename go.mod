@@ -3,7 +3,7 @@ module github.com/crazyuploader/rdctl-bot
 go 1.25.3
 
 require (
-	github.com/ansrivas/fiberprometheus/v2 v2.16.0
+	github.com/ansrivas/fiberprometheus/v2 v2.17.0
 	github.com/go-telegram/bot v1.19.0
 	github.com/gofiber/fiber/v2 v2.52.12
 	github.com/gofiber/fiber/v3 v3.1.0
