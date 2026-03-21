@@ -95,11 +95,12 @@ function showApp() {
 // ─── Data Fetching ────────────────────────────────────────────────────────────
 async function fetchAllData() {
   await fetchAuthInfo();
+  // Fetch kept torrent IDs first so renderTorrents() already has them when it runs
+  await fetchKeptTorrents();
   await Promise.all([
     fetchStatus(),
     fetchTorrents(),
     fetchDownloads(),
-    fetchKeptTorrents(),
     fetchAutoDeleteSetting(),
   ]);
 }
@@ -155,6 +156,8 @@ async function fetchTorrents() {
       const needsFullRender = smartUpdateTorrents(newTorrents);
       cachedTorrents = newTorrents;
       if (needsFullRender) renderTorrents();
+      // Always sync keep icons even if we didn't do a full render
+      updateKeepStatus();
     } else {
       cachedTorrents = newTorrents;
       renderTorrents();
@@ -471,7 +474,7 @@ async function fetchKeptTorrents() {
     const result = await apiFetch(`${API_BASE_URL}/kept-torrents`);
     keptTorrentIds.clear();
     (result.data || []).forEach((t) => keptTorrentIds.add(t.TorrentID));
-    updateAllKeptIcons();
+    updateKeepStatus();
   } catch (error) {
     console.error("Failed to fetch kept torrents:", error);
   }
@@ -507,6 +510,8 @@ function updateKeepStatus() {
       existingBadge.remove();
     }
   });
+  // Re-render all lucide icon placeholders into actual SVGs
+  lucide.createIcons();
 }
 
 async function toggleKeep(id, filename) {
@@ -748,8 +753,12 @@ function toggleAutoRefresh(type, enabled) {
   refreshIntervals[type] = null;
   if (enabled) {
     refreshIntervals[type] = setInterval(() => {
-      if (type === "torrents") fetchTorrents();
-      else fetchDownloads();
+      if (type === "torrents") {
+        fetchKeptTorrents();
+        fetchTorrents();
+      } else {
+        fetchDownloads();
+      }
     }, REFRESH_INTERVAL_MS);
   }
 }
