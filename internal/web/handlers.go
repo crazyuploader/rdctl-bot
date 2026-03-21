@@ -290,6 +290,22 @@ func (d *Dependencies) SetAutoDeleteSetting(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
 	}
 
+	// Validate the value is a valid integer
+	days, err := strconv.Atoi(body.Value)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "Value must be a valid integer")
+	}
+
+	// Validate range: must be non-negative and within reasonable upper bound
+	if days < 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "Value must be non-negative (>= 0)")
+	}
+
+	if days > 3650 {
+		return fiber.NewError(fiber.StatusBadRequest, "Value must not exceed 3650 days")
+	}
+
+	// Store the validated value (as string to match existing interface)
 	if err := d.SettingRepo.SetSetting(c.Context(), "auto_delete_days", body.Value); err != nil {
 		return err
 	}

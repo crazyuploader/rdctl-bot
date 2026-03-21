@@ -32,6 +32,7 @@ let refreshIntervals = {};
 let userRole = null; // 'admin' or 'viewer'
 let isAdmin = false;
 let keptTorrentsInterval = null; // Interval for updating kept torrents
+let autoDeleteInterval = null; // Interval for updating auto-delete setting
 
 // Cache for filtering
 let cachedTorrents = [];
@@ -976,10 +977,10 @@ function renderTorrents(filterText = null, preserveSelection = false) {
                   : ""
               }
               <!-- Keep/Unkeep Button -->
-              <button class="p-2 text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100" 
+              <button class="p-2 text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                       onclick="event.stopPropagation(); toggleKeep('${
                         t.id
-                      }', '${escapeHtml(t.filename)}')" 
+                      }', ${JSON.stringify(t.filename)})"
                       title="${keptTorrentIds.has(t.id) ? "Unkeep" : "Keep"}">
                 ${keptTorrentIds.has(t.id) ? "🛡️" : "🔓"}
               </button>
