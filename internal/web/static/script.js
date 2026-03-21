@@ -470,8 +470,8 @@ async function fetchKeptTorrents() {
   try {
     const result = await apiFetch(`${API_BASE_URL}/kept-torrents`);
     keptTorrentIds.clear();
-    (result.data || []).forEach((t) => keptTorrentIds.add(t.torrent_id));
-    updateKeepStatus();
+    (result.data || []).forEach((t) => keptTorrentIds.add(t.TorrentID));
+    updateAllKeptIcons();
   } catch (error) {
     console.error("Failed to fetch kept torrents:", error);
   }
