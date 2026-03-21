@@ -271,3 +271,35 @@ func (r *CommandRepository) GetUserStats(ctx context.Context, userID uint) (map[
 
 	return stats, nil
 }
+
+// SettingRepository handles runtime configuration settings
+type SettingRepository struct {
+	db *gorm.DB
+}
+
+// NewSettingRepository creates a new SettingRepository backed by the provided GORM DB handle.
+func NewSettingRepository(db *gorm.DB) *SettingRepository {
+	return &SettingRepository{db: db}
+}
+
+// GetSetting retrieves a setting value by key. Returns empty string if not found.
+func (r *SettingRepository) GetSetting(ctx context.Context, key string) (string, error) {
+	var setting Setting
+	err := r.db.WithContext(ctx).Where("key = ?", key).First(&setting).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return setting.Value, nil
+}
+
+// SetSetting creates or updates a setting value by key.
+func (r *SettingRepository) SetSetting(ctx context.Context, key, value string) error {
+	setting := Setting{
+		Key:   key,
+		Value: value,
+	}
+	return r.db.WithContext(ctx).Save(&setting).Error
+}

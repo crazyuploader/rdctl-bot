@@ -34,6 +34,7 @@ type Bot struct {
 	torrentRepo    *db.TorrentRepository
 	downloadRepo   *db.DownloadRepository
 	commandRepo    *db.CommandRepository
+	settingRepo    *db.SettingRepository
 	tokenStore     *web.TokenStore
 }
 
@@ -118,12 +119,17 @@ func NewBot(cfg *config.Config, database *gorm.DB, proxyURL, ipTestURL, ipVerify
 		torrentRepo:    db.NewTorrentRepository(database),
 		downloadRepo:   db.NewDownloadRepository(database),
 		commandRepo:    db.NewCommandRepository(database),
+		settingRepo:    db.NewSettingRepository(database),
 	}, nil
 }
 
 // Start begins processing updates
 func (b *Bot) Start(ctx context.Context) error {
 	b.registerHandlers()
+
+	// Start auto-delete background worker
+	go b.startAutoDeleteWorker(ctx)
+
 	log.Println("Bot started. Waiting for messages...")
 	b.api.Start(ctx)
 	return nil
@@ -144,6 +150,7 @@ func (b *Bot) registerHandlers() {
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/removelink", bot.MatchTypePrefix, b.handleRemoveLinkCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/status", bot.MatchTypeExact, b.handleStatusCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/dashboard", bot.MatchTypeExact, b.handleDashboardCommand)
+	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/autodelete", bot.MatchTypePrefix, b.handleAutoDeleteCommand)
 
 	// Message handlers for links
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "magnet:?", bot.MatchTypeContains, b.handleMagnetLink)

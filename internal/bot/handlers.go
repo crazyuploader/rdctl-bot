@@ -59,6 +59,7 @@ func (b *Bot) handleHelpCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 			"<b>⚙️ General Commands:</b>\n" +
 			"• <code>/status</code> — Show your Real-Debrid account status\n" +
 			"• <code>/dashboard</code> — Get a temporary link to the web dashboard\n" +
+			"• <code>/autodelete &lt;days&gt;</code> — Auto-delete torrents older than X days <i>(superadmin only)</i>\n" +
 			"• <code>/help</code> — Display this help message"
 
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)

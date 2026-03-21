@@ -140,6 +140,12 @@ func runMigrations(db *gorm.DB) error {
 		return fmt.Errorf("failed to migrate download_activities table: %w", err)
 	}
 
+	// Step 4: Migrate Settings table (no dependencies)
+	log.Println("Migrating settings table...")
+	if err := db.AutoMigrate(&Setting{}); err != nil {
+		return fmt.Errorf("failed to migrate settings table: %w", err)
+	}
+
 	log.Println("All migrations completed successfully!")
 	return nil
 }

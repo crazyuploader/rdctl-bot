@@ -147,3 +147,14 @@ func (DownloadActivity) TableName() string {
 func (CommandLog) TableName() string {
 	return "command_logs"
 }
+
+// Setting stores key-value configuration that can be changed at runtime via Telegram
+type Setting struct {
+	Key       string    `gorm:"primaryKey"`
+	Value     string    `gorm:"not null"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime"`
+}
+
+func (Setting) TableName() string {
+	return "settings"
+}
