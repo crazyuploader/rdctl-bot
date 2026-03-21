@@ -69,6 +69,7 @@ type AppConfig struct {
 	LogLevel        string          `mapstructure:"log_level"`
 	RateLimit       RateLimitConfig `mapstructure:"rate_limit"`
 	MaxKeptTorrents int             `mapstructure:"max_kept_torrents"` // Max kept torrents per non-admin user (0 = unlimited, admins always unlimited)
+	AutoDeleteDays  int             `mapstructure:"auto_delete_days"`  // Default auto-delete days fallback when not set in DB
 }
 
 // RateLimitConfig holds rate limiting settings

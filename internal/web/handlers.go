@@ -287,6 +287,14 @@ func (d *Dependencies) GetAutoDeleteSetting(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+
+	if value == "" {
+		if d.Config.App.AutoDeleteDays > 0 {
+			value = strconv.Itoa(d.Config.App.AutoDeleteDays)
+		} else {
+			value = "0"
+		}
+	}
 	return c.JSON(fiber.Map{
 		"success": true,
 		"data":    value,

@@ -54,12 +54,28 @@ func (b *Bot) handleAutoDeleteCommand(ctx context.Context, tgBot *bot.Bot, updat
 			}
 
 			var text string
-			if currentValue == "" || currentValue == "0" {
+			switch currentValue {
+			case "":
+				if b.config.App.AutoDeleteDays > 0 {
+					text = fmt.Sprintf(
+						"<b>⏳ Auto-Delete</b>\n\n"+
+							"Torrents older than <b>%d days</b> are automatically deleted (using config.yaml default).\n\n"+
+							"<b>Usage:</b> <code>/autodelete &lt;days&gt;</code>\n"+
+							"Set to <code>0</code> to disable.",
+						b.config.App.AutoDeleteDays,
+					)
+				} else {
+					text = "<b>⏳ Auto-Delete</b>\n\n" +
+						"Auto-delete is currently <b>disabled</b>.\n\n" +
+						"<b>Usage:</b> <code>/autodelete &lt;days&gt;</code>\n" +
+						"Set to <code>0</code> to disable."
+				}
+			case "0":
 				text = "<b>⏳ Auto-Delete</b>\n\n" +
 					"Auto-delete is currently <b>disabled</b>.\n\n" +
 					"<b>Usage:</b> <code>/autodelete &lt;days&gt;</code>\n" +
 					"Set to <code>0</code> to disable."
-			} else {
+			default:
 				text = fmt.Sprintf(
 					"<b>⏳ Auto-Delete</b>\n\n"+
 						"Torrents older than <b>%s days</b> are automatically deleted.\n\n"+
@@ -137,13 +153,22 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 		return
 	}
 
-	if daysStr == "" || daysStr == "0" {
-		return // Auto-delete is disabled
-	}
-
-	days, err := strconv.Atoi(daysStr)
-	if err != nil || days <= 0 {
-		return
+	var days int
+	switch daysStr {
+	case "":
+		// Use fallback
+		days = b.config.App.AutoDeleteDays
+		if days <= 0 {
+			return // Auto-delete is disabled
+		}
+	case "0":
+		return // Explicitly disabled
+	default:
+		var parseErr error
+		days, parseErr = strconv.Atoi(daysStr)
+		if parseErr != nil || days <= 0 {
+			return
+		}
 	}
 
 	// Get kept torrent IDs to skip them during deletion

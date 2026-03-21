@@ -27,6 +27,7 @@ app:
     messages_per_second: 25 # Stay under Telegram's 30/s limit
     burst: 5
   max_kept_torrents: 10 # Max kept torrents per non-admin user (0 = unlimited, admins always have unlimited)
+  auto_delete_days: 0 # Default auto-delete days fallback when not set in UI/DB (0 = disabled)
 
 database:
   # Database host
