@@ -58,6 +58,48 @@ func (r *UserRepository) GetOrCreateUser(ctx context.Context, userID int64, user
 	return &updatedUser, nil
 }
 
+// ChatRepository handles chat operations
+type ChatRepository struct {
+	db *gorm.DB
+}
+
+// NewChatRepository creates a ChatRepository using the provided gorm.DB.
+func NewChatRepository(db *gorm.DB) *ChatRepository {
+	return &ChatRepository{db: db}
+}
+
+// GetOrCreateChat gets or creates a chat based on its Telegram chat ID
+func (r *ChatRepository) GetOrCreateChat(ctx context.Context, chatID int64, title, chatType string) (*Chat, error) {
+	now := time.Now().UTC()
+	chat := Chat{
+		ChatID:    chatID,
+		Title:     title,
+		Type:      chatType,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	result := r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "chat_id"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"title":      title,
+			"type":       chatType,
+			"updated_at": now,
+		}),
+	}).Create(&chat)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	var updatedChat Chat
+	if err := r.db.WithContext(ctx).Where("chat_id = ?", chatID).First(&updatedChat).Error; err != nil {
+		return nil, err
+	}
+
+	return &updatedChat, nil
+}
+
 // ActivityRepository handles activity logging
 type ActivityRepository struct {
 	db *gorm.DB
@@ -463,21 +505,13 @@ func (r *KeptTorrentRepository) GetKeptTorrentIDs(ctx context.Context) (map[stri
 	return result, nil
 }
 
-// KeptTorrentWithUser represents a kept torrent with user information
-type KeptTorrentWithUser struct {
-	KeptTorrent
-	KeptByUsername string
-}
-
 // ListKeptTorrents returns all kept torrents with user details
-func (r *KeptTorrentRepository) ListKeptTorrents(ctx context.Context) ([]KeptTorrentWithUser, error) {
-	var results []KeptTorrentWithUser
+func (r *KeptTorrentRepository) ListKeptTorrents(ctx context.Context) ([]KeptTorrent, error) {
+	var results []KeptTorrent
 	err := r.db.WithContext(ctx).
-		Table("kept_torrents").
-		Select("kept_torrents.*, users.username as kept_by_username").
-		Joins("LEFT JOIN users ON users.user_id = kept_torrents.kept_by_id").
-		Order("kept_torrents.kept_at DESC").
-		Scan(&results).Error
+		Preload("User").
+		Order("kept_at DESC").
+		Find(&results).Error
 	return results, err
 }
 

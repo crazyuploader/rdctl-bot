@@ -6,6 +6,16 @@ import (
 	"gorm.io/gorm"
 )
 
+// Chat represents a Telegram chat (private, group, supergroup, channel)
+type Chat struct {
+	ID        uint      `gorm:"primaryKey"`
+	ChatID    int64     `gorm:"uniqueIndex;not null"`
+	Title     string
+	Type      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 // User represents a Telegram user
 type User struct {
 	ID            uint   `gorm:"primaryKey"`
@@ -62,6 +72,7 @@ type ActivityLog struct {
 	CreatedAt       time.Time `gorm:"index:idx_user_created;index:idx_chat_created;not null"`
 
 	User User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Chat Chat `gorm:"foreignKey:ChatID;references:ChatID;constraint:OnDelete:CASCADE"`
 }
 
 // TorrentActivity tracks torrent-specific activities
@@ -85,6 +96,7 @@ type TorrentActivity struct {
 	SelectedFiles string    `gorm:"type:json;not null;default:'[]'"` // Stores selected files as JSON array
 
 	User               User               `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Chat               Chat               `gorm:"foreignKey:ChatID;references:ChatID;constraint:OnDelete:CASCADE"`
 	DownloadActivities []DownloadActivity `gorm:"foreignKey:TorrentActivityID"`
 }
 
@@ -107,6 +119,7 @@ type DownloadActivity struct {
 	TorrentActivityID *uint     `gorm:"index"` // Links to originating torrent activity
 
 	User            User             `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Chat            Chat             `gorm:"foreignKey:ChatID;references:ChatID;constraint:OnDelete:CASCADE"`
 	TorrentActivity *TorrentActivity `gorm:"foreignKey:TorrentActivityID;constraint:OnDelete:SET NULL"`
 }
 
@@ -127,11 +140,16 @@ type CommandLog struct {
 
 	// Relationships
 	User User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Chat Chat `gorm:"foreignKey:ChatID;references:ChatID;constraint:OnDelete:CASCADE"`
 }
 
 // TableName overrides
 func (User) TableName() string {
 	return "users"
+}
+
+func (Chat) TableName() string {
+	return "chats"
 }
 
 func (ActivityLog) TableName() string {
@@ -168,6 +186,8 @@ type KeptTorrent struct {
 	Filename  string
 	KeptByID  int64     `gorm:"index;not null"` // Telegram user ID who kept it
 	KeptAt    time.Time `gorm:"not null"`
+	
+	User User `gorm:"foreignKey:KeptByID;references:UserID;constraint:OnDelete:CASCADE"`
 }
 
 func (KeptTorrent) TableName() string {
@@ -199,6 +219,9 @@ type SettingAudit struct {
 	ChangedBy int64     `gorm:"index;not null"` // User who made change
 	ChatID    int64     `gorm:"index"`          // Chat where change was made
 	ChangedAt time.Time `gorm:"index;not null"`
+
+	User User `gorm:"foreignKey:ChangedBy;references:UserID;constraint:OnDelete:CASCADE"`
+	Chat Chat `gorm:"foreignKey:ChatID;references:ChatID;constraint:OnDelete:SET NULL"`
 }
 
 func (SettingAudit) TableName() string {

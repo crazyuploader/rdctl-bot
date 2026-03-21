@@ -37,6 +37,7 @@ type Bot struct {
 	commandRepo    *db.CommandRepository
 	settingRepo    *db.SettingRepository
 	keptRepo       *db.KeptTorrentRepository
+	chatRepo       *db.ChatRepository
 	tokenStore     *web.TokenStore
 	wg             sync.WaitGroup
 	cancel         context.CancelFunc
@@ -126,6 +127,7 @@ func NewBot(cfg *config.Config, database *gorm.DB, proxyURL, ipTestURL, ipVerify
 		commandRepo:    db.NewCommandRepository(database),
 		settingRepo:    db.NewSettingRepository(database),
 		keptRepo:       db.NewKeptTorrentRepository(database),
+		chatRepo:       db.NewChatRepository(database),
 	}
 
 	// Create or retrieve system user for automated operations
@@ -243,11 +245,41 @@ func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThr
 	return
 }
 
+// getChatFromUpdate extracts chat info from an update
+func (b *Bot) getChatFromUpdate(update *models.Update) (chatID int64, title, chatType string) {
+	var chat *models.Chat
+	if update.Message != nil {
+		chat = &update.Message.Chat
+	} else if update.CallbackQuery != nil && update.CallbackQuery.Message.Message != nil {
+		chat = &update.CallbackQuery.Message.Message.Chat
+	}
+	if chat != nil {
+		chatID = chat.ID
+		title = chat.Title
+		chatType = string(chat.Type)
+		if title == "" {
+			title = chat.Username
+		}
+		if title == "" {
+			title = strings.TrimSpace(chat.FirstName + " " + chat.LastName)
+		}
+	}
+	return
+}
+
 // withAuth is a middleware to check authorization and execute the handler
 func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User)) {
 	chatID, messageThreadID, username, firstName, lastName, userID := b.getUserFromUpdate(update)
+	_, title, chatType := b.getChatFromUpdate(update)
 
 	isAllowed, isSuperAdmin := b.middleware.CheckAuthorization(chatID, userID)
+
+	if chatID != 0 {
+		_, err := b.chatRepo.GetOrCreateChat(ctx, chatID, title, chatType)
+		if err != nil {
+			log.Printf("Warning: failed to automatically log chat ID: %v", err)
+		}
+	}
 
 	user, err := b.userRepo.GetOrCreateUser(ctx, userID, username, firstName, lastName, isSuperAdmin)
 	if err != nil {

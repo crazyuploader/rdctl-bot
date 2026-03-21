@@ -112,10 +112,20 @@ func Init(dsn string) (*gorm.DB, error) {
 func runMigrations(db *gorm.DB) error {
 	log.Println("Starting database migrations...")
 
-	// Step 1: Migrate User table first (no dependencies)
+	// Step 1: Migrate Chat and User tables first (no dependencies)
+	log.Println("Migrating chats table...")
+	if err := db.AutoMigrate(&Chat{}); err != nil {
+		return fmt.Errorf("failed to migrate chats table: %w", err)
+	}
+
 	log.Println("Migrating users table...")
 	if err := db.AutoMigrate(&User{}); err != nil {
 		return fmt.Errorf("failed to migrate users table: %w", err)
+	}
+
+	// Seed legacy chat IDs to satisfy foreign key constraints before migrating dependent tables
+	if err := seedLegacyChats(db); err != nil {
+		return fmt.Errorf("failed to seed legacy chats: %w", err)
 	}
 
 	// Step 2: Migrate tables that depend on User
@@ -177,4 +187,42 @@ func Close(db *gorm.DB) error {
 		return err
 	}
 	return sqlDB.Close()
+}
+
+// seedLegacyChats extracts all distinct chat_ids from existing logs and creates dummy Chat entries
+// so that when GORM creates the foreign key constraints, it does not fail on orphaned data.
+func seedLegacyChats(db *gorm.DB) error {
+	log.Println("Seeding legacy chat IDs to satisfy foreign key constraints...")
+
+	tables := []string{"activity_logs", "command_logs", "torrent_activities", "download_activities", "setting_audits"}
+	uniqueChatIDs := make(map[int64]bool)
+
+	for _, table := range tables {
+		if db.Migrator().HasTable(table) {
+			var ids []int64
+			if err := db.Table(table).Where("chat_id != 0").Distinct("chat_id").Pluck("chat_id", &ids).Error; err != nil {
+				log.Printf("Warning: failed to fetch distinct chat IDs from %s: %v", table, err)
+				continue
+			}
+			for _, id := range ids {
+				uniqueChatIDs[id] = true
+			}
+		}
+	}
+
+	now := time.Now().UTC()
+	for chatID := range uniqueChatIDs {
+		chat := Chat{
+			ChatID:    chatID,
+			Title:     fmt.Sprintf("Legacy Chat %d", chatID),
+			Type:      "unknown",
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if err := db.Where("chat_id = ?", chatID).FirstOrCreate(&chat).Error; err != nil {
+			log.Printf("Warning: failed to seed legacy chat %d: %v", chatID, err)
+		}
+	}
+
+	return nil
 }

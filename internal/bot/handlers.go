@@ -846,7 +846,7 @@ func (b *Bot) handleKeepCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 			} else {
 				for _, kt := range keptTorrents {
 					keptAt := kt.KeptAt.Format("2006-01-02 15:04")
-					keptBy := kt.KeptByUsername
+					keptBy := kt.User.Username
 					if keptBy == "" {
 						keptBy = fmt.Sprintf("User #%d", kt.KeptByID)
 					}
@@ -943,7 +943,7 @@ func (b *Bot) handleUnkeepCommand(ctx context.Context, tgBot *bot.Bot, update *m
 			} else {
 				for _, kt := range keptTorrents {
 					keptAt := kt.KeptAt.Format("2006-01-02 15:04")
-					keptBy := kt.KeptByUsername
+					keptBy := kt.User.Username
 					if keptBy == "" {
 						keptBy = fmt.Sprintf("User #%d", kt.KeptByID)
 					}
