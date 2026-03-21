@@ -211,10 +211,10 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 			// Check if error is retryable (rate limit or server error)
 			errStr := deleteErr.Error()
 			isRetryable := strings.Contains(errStr, "429") ||
-						   strings.Contains(errStr, "500") ||
-						   strings.Contains(errStr, "502") ||
-						   strings.Contains(errStr, "503") ||
-						   strings.Contains(errStr, "504")
+				strings.Contains(errStr, "500") ||
+				strings.Contains(errStr, "502") ||
+				strings.Contains(errStr, "503") ||
+				strings.Contains(errStr, "504")
 
 			if !isRetryable || attempt == maxRetries-1 {
 				// Not retryable or last attempt - break

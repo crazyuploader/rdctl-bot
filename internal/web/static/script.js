@@ -496,28 +496,35 @@ function updateKeepStatusOnCards() {
     const card = document.querySelector(`[data-torrent-id="${torrentId}"]`);
     if (card) {
       // Add kept badge if not present
-      if (!card.querySelector('.kept-badge')) {
-        const badge = document.createElement('div');
-        badge.className = 'kept-badge absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-blue-500 text-white text-xs font-bold shadow-lg';
-        badge.textContent = 'KEPT';
-        card.style.position = 'relative';
+      if (!card.querySelector(".kept-badge")) {
+        const badge = document.createElement("div");
+        badge.className =
+          "kept-badge absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-blue-500 text-white text-xs font-bold shadow-lg";
+        badge.textContent = "KEPT";
+        card.style.position = "relative";
         card.appendChild(badge);
       }
       // Update keep button icon to "kept" state
-      const keepBtn = card.querySelector('button[title*="Keep"], button[title*="kept"]');
+      const keepBtn = card.querySelector(
+        'button[title*="Keep"], button[title*="kept"]',
+      );
       if (keepBtn) {
-        keepBtn.className = keepBtn.className.replace(/text-slate-500/g, 'text-blue-400 bg-blue-500/10');
-        keepBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>';
+        keepBtn.className = keepBtn.className.replace(
+          /text-slate-500/g,
+          "text-blue-400 bg-blue-500/10",
+        );
+        keepBtn.innerHTML =
+          '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>';
         keepBtn.title = "Remove from kept";
       }
     }
   });
-  
+
   // Also add ring to kept cards
-  document.querySelectorAll('#torrents-list > div').forEach(card => {
+  document.querySelectorAll("#torrents-list > div").forEach((card) => {
     const torrentId = card.dataset.torrentId;
     if (torrentId && keptTorrentIds.has(torrentId)) {
-      card.classList.add('ring-2', 'ring-blue-500/30');
+      card.classList.add("ring-2", "ring-blue-500/30");
     }
   });
 }
@@ -615,7 +622,7 @@ async function fetchTorrents(loadMore = false) {
     } else {
       // Smart update: only re-render if data actually changed
       const hasChanges = smartUpdateTorrents(newTorrents);
-      
+
       if (hasChanges) {
         cachedTorrents = newTorrents;
         renderTorrents();
@@ -634,83 +641,97 @@ function smartUpdateTorrents(newTorrents) {
   if (cachedTorrents.length !== newTorrents.length) {
     return true; // Item added/removed, need full re-render
   }
-  
+
   // Compare each torrent for changes
   for (let i = 0; i < newTorrents.length; i++) {
     const oldT = cachedTorrents[i];
     const newT = newTorrents[i];
-    
-    if (oldT.id !== newT.id || 
-        oldT.status !== newT.status || 
-        oldT.progress !== newT.progress ||
-        oldT.speed !== newT.speed ||
-        oldT.seeders !== newT.seeders) {
+
+    if (
+      oldT.id !== newT.id ||
+      oldT.status !== newT.status ||
+      oldT.progress !== newT.progress ||
+      oldT.speed !== newT.speed ||
+      oldT.seeders !== newT.seeders
+    ) {
       // Found a difference, update just that card
       updateTorrentCard(newT);
     }
   }
-  
+
   return false; // No structural changes
 }
 
 function updateTorrentCard(torrent) {
   const card = document.querySelector(`[data-torrent-id="${torrent.id}"]`);
   if (!card) return;
-  
+
   // Update progress bar
-  const progressBar = card.querySelector('.progress-bar');
-  const progressText = card.querySelector('.progress-text');
-  
+  const progressBar = card.querySelector(".progress-bar");
+  const progressText = card.querySelector(".progress-text");
+
   if (progressBar) {
     const progressPercent = Math.round(torrent.progress);
     progressBar.style.width = `${progressPercent}%`;
-    
+
     // Update progress color
-    progressBar.className = progressBar.className.replace(/bg-\w+-\d+/g, '');
+    progressBar.className = progressBar.className.replace(/bg-\w+-\d+/g, "");
     if (torrent.progress >= 100) {
-      progressBar.classList.add('bg-green-500');
+      progressBar.classList.add("bg-green-500");
     } else if (torrent.progress > 0) {
-      progressBar.classList.add('bg-blue-500');
+      progressBar.classList.add("bg-blue-500");
     } else {
-      progressBar.classList.add('bg-slate-700');
+      progressBar.classList.add("bg-slate-700");
     }
-    
+
     // Update animation for downloading
     if (torrent.status === "Downloading") {
-      progressBar.classList.add('animate-pulse');
+      progressBar.classList.add("animate-pulse");
     } else {
-      progressBar.classList.remove('animate-pulse');
+      progressBar.classList.remove("animate-pulse");
     }
   }
-  
+
   if (progressText) {
     progressText.textContent = `${torrent.progress.toFixed(1)}%`;
-    progressText.className = progressText.className.replace(/text-\w+-\d+/g, '');
+    progressText.className = progressText.className.replace(
+      /text-\w+-\d+/g,
+      "",
+    );
     if (torrent.progress >= 100) {
-      progressText.classList.add('text-green-400');
+      progressText.classList.add("text-green-400");
     } else {
-      progressText.classList.add('text-blue-400');
+      progressText.classList.add("text-blue-400");
     }
   }
-  
+
   // Update status badge
-  const statusBadge = card.querySelector('.status-badge');
+  const statusBadge = card.querySelector(".status-badge");
   if (statusBadge) {
-    const statusClass = 
-      torrent.status === "Downloaded" ? "text-green-400 bg-green-500/10" :
-      torrent.status === "Downloading" ? "text-blue-400 bg-blue-500/10" :
-      torrent.status === "Error" || torrent.status === "Dead" ? "text-red-400 bg-red-500/10" :
-      "text-slate-400 bg-slate-800/50";
-    
-    statusBadge.className = statusBadge.className.replace(/text-\w+-\d+|bg-\w+-\d+\/\d+/g, '');
-    statusBadge.classList.add(...statusClass.split(' '));
-    
+    const statusClass =
+      torrent.status === "Downloaded"
+        ? "text-green-400 bg-green-500/10"
+        : torrent.status === "Downloading"
+          ? "text-blue-400 bg-blue-500/10"
+          : torrent.status === "Error" || torrent.status === "Dead"
+            ? "text-red-400 bg-red-500/10"
+            : "text-slate-400 bg-slate-800/50";
+
+    statusBadge.className = statusBadge.className.replace(
+      /text-\w+-\d+|bg-\w+-\d+\/\d+/g,
+      "",
+    );
+    statusBadge.classList.add(...statusClass.split(" "));
+
     // Update status text
-    statusBadge.innerHTML = statusBadge.innerHTML.replace(/>([\w\s]+)</, `>${torrent.status}<`);
+    statusBadge.innerHTML = statusBadge.innerHTML.replace(
+      />([\w\s]+)</,
+      `>${torrent.status}<`,
+    );
   }
-  
+
   // Update speed
-  const speedSpan = card.querySelector('.speed-info');
+  const speedSpan = card.querySelector(".speed-info");
   if (speedSpan && torrent.speed !== undefined && torrent.speed > 0) {
     speedSpan.innerHTML = `<svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
@@ -1068,20 +1089,21 @@ function renderTorrents(filterText = null, preserveSelection = false) {
             : "bg-slate-700";
 
       const addedDate = t.added ? new Date(t.added).toLocaleDateString() : "";
-      
-      const statusIcon = t.status === "Downloaded"
-        ? '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
-        : t.status === "Downloading"
-          ? '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>'
-          : t.status === "Error" || t.status === "Dead"
-            ? '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>'
-            : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+
+      const statusIcon =
+        t.status === "Downloaded"
+          ? '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
+          : t.status === "Downloading"
+            ? '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>'
+            : t.status === "Error" || t.status === "Dead"
+              ? '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>'
+              : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
 
       return `
          <div data-torrent-id="${t.id}" class="group relative glass-effect border ${
            isSelected ? "border-blue-500 bg-blue-500/5" : "border-slate-700/50"
          } ${isKept ? "ring-2 ring-blue-500/30" : ""} rounded-xl p-4 hover:border-blue-500/40 transition-all duration-200">
-           ${isKept ? '<div class="kept-badge absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-blue-500 text-white text-xs font-bold shadow-lg">KEPT</div>' : ''}
+           ${isKept ? '<div class="kept-badge absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-blue-500 text-white text-xs font-bold shadow-lg">KEPT</div>' : ""}
            <div class="flex justify-between items-start gap-3 mb-3">
               <!-- Selection Checkbox -->
               ${
@@ -1151,26 +1173,31 @@ function renderTorrents(filterText = null, preserveSelection = false) {
                        </span>`
                     : ""
                 }
-                ${addedDate ? `<span class="flex items-center gap-1.5">
+                ${
+                  addedDate
+                    ? `<span class="flex items-center gap-1.5">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                   </svg>
                   ${addedDate}
-                </span>` : ""}
+                </span>`
+                    : ""
+                }
               </div>
             </div>
             
             <!-- Action Buttons -->
             <div class="flex items-center gap-1">
               <!-- Keep/Unkeep Button -->
-              <button class="p-2 ${isKept ? 'text-blue-400 bg-blue-500/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-500/10'} rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+              <button class="p-2 ${isKept ? "text-blue-400 bg-blue-500/10" : "text-slate-500 hover:text-blue-400 hover:bg-blue-500/10"} rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
                       data-id="${t.id}"
                       data-filename="${escapeHtml(t.filename)}"
                       onclick="event.stopPropagation(); toggleKeep(this.dataset.id, this.dataset.filename)"
-                      title="${isKept ? 'Remove from kept' : 'Keep (exempt from auto-delete)'}">
-                ${isKept 
-                  ? '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>'
-                  : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>'
+                      title="${isKept ? "Remove from kept" : "Keep (exempt from auto-delete)"}">
+                ${
+                  isKept
+                    ? '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>'
+                    : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>'
                 }
               </button>
               
@@ -1186,8 +1213,8 @@ function renderTorrents(filterText = null, preserveSelection = false) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
               </svg>
             </button>`
-                 : ""
-             }
+                  : ""
+              }
             </div>
           </div>
           <div class="relative h-2 w-full bg-slate-800 rounded-full overflow-hidden">
@@ -1196,12 +1223,12 @@ function renderTorrents(filterText = null, preserveSelection = false) {
             }" style="width: ${t.progress}%"></div>
           </div>
           <div class="mt-1 flex items-center justify-between text-xs">
-            <span class="progress-text font-medium ${t.progress >= 100 ? 'text-green-400' : 'text-blue-400'}">${t.progress.toFixed(
-            1,
-          )}%</span>
+            <span class="progress-text font-medium ${t.progress >= 100 ? "text-green-400" : "text-blue-400"}">${t.progress.toFixed(
+              1,
+            )}%</span>
             ${
               t.status === "Downloading" && t.speed > 0
-                ? `<span class="text-slate-500">${formatBytes(t.bytes * (100 - t.progress) / 100 / t.speed)} remaining</span>`
+                ? `<span class="text-slate-500">${formatBytes((t.bytes * (100 - t.progress)) / 100 / t.speed)} remaining</span>`
                 : ""
             }
           </div>
@@ -1291,15 +1318,15 @@ function renderDownloads(filterText = null) {
 
   if (filteredDownloads.length === 0) {
     list.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-slate-500 py-12">
-      <div class="w-20 h-20 mb-4 rounded-full ${filter ? 'bg-slate-800/50' : 'bg-green-500/10'} flex items-center justify-center">
+      <div class="w-20 h-20 mb-4 rounded-full ${filter ? "bg-slate-800/50" : "bg-green-500/10"} flex items-center justify-center">
         <svg class="w-10 h-10 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
       </div>
-      <p class="text-base font-medium ${filter ? 'text-slate-400' : 'text-slate-400'} mb-1">${
+      <p class="text-base font-medium ${filter ? "text-slate-400" : "text-slate-400"} mb-1">${
         filter ? "No matching downloads" : "No recent downloads"
       }</p>
-      <p class="text-sm text-slate-500">${filter ? 'Try a different search term' : 'Unrestricted links will appear here'}</p>
+      <p class="text-sm text-slate-500">${filter ? "Try a different search term" : "Unrestricted links will appear here"}</p>
     </div>`;
     return;
   }
@@ -1309,7 +1336,10 @@ function renderDownloads(filterText = null) {
       const safeUrl = sanitizeUrl(d.download);
       const generatedDate = new Date(d.generated);
       const formattedDate = generatedDate.toLocaleDateString();
-      const formattedTime = generatedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const formattedTime = generatedDate.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
       return `
         <div class="group relative glass-effect border border-slate-700/50 rounded-xl p-4 hover:border-purple-500/40 transition-all duration-200">
           <div class="flex justify-between items-start gap-4">
@@ -1317,8 +1347,8 @@ function renderDownloads(filterText = null) {
               <div class="flex items-center gap-2 mb-1">
                 <div class="flex-1 text-sm font-semibold text-white truncate">
                   <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="hover:text-purple-400 transition-colors" title="${escapeHtml(d.filename)}">${escapeHtml(
-                  d.filename,
-                )}</a>
+                    d.filename,
+                  )}</a>
                 </div>
                 <span class="flex-shrink-0 px-2 py-0.5 rounded-md text-xs font-bold uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20">${
                   d.host

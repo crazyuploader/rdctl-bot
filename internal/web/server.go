@@ -186,9 +186,9 @@ func NewServer(deps Dependencies) *Server {
 	api.Get("/stats/user/:id", deps.GetUserStats)
 	api.Get("/kept-torrents", deps.GetKeptTorrents)
 
-	// Keep management - Admin only
-	api.Post("/torrents/:id/keep", AdminOnly(deps.TokenStore, ipManager), deps.KeepTorrent)
-	api.Delete("/torrents/:id/keep", AdminOnly(deps.TokenStore, ipManager), deps.UnkeepTorrent)
+	// Keep management (Limits applied in handler)
+	api.Post("/torrents/:id/keep", deps.KeepTorrent)
+	api.Delete("/torrents/:id/keep", deps.UnkeepTorrent)
 
 	// Delete operations - Admin only
 	api.Delete("/torrents/:id", AdminOnly(deps.TokenStore, ipManager), deps.DeleteTorrent)

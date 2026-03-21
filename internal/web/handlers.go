@@ -242,6 +242,18 @@ func (d *Dependencies) KeepTorrent(c *fiber.Ctx) error {
 		userID = token.UserID
 	}
 
+	// Check kept torrent limit for non-admins
+	role := GetRole(c)
+	if role != RoleAdmin && d.Config.App.MaxKeptTorrents > 0 {
+		currentCount, err := d.KeptRepo.CountKeptByUser(c.Context(), userID)
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, "Failed to check kept torrent count")
+		}
+		if currentCount >= int64(d.Config.App.MaxKeptTorrents) {
+			return fiber.NewError(fiber.StatusForbidden, "Maximum kept torrent limit reached")
+		}
+	}
+
 	if err := d.KeptRepo.KeepTorrent(c.Context(), id, torrent.Filename, userID); err != nil {
 		return err
 	}
