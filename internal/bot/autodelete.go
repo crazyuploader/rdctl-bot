@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/crazyuploader/rdctl-bot/internal/db"
+	"github.com/crazyuploader/rdctl-bot/internal/realdebrid"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 )
@@ -143,8 +144,9 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 	log.Printf("Auto-delete: checking for torrents older than %d days (before %s)", days, cutoff.Format("2006-01-02 15:04"))
 
 	// Fetch torrents in batches to handle large lists
-	offset := 0
 	const batchSize = 100
+	offset := 0
+	var oldTorrents []realdebrid.Torrent
 	totalDeleted := 0
 
 	for {
@@ -160,17 +162,7 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 
 		for _, t := range torrents {
 			if t.Added.Before(cutoff) {
-				if err := b.rdClient.DeleteTorrent(t.ID); err != nil {
-					log.Printf("Auto-delete: failed to delete torrent %s (%s): %v", t.ID, t.Filename, err)
-					continue
-				}
-				log.Printf("Auto-delete: deleted torrent %s (%s), added on %s", t.ID, t.Filename, t.Added.Format("2006-01-02"))
-				totalDeleted++
-
-				// Log the deletion to the DB for auditing (use system user ID 0)
-				if err := b.torrentRepo.LogTorrentActivity(ctx, 0, 0, t.ID, t.Hash, t.Filename, "", "delete", "auto_deleted", t.Bytes, t.Progress, true, "", map[string]interface{}{"auto_delete_days": days}); err != nil {
-					log.Printf("Auto-delete: failed to log torrent deletion: %v", err)
-				}
+				oldTorrents = append(oldTorrents, t)
 			}
 		}
 
@@ -180,6 +172,20 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 		}
 
 		offset += batchSize
+	}
+
+	for _, t := range oldTorrents {
+		if err := b.rdClient.DeleteTorrent(t.ID); err != nil {
+			log.Printf("Auto-delete: failed to delete torrent %s (%s): %v", t.ID, t.Filename, err)
+			continue
+		}
+		log.Printf("Auto-delete: deleted torrent %s (%s), added on %s", t.ID, t.Filename, t.Added.Format("2006-01-02"))
+		totalDeleted++
+
+		// Log the deletion to the DB for auditing (use system user ID 0)
+		if err := b.torrentRepo.LogTorrentActivity(ctx, 0, 0, t.ID, t.Hash, t.Filename, "", "delete", "auto_deleted", t.Bytes, t.Progress, true, "", map[string]interface{}{"auto_delete_days": days}); err != nil {
+			log.Printf("Auto-delete: failed to log torrent deletion: %v", err)
+		}
 	}
 
 	if totalDeleted > 0 {

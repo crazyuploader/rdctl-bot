@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/crazyuploader/rdctl-bot/internal/config"
@@ -36,6 +37,7 @@ type Bot struct {
 	commandRepo    *db.CommandRepository
 	settingRepo    *db.SettingRepository
 	tokenStore     *web.TokenStore
+	wg             sync.WaitGroup
 }
 
 // NewBot creates and returns a fully configured Bot.
@@ -128,7 +130,11 @@ func (b *Bot) Start(ctx context.Context) error {
 	b.registerHandlers()
 
 	// Start auto-delete background worker
-	go b.startAutoDeleteWorker(ctx)
+	b.wg.Add(1)
+	go func() {
+		defer b.wg.Done()
+		b.startAutoDeleteWorker(ctx)
+	}()
 
 	log.Println("Bot started. Waiting for messages...")
 	b.api.Start(ctx)
@@ -161,6 +167,10 @@ func (b *Bot) registerHandlers() {
 // Stop gracefully stops the bot and closes the database connection
 func (b *Bot) Stop() {
 	log.Println("Bot stopping...")
+
+	// Wait for background workers to finish
+	b.wg.Wait()
+
 	if err := db.Close(b.db); err != nil {
 		log.Printf("Error closing database: %v", err)
 	}

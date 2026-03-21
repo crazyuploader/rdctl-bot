@@ -301,5 +301,10 @@ func (r *SettingRepository) SetSetting(ctx context.Context, key, value string) e
 		Key:   key,
 		Value: value,
 	}
-	return r.db.WithContext(ctx).Save(&setting).Error
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "key"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"value": value,
+		}),
+	}).Create(&setting).Error
 }
