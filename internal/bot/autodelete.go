@@ -140,6 +140,14 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 		return
 	}
 
+	// Get kept torrent IDs to skip them during deletion
+	keptTorrentIDs, err := b.keptRepo.GetKeptTorrentIDs(ctx)
+	if err != nil {
+		log.Printf("Auto-delete: failed to get kept torrent IDs: %v", err)
+		// Continue anyway, but we won't be able to skip kept torrents
+		keptTorrentIDs = make(map[string]bool)
+	}
+
 	cutoff := time.Now().UTC().AddDate(0, 0, -days)
 	log.Printf("Auto-delete: checking for torrents older than %d days (before %s)", days, cutoff.Format("2006-01-02 15:04"))
 
@@ -148,6 +156,7 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 	offset := 0
 	var oldTorrents []realdebrid.Torrent
 	totalDeleted := 0
+	totalSkipped := 0
 
 	for {
 		torrents, err := b.rdClient.GetTorrents(batchSize, offset)
@@ -161,6 +170,12 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 		}
 
 		for _, t := range torrents {
+			// Skip if torrent is marked as kept
+			if keptTorrentIDs[t.ID] {
+				totalSkipped++
+				continue
+			}
+
 			if t.Added.Before(cutoff) {
 				oldTorrents = append(oldTorrents, t)
 			}
@@ -190,5 +205,8 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 
 	if totalDeleted > 0 {
 		log.Printf("Auto-delete: completed, deleted %d torrent(s)", totalDeleted)
+	}
+	if totalSkipped > 0 {
+		log.Printf("Auto-delete: skipped %d kept torrent(s)", totalSkipped)
 	}
 }

@@ -158,3 +158,16 @@ type Setting struct {
 func (Setting) TableName() string {
 	return "settings"
 }
+
+// KeptTorrent represents a torrent that a user has marked to be kept (excluded from auto-delete)
+type KeptTorrent struct {
+	ID        uint   `gorm:"primaryKey"`
+	TorrentID string `gorm:"uniqueIndex;not null"` // Real-Debrid torrent ID
+	Filename  string
+	KeptByID  int64     `gorm:"index;not null"` // Telegram user ID who kept it
+	KeptAt    time.Time `gorm:"not null"`
+}
+
+func (KeptTorrent) TableName() string {
+	return "kept_torrents"
+}

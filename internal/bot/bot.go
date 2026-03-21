@@ -36,6 +36,7 @@ type Bot struct {
 	downloadRepo   *db.DownloadRepository
 	commandRepo    *db.CommandRepository
 	settingRepo    *db.SettingRepository
+	keptRepo       *db.KeptTorrentRepository
 	tokenStore     *web.TokenStore
 	wg             sync.WaitGroup
 }
@@ -122,6 +123,7 @@ func NewBot(cfg *config.Config, database *gorm.DB, proxyURL, ipTestURL, ipVerify
 		downloadRepo:   db.NewDownloadRepository(database),
 		commandRepo:    db.NewCommandRepository(database),
 		settingRepo:    db.NewSettingRepository(database),
+		keptRepo:       db.NewKeptTorrentRepository(database),
 	}, nil
 }
 
@@ -157,6 +159,8 @@ func (b *Bot) registerHandlers() {
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/status", bot.MatchTypeExact, b.handleStatusCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/dashboard", bot.MatchTypeExact, b.handleDashboardCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/autodelete", bot.MatchTypePrefix, b.handleAutoDeleteCommand)
+	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/keep", bot.MatchTypePrefix, b.handleKeepCommand)
+	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/unkeep", bot.MatchTypePrefix, b.handleUnkeepCommand)
 
 	// Message handlers for links
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "magnet:?", bot.MatchTypeContains, b.handleMagnetLink)

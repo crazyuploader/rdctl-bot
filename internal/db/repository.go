@@ -308,3 +308,71 @@ func (r *SettingRepository) SetSetting(ctx context.Context, key, value string) e
 		}),
 	}).Create(&setting).Error
 }
+
+// KeptTorrentRepository handles kept torrent operations
+type KeptTorrentRepository struct {
+	db *gorm.DB
+}
+
+// NewKeptTorrentRepository creates a new KeptTorrentRepository backed by the provided gorm.DB.
+func NewKeptTorrentRepository(db *gorm.DB) *KeptTorrentRepository {
+	return &KeptTorrentRepository{db: db}
+}
+
+// KeepTorrent marks a torrent as kept (excluded from auto-delete)
+func (r *KeptTorrentRepository) KeepTorrent(ctx context.Context, torrentID, filename string, keptByID int64) error {
+	keptTorrent := KeptTorrent{
+		TorrentID: torrentID,
+		Filename:  filename,
+		KeptByID:  keptByID,
+		KeptAt:    time.Now().UTC(),
+	}
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "torrent_id"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"filename":   filename,
+			"kept_by_id": keptByID,
+			"kept_at":    time.Now().UTC(),
+		}),
+	}).Create(&keptTorrent).Error
+}
+
+// UnkeepTorrent removes the keep mark from a torrent
+func (r *KeptTorrentRepository) UnkeepTorrent(ctx context.Context, torrentID string) error {
+	return r.db.WithContext(ctx).Where("torrent_id = ?", torrentID).Delete(&KeptTorrent{}).Error
+}
+
+// IsKept checks if a torrent is marked as kept
+func (r *KeptTorrentRepository) IsKept(ctx context.Context, torrentID string) (bool, error) {
+	var keptTorrent KeptTorrent
+	err := r.db.WithContext(ctx).Where("torrent_id = ?", torrentID).First(&keptTorrent).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// GetKeptTorrentIDs returns a map of all kept torrent IDs for quick lookup
+func (r *KeptTorrentRepository) GetKeptTorrentIDs(ctx context.Context) (map[string]bool, error) {
+	var keptTorrents []KeptTorrent
+	err := r.db.WithContext(ctx).Find(&keptTorrents).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]bool)
+	for _, kt := range keptTorrents {
+		result[kt.TorrentID] = true
+	}
+	return result, nil
+}
+
+// ListKeptTorrents returns all kept torrents with details
+func (r *KeptTorrentRepository) ListKeptTorrents(ctx context.Context) ([]KeptTorrent, error) {
+	var keptTorrents []KeptTorrent
+	err := r.db.WithContext(ctx).Order("kept_at DESC").Find(&keptTorrents).Error
+	return keptTorrents, err
+}

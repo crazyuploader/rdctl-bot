@@ -146,6 +146,12 @@ func runMigrations(db *gorm.DB) error {
 		return fmt.Errorf("failed to migrate settings table: %w", err)
 	}
 
+	// Step 5: Migrate KeptTorrent table (no dependencies)
+	log.Println("Migrating kept_torrents table...")
+	if err := db.AutoMigrate(&KeptTorrent{}); err != nil {
+		return fmt.Errorf("failed to migrate kept_torrents table: %w", err)
+	}
+
 	log.Println("All migrations completed successfully!")
 	return nil
 }

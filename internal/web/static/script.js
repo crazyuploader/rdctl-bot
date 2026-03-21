@@ -2,17 +2,42 @@ document.addEventListener("DOMContentLoaded", () => {
   checkLogin();
   setupEventListeners();
   setupTabs();
+  // Fetch kept torrents initially and set up interval to update
+  fetchKeptTorrents();
+  keptTorrentsInterval = setInterval(fetchKeptTorrents, 30000); // Update every 30 seconds
+
+  // Fetch auto-delete setting initially and set up interval to update
+  fetchAutoDeleteSetting();
+  autoDeleteInterval = setInterval(fetchAutoDeleteSetting, 30000); // Update every 30 seconds
+
+  // Add event listener for auto-delete save button
+  const saveBtn = document.getElementById("autodelete-save");
+  if (saveBtn) {
+    saveBtn.addEventListener("click", saveAutoDeleteSetting);
+  }
+
+  // Add event listener for auto-delete input (save on Enter key)
+  const inputEl = document.getElementById("autodelete-input");
+  if (inputEl) {
+    inputEl.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        saveAutoDeleteSetting();
+      }
+    });
+  }
 });
 
 const API_BASE_URL = "/api";
 let refreshIntervals = {};
 let userRole = null; // 'admin' or 'viewer'
 let isAdmin = false;
+let keptTorrentsInterval = null; // Interval for updating kept torrents
 
 // Cache for filtering
 let cachedTorrents = [];
 let cachedDownloads = [];
 let activeTab = "all";
+let keptTorrentIds = new Set(); // Set of kept torrent IDs
 
 // --- Auth & Init ---
 
@@ -445,6 +470,48 @@ function showToast(message, type = "success") {
 
 // --- Fetch Data ---
 
+async function fetchKeptTorrents() {
+  try {
+    const result = await apiFetch(`${API_BASE_URL}/kept-torrents`);
+    const keptTorrents = result.data || [];
+
+    // Update the kept torrent IDs set
+    keptTorrentIds.clear();
+    keptTorrents.forEach((t) => {
+      keptTorrentIds.add(t.torrent_id);
+    });
+
+    // Re-render torrents to update shield icons
+    renderTorrents();
+  } catch (error) {
+    console.error("Error fetching kept torrents:", error);
+    // Don't show toast for this as it's a background update
+  }
+}
+
+async function fetchAutoDeleteSetting() {
+  try {
+    const result = await apiFetch(`${API_BASE_URL}/settings/autodelete`);
+    const value = result.data || "0";
+
+    // Update UI
+    const valueEl = document.getElementById("autodelete-value");
+    const inputEl = document.getElementById("autodelete-input");
+    const settingsEl = document.getElementById("autodelete-settings");
+
+    if (valueEl) valueEl.textContent = value;
+    if (inputEl) inputEl.value = value;
+
+    // Show settings panel if user is admin
+    if (settingsEl && isAdmin) {
+      settingsEl.classList.remove("hidden");
+    }
+  } catch (error) {
+    console.error("Error fetching auto-delete setting:", error);
+    // Don't show toast for this as it's a background update
+  }
+}
+
 async function fetchStatus() {
   try {
     const result = await apiFetch(`${API_BASE_URL}/status`);
@@ -723,6 +790,65 @@ async function deleteSelectedTorrents() {
   }
 }
 
+// Toggle keep/unkeep status for a torrent
+async function toggleKeep(torrentId, filename) {
+  try {
+    if (keptTorrentIds.has(torrentId)) {
+      // Currently kept, so unkeep it
+      await apiFetch(`${API_BASE_URL}/torrents/${torrentId}/keep`, {
+        method: "DELETE",
+      });
+      keptTorrentIds.delete(torrentId);
+      showToast(`Torrent "${filename}" is no longer kept`, "success");
+    } else {
+      // Not kept, so keep it
+      await apiFetch(`${API_BASE_URL}/torrents/${torrentId}/keep`, {
+        method: "POST",
+      });
+      keptTorrentIds.add(torrentId);
+      showToast(`Torrent "${filename}" is now kept`, "success");
+    }
+
+    // Re-render to update the button
+    renderTorrents();
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+// Save auto-delete setting
+async function saveAutoDeleteSetting() {
+  const inputEl = document.getElementById("autodelete-input");
+  if (!inputEl) return;
+
+  const value = inputEl.value.trim();
+  if (value === "") {
+    showToast("Please enter a valid number of days", "error");
+    return;
+  }
+
+  const days = parseInt(value);
+  if (isNaN(days) || days < 0) {
+    showToast("Please enter a valid number of days (0 or greater)", "error");
+    return;
+  }
+
+  try {
+    await apiFetch(`${API_BASE_URL}/settings/autodelete`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ value }),
+    });
+    showToast("Auto-delete setting saved successfully", "success");
+
+    // Update the display
+    const valueEl = document.getElementById("autodelete-value");
+    if (valueEl) valueEl.textContent = value;
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
 function renderTorrents(filterText = null, preserveSelection = false) {
   const list = document.getElementById("torrents-list");
   const countBadge = document.getElementById("torrents-count");
@@ -815,40 +941,48 @@ function renderTorrents(filterText = null, preserveSelection = false) {
       const addedDate = t.added ? new Date(t.added).toLocaleDateString() : "";
 
       return `
-        <div class="group relative glass-effect border ${
-          isSelected ? "border-blue-500 bg-blue-500/5" : "border-slate-700/50"
-        } rounded-xl p-4 hover:border-blue-500/40 transition-all duration-200">
-          <div class="flex justify-between items-start gap-3 mb-3">
-             <!-- Selection Checkbox -->
-             ${
-               isAdmin
-                 ? `
-             <div class="pt-1 cursor-pointer" onclick="event.stopPropagation(); toggleSelection('${
-               t.id
-             }')">
-                <div class="relative w-5 h-5 group/checkbox">
-                  <!-- Unchecked Circle -->
-                  <svg class="w-5 h-5 text-slate-500 transition-all duration-200 group-hover/checkbox:text-blue-400 group-hover/checkbox:scale-110 ${
-                    isSelected ? "opacity-0" : "opacity-100"
-                  }" 
-                       fill="none" 
-                       stroke="currentColor" 
-                       viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="9" stroke-width="2"/>
-                  </svg>
-                  <!-- Checked Circle -->
-                  <svg class="w-5 h-5 absolute top-0 left-0 text-blue-500 transition-all duration-200 ${
-                    isSelected ? "opacity-100 scale-100" : "opacity-0 scale-50"
-                  }" 
-                       fill="currentColor" 
-                       viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                  </svg>
-                </div>
-             </div>
-             `
-                 : ""
-             }
+         <div class="group relative glass-effect border ${
+           isSelected ? "border-blue-500 bg-blue-500/5" : "border-slate-700/50"
+         } rounded-xl p-4 hover:border-blue-500/40 transition-all duration-200">
+           <div class="flex justify-between items-start gap-3 mb-3">
+              <!-- Selection Checkbox -->
+              ${
+                isAdmin
+                  ? `
+              <div class="pt-1 cursor-pointer" onclick="event.stopPropagation(); toggleSelection('${
+                t.id
+              }')">
+                 <div class="relative w-5 h-5 group/checkbox">
+                   <!-- Unchecked Circle -->
+                   <svg class="w-5 h-5 text-slate-500 transition-all duration-200 group-hover/checkbox:text-blue-400 group-hover/checkbox:scale-110 ${
+                     isSelected ? "opacity-0" : "opacity-100"
+                   }" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24">
+                     <circle cx="12" cy="12" r="9" stroke-width="2"/>
+                   </svg>
+                   <!-- Checked Circle -->
+                   <svg class="w-5 h-5 absolute top-0 left-0 text-blue-500 transition-all duration-200 ${
+                     isSelected ? "opacity-100 scale-100" : "opacity-0 scale-50"
+                   }" 
+                        fill="currentColor" 
+                        viewBox="0 0 24 24">
+                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                   </svg>
+                 </div>
+              </div>
+              `
+                  : ""
+              }
+              <!-- Keep/Unkeep Button -->
+              <button class="p-2 text-slate-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100" 
+                      onclick="event.stopPropagation(); toggleKeep('${
+                        t.id
+                      }', '${escapeHtml(t.filename)}')" 
+                      title="${keptTorrentIds.has(t.id) ? "Unkeep" : "Keep"}">
+                ${keptTorrentIds.has(t.id) ? "🛡️" : "🔓"}
+              </button>
 
             <div class="flex-1 min-w-0">
               <div class="text-sm font-semibold text-white break-all mb-1" title="${escapeHtml(

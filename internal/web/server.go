@@ -40,6 +40,8 @@ type Dependencies struct {
 	TorrentRepo  *db.TorrentRepository
 	DownloadRepo *db.DownloadRepository
 	CommandRepo  *db.CommandRepository
+	SettingRepo  *db.SettingRepository
+	KeptRepo     *db.KeptTorrentRepository
 	Config       *config.Config
 	TokenStore   *TokenStore
 }
@@ -182,10 +184,19 @@ func NewServer(deps Dependencies) *Server {
 	api.Get("/downloads", deps.GetDownloads)
 	api.Post("/unrestrict", deps.UnrestrictLink)
 	api.Get("/stats/user/:id", deps.GetUserStats)
+	api.Get("/kept-torrents", deps.GetKeptTorrents)
+
+	// Keep management - Admin only
+	api.Post("/torrents/:id/keep", AdminOnly(deps.TokenStore, ipManager), deps.KeepTorrent)
+	api.Delete("/torrents/:id/keep", AdminOnly(deps.TokenStore, ipManager), deps.UnkeepTorrent)
 
 	// Delete operations - Admin only
 	api.Delete("/torrents/:id", AdminOnly(deps.TokenStore, ipManager), deps.DeleteTorrent)
 	api.Delete("/downloads/:id", AdminOnly(deps.TokenStore, ipManager), deps.DeleteDownload)
+
+	// Settings - Admin only
+	api.Get("/settings/autodelete", deps.GetAutoDeleteSetting)
+	api.Put("/settings/autodelete", AdminOnly(deps.TokenStore, ipManager), deps.SetAutoDeleteSetting)
 
 	// Embed static files - Place this last to ensure API routes are matched first
 	// or properly fall through if not found.

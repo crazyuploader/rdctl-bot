@@ -56,6 +56,9 @@ func (b *Bot) handleHelpCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 			"• <code>/unrestrict &lt;link&gt;</code> — Unrestrict a hoster link\n" +
 			"• <code>/downloads</code> — List recent downloads\n" +
 			"• <code>/removelink &lt;id&gt;</code> — Remove a download from history <i>(superadmin only)</i>\n\n" +
+			"<b>🔒 Keep Management:</b>\n" +
+			"• <code>/keep &lt;id&gt;</code> — Mark a torrent as kept (excluded from auto-delete)\n" +
+			"• <code>/unkeep &lt;id&gt;</code> — Remove keep mark from a torrent\n\n" +
 			"<b>⚙️ General Commands:</b>\n" +
 			"• <code>/status</code> — Show your Real-Debrid account status\n" +
 			"• <code>/dashboard</code> — Get a temporary link to the web dashboard\n" +
@@ -811,4 +814,100 @@ func (b *Bot) logActivityHelper(ctx context.Context, user *db.User, chatID int64
 	if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, activityType, command, messageThreadID, success, errorMsg, metadata); err != nil {
 		log.Printf("Warning: failed to log activity %s: %v", activityType, err)
 	}
+}
+
+// handleKeepCommand handles the /keep command
+func (b *Bot) handleKeepCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
+		startTime := time.Now()
+		b.middleware.LogCommand(update, "keep")
+
+		parts := strings.Fields(update.Message.Text)
+		if len(parts) < 2 {
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, "<b>Usage:</b> /keep &lt;torrent_id&gt;", update.Message.ID)
+			if user != nil {
+				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "keep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, "Missing arguments", 0); err != nil {
+					log.Printf("Warning: failed to log keep missing args: %v", err)
+				}
+			}
+			return
+		}
+		torrentID := parts[1]
+
+		// Get torrent info for filename
+		torrent, err := b.rdClient.GetTorrentInfo(torrentID)
+		if err != nil {
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Could not retrieve torrent info: %s", html.EscapeString(err.Error())), update.Message.ID)
+			if user != nil {
+				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "keep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, err.Error(), 0); err != nil {
+					log.Printf("Warning: failed to log keep command error: %v", err)
+				}
+			}
+			return
+		}
+
+		// Mark torrent as kept
+		if err := b.keptRepo.KeepTorrent(ctx, torrentID, torrent.Filename, int64(user.ID)); err != nil {
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Failed to keep torrent: %s", html.EscapeString(err.Error())), update.Message.ID)
+			if user != nil {
+				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "keep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, err.Error(), 0); err != nil {
+					log.Printf("Warning: failed to log keep command error: %v", err)
+				}
+			}
+			return
+		}
+
+		b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[OK]</b> Torrent <code>%s</code> has been marked as kept and will be excluded from auto-delete.", html.EscapeString(torrentID)), update.Message.ID)
+
+		if user != nil {
+			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "keep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0); err != nil {
+				log.Printf("Warning: failed to log keep command success: %v", err)
+			}
+			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeCommandStart, "keep", messageThreadID, true, "", map[string]any{"torrent_id": torrentID}); err != nil {
+				log.Printf("Warning: failed to log keep command activity: %v", err)
+			}
+		}
+	})
+}
+
+// handleUnkeepCommand handles the /unkeep command
+func (b *Bot) handleUnkeepCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
+		startTime := time.Now()
+		b.middleware.LogCommand(update, "unkeep")
+
+		parts := strings.Fields(update.Message.Text)
+		if len(parts) < 2 {
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, "<b>Usage:</b> /unkeep &lt;torrent_id&gt;", update.Message.ID)
+			if user != nil {
+				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "unkeep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, "Missing arguments", 0); err != nil {
+					log.Printf("Warning: failed to log unkeep missing args: %v", err)
+				}
+			}
+			return
+		}
+		torrentID := parts[1]
+
+		// Remove keep mark from torrent
+		if err := b.keptRepo.UnkeepTorrent(ctx, torrentID); err != nil {
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Failed to unkeep torrent: %s", html.EscapeString(err.Error())), update.Message.ID)
+			if user != nil {
+				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "unkeep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, err.Error(), 0); err != nil {
+					log.Printf("Warning: failed to log unkeep command error: %v", err)
+				}
+			}
+			return
+		}
+
+		b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[OK]</b> Torrent <code>%s</code> is no longer marked as kept and will be subject to auto-delete.", html.EscapeString(torrentID)), update.Message.ID)
+
+		if user != nil {
+			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "unkeep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0); err != nil {
+				log.Printf("Warning: failed to log unkeep command success: %v", err)
+			}
+			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeCommandStart, "unkeep", messageThreadID, true, "", map[string]any{"torrent_id": torrentID}); err != nil {
+				log.Printf("Warning: failed to log unkeep command activity: %v", err)
+			}
+		}
+	})
 }
