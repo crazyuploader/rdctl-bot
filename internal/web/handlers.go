@@ -271,7 +271,13 @@ func (d *Dependencies) UnkeepTorrent(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Torrent ID is required")
 	}
 
-	if err := d.KeptRepo.UnkeepTorrent(c.Context(), id); err != nil {
+	// Get user ID from token or context
+	userID := int64(0)
+	if token := GetToken(c); token != nil {
+		userID = token.UserID
+	}
+
+	if err := d.KeptRepo.UnkeepTorrent(c.Context(), id, userID); err != nil {
 		return err
 	}
 

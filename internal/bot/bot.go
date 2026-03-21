@@ -269,7 +269,7 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 		b.middleware.LogUnauthorized(username, chatID, userID)
 		b.sendUnauthorizedMessage(ctx, chatID, messageThreadID, userID)
 		if user != nil {
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil); err != nil {
+			if err := b.activityRepo.LogActivity(ctx, "", user.ID, chatID, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil); err != nil {
 				log.Printf("Warning: failed to log unauthorized activity: %v", err)
 			}
 		}

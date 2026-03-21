@@ -536,7 +536,7 @@ async function fetchAutoDeleteSetting() {
     const days = parseInt(daysStr, 10);
     const valueEl = document.getElementById("autodelete-value");
     const inputEl = document.getElementById("autodelete-input");
-    
+
     if (!isNaN(days) && days > 0) {
       valueEl.textContent = `${days}\u00a0${days === 1 ? "day" : "days"}`;
       if (inputEl) inputEl.value = days;

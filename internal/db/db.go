@@ -152,6 +152,17 @@ func runMigrations(db *gorm.DB) error {
 		return fmt.Errorf("failed to migrate kept_torrents table: %w", err)
 	}
 
+	// Step 6: Migrate Action/Audit tables
+	log.Println("Migrating kept_torrent_actions table...")
+	if err := db.AutoMigrate(&KeptTorrentAction{}); err != nil {
+		return fmt.Errorf("failed to migrate kept_torrent_actions table: %w", err)
+	}
+
+	log.Println("Migrating setting_audits table...")
+	if err := db.AutoMigrate(&SettingAudit{}); err != nil {
+		return fmt.Errorf("failed to migrate setting_audits table: %w", err)
+	}
+
 	log.Println("All migrations completed successfully!")
 	return nil
 }

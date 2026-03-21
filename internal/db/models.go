@@ -49,8 +49,9 @@ const (
 // ActivityLog is the main activity logging table
 type ActivityLog struct {
 	ID              uint         `gorm:"primaryKey"`
-	UserID          uint         `gorm:"index;not null"`
-	ChatID          int64        `gorm:"index;not null"`
+	RequestID       string       `gorm:"index"` // Correlation ID for request tracing
+	UserID          uint         `gorm:"index:idx_user_created;not null"`
+	ChatID          int64        `gorm:"index:idx_chat_created;not null"`
 	Username        string       `gorm:"index"`
 	ActivityType    ActivityType `gorm:"index;not null"`
 	Command         string       `gorm:"index"`
@@ -58,32 +59,31 @@ type ActivityLog struct {
 	Success         bool      `gorm:"default:true"`
 	ErrorMessage    string    `gorm:"type:text"`
 	Metadata        string    `gorm:"type:json"` // Store additional data as JSON
-	CreatedAt       time.Time `gorm:"index"`
+	CreatedAt       time.Time `gorm:"index:idx_user_created;index:idx_chat_created;not null"`
 
-	// Relationships
 	User User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 }
 
 // TorrentActivity tracks torrent-specific activities
 type TorrentActivity struct {
 	ID            uint   `gorm:"primaryKey"`
-	UserID        uint   `gorm:"index;not null"`
+	RequestID     string `gorm:"index"` // Correlation ID for request tracing
+	UserID        uint   `gorm:"index:idx_torrent_user_action;not null"`
 	ChatID        int64  `gorm:"index;not null"`
 	TorrentID     string `gorm:"index;not null"`
 	TorrentHash   string `gorm:"index"`
 	TorrentName   string
 	MagnetLink    string `gorm:"type:text"`
-	Action        string `gorm:"index;not null"` // add, delete, info, select_files
+	Action        string `gorm:"index:idx_torrent_user_action;not null"` // add, delete, info, select_files
 	Status        string
 	FileSize      int64
 	Progress      float64
 	Success       bool      `gorm:"default:true"`
 	ErrorMessage  string    `gorm:"type:text"`
 	Metadata      string    `gorm:"type:json;default:'{}'"`
-	CreatedAt     time.Time `gorm:"index"`
+	CreatedAt     time.Time `gorm:"index;not null"`
 	SelectedFiles string    `gorm:"type:json;not null;default:'[]'"` // Stores selected files as JSON array
 
-	// Relationships
 	User               User               `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 	DownloadActivities []DownloadActivity `gorm:"foreignKey:TorrentActivityID"`
 }
@@ -91,21 +91,21 @@ type TorrentActivity struct {
 // DownloadActivity tracks download/unrestrict activities
 type DownloadActivity struct {
 	ID                uint   `gorm:"primaryKey"`
-	UserID            uint   `gorm:"index;not null"`
+	RequestID         string `gorm:"index"` // Correlation ID for request tracing
+	UserID            uint   `gorm:"index:idx_download_user_action;not null"`
 	ChatID            int64  `gorm:"index;not null"`
 	DownloadID        string `gorm:"index"`
 	OriginalLink      string `gorm:"type:text"`
 	FileName          string
 	FileSize          int64
 	Host              string    `gorm:"index"`
-	Action            string    `gorm:"index;not null"` // unrestrict, list, delete
+	Action            string    `gorm:"index:idx_download_user_action;not null"` // unrestrict, list, delete
 	Success           bool      `gorm:"default:true"`
 	ErrorMessage      string    `gorm:"type:text"`
 	Metadata          string    `gorm:"type:json"`
-	CreatedAt         time.Time `gorm:"index"`
+	CreatedAt         time.Time `gorm:"index;not null"`
 	TorrentActivityID *uint     `gorm:"index"` // Links to originating torrent activity
 
-	// Relationships
 	User            User             `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 	TorrentActivity *TorrentActivity `gorm:"foreignKey:TorrentActivityID;constraint:OnDelete:SET NULL"`
 }
@@ -172,4 +172,35 @@ type KeptTorrent struct {
 
 func (KeptTorrent) TableName() string {
 	return "kept_torrents"
+}
+
+// KeptTorrentAction tracks keep/unkeep actions on torrents
+type KeptTorrentAction struct {
+	ID        uint      `gorm:"primaryKey"`
+	TorrentID string    `gorm:"index;not null"`
+	Action    string    `gorm:"index;not null"` // "keep" or "unkeep"
+	UserID    uint      `gorm:"index;not null"`
+	Username  string    `gorm:"index"`
+	CreatedAt time.Time `gorm:"index;not null"`
+
+	User User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+}
+
+func (KeptTorrentAction) TableName() string {
+	return "kept_torrent_actions"
+}
+
+// SettingAudit tracks changes to settings
+type SettingAudit struct {
+	ID        uint   `gorm:"primaryKey"`
+	Key       string `gorm:"index;not null"`
+	OldValue  string
+	NewValue  string
+	ChangedBy int64     `gorm:"index;not null"` // User who made change
+	ChatID    int64     `gorm:"index"`          // Chat where change was made
+	ChangedAt time.Time `gorm:"index;not null"`
+}
+
+func (SettingAudit) TableName() string {
+	return "setting_audits"
 }
