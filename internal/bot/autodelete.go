@@ -196,16 +196,56 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 	}
 
 	for _, t := range oldTorrents {
-		if err := b.rdClient.DeleteTorrent(t.ID); err != nil {
-			log.Printf("Auto-delete: failed to delete torrent %s (%s): %v", t.ID, t.Filename, err)
+		// Retry deletion with exponential backoff for transient errors
+		var deleteErr error
+		maxRetries := 3
+		baseDelay := 1 * time.Second
+
+		for attempt := 0; attempt < maxRetries; attempt++ {
+			deleteErr = b.rdClient.DeleteTorrent(t.ID)
+			if deleteErr == nil {
+				// Success - break out of retry loop
+				break
+			}
+
+			// Check if error is retryable (rate limit or server error)
+			errStr := deleteErr.Error()
+			isRetryable := strings.Contains(errStr, "429") ||
+						   strings.Contains(errStr, "500") ||
+						   strings.Contains(errStr, "502") ||
+						   strings.Contains(errStr, "503") ||
+						   strings.Contains(errStr, "504")
+
+			if !isRetryable || attempt == maxRetries-1 {
+				// Not retryable or last attempt - break
+				break
+			}
+
+			// Exponential backoff: wait 1s, 2s, 4s...
+			backoffDelay := baseDelay * time.Duration(1<<uint(attempt))
+			log.Printf("Auto-delete: retry %d/%d for torrent %s after error: %v (waiting %v)",
+				attempt+1, maxRetries, t.ID, deleteErr, backoffDelay)
+			time.Sleep(backoffDelay)
+		}
+
+		if deleteErr != nil {
+			log.Printf("Auto-delete: failed to delete torrent %s (%s) after %d attempts: %v",
+				t.ID, t.Filename, maxRetries, deleteErr)
 			continue
 		}
+
 		log.Printf("Auto-delete: deleted torrent %s (%s), added on %s", t.ID, t.Filename, t.Added.Format("2006-01-02"))
 		totalDeleted++
 
 		// Log the deletion to the DB for auditing (use system user ID)
 		if err := b.torrentRepo.LogTorrentActivity(ctx, b.systemUserID, 0, t.ID, t.Hash, t.Filename, "", "delete", "auto_deleted", t.Bytes, t.Progress, true, "", map[string]interface{}{"auto_delete_days": days}); err != nil {
 			log.Printf("Auto-delete: failed to log torrent deletion: %v", err)
+		}
+
+		// Add a small delay between successful deletes to avoid rate limiting
+		// Skip delay on the last torrent
+		if totalDeleted < len(oldTorrents) {
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 
