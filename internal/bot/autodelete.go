@@ -220,7 +220,7 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 		offset += batchSize
 	}
 
-	for _, t := range oldTorrents {
+	for i, t := range oldTorrents {
 		// Retry deletion with exponential backoff for transient errors
 		var deleteErr error
 		maxRetries := 3
@@ -269,7 +269,7 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 
 		// Add a small delay between successful deletes to avoid rate limiting
 		// Skip delay on the last torrent
-		if totalDeleted < len(oldTorrents) {
+		if i != len(oldTorrents)-1 {
 			time.Sleep(500 * time.Millisecond)
 		}
 	}

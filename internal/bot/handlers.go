@@ -907,7 +907,7 @@ func (b *Bot) handleKeepCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "keep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0); err != nil {
 				log.Printf("Warning: failed to log keep command success: %v", err)
 			}
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeCommandStart, "keep", messageThreadID, true, "", map[string]any{"torrent_id": torrentID}); err != nil {
+			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeTorrentKeep, "keep", messageThreadID, true, "", map[string]any{"torrent_id": torrentID}); err != nil {
 				log.Printf("Warning: failed to log keep command activity: %v", err)
 			}
 		}
@@ -973,7 +973,7 @@ func (b *Bot) handleUnkeepCommand(ctx context.Context, tgBot *bot.Bot, update *m
 			if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "unkeep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0); err != nil {
 				log.Printf("Warning: failed to log unkeep command success: %v", err)
 			}
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeCommandStart, "unkeep", messageThreadID, true, "", map[string]any{"torrent_id": torrentID}); err != nil {
+			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, user.Username, db.ActivityTypeTorrentUnkeep, "unkeep", messageThreadID, true, "", map[string]any{"torrent_id": torrentID}); err != nil {
 				log.Printf("Warning: failed to log unkeep command activity: %v", err)
 			}
 		}

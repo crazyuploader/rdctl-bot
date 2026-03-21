@@ -40,6 +40,8 @@ const (
 	ActivityTypeMagnetLink         ActivityType = "magnet_link"
 	ActivityTypeHosterLink         ActivityType = "hoster_link"
 	ActivityTypeCommandDashboard   ActivityType = "command_dashboard"
+	ActivityTypeTorrentKeep        ActivityType = "torrent_keep"
+	ActivityTypeTorrentUnkeep      ActivityType = "torrent_unkeep"
 	ActivityTypeUnauthorized       ActivityType = "unauthorized"
 	ActivityTypeError              ActivityType = "error"
 )
