@@ -862,7 +862,7 @@ func (b *Bot) handleKeepCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 
 		// Check kept torrent limit for non-admins
 		if !isSuperAdmin && b.config.App.MaxKeptTorrents > 0 {
-			currentCount, err := b.keptRepo.CountKeptByUser(ctx, int64(user.ID))
+			currentCount, err := b.keptRepo.CountKeptByUser(ctx, int64(user.UserID))
 			if err != nil {
 				b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Failed to check kept torrent count: %s", html.EscapeString(err.Error())), update.Message.ID)
 				return
@@ -891,7 +891,7 @@ func (b *Bot) handleKeepCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		}
 
 		// Mark torrent as kept
-		if err := b.keptRepo.KeepTorrent(ctx, torrentID, torrent.Filename, int64(user.ID)); err != nil {
+		if err := b.keptRepo.KeepTorrent(ctx, torrentID, torrent.Filename, int64(user.UserID)); err != nil {
 			b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Failed to keep torrent: %s", html.EscapeString(err.Error())), update.Message.ID)
 			if user != nil {
 				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "keep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, err.Error(), 0); err != nil {
