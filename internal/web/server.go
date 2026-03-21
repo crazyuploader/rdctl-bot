@@ -195,7 +195,7 @@ func NewServer(deps Dependencies) *Server {
 	api.Delete("/downloads/:id", AdminOnly(deps.TokenStore, ipManager), deps.DeleteDownload)
 
 	// Settings - Admin only
-	api.Get("/settings/autodelete", deps.GetAutoDeleteSetting)
+	api.Get("/settings/autodelete", AdminOnly(deps.TokenStore, ipManager), deps.GetAutoDeleteSetting)
 	api.Put("/settings/autodelete", AdminOnly(deps.TokenStore, ipManager), deps.SetAutoDeleteSetting)
 
 	// Embed static files - Place this last to ensure API routes are matched first

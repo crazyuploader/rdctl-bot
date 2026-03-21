@@ -21,6 +21,9 @@ const (
 
 	// autoDeleteCheckInterval defines how often the worker checks for old torrents
 	autoDeleteCheckInterval = 1 * time.Hour
+
+	// maxAutoDeleteDays is the maximum allowed value for auto-delete days
+	maxAutoDeleteDays = 3650
 )
 
 // handleAutoDeleteCommand handles the /autodelete command (superadmin only)
@@ -73,8 +76,8 @@ func (b *Bot) handleAutoDeleteCommand(ctx context.Context, tgBot *bot.Bot, updat
 		// Parse the days argument
 		daysStr := parts[1]
 		days, err := strconv.Atoi(daysStr)
-		if err != nil || days < 0 {
-			b.sendHTMLMessage(ctx, chatID, messageThreadID, "<b>[ERROR]</b> Please provide a valid number of days (0 to disable).", update.Message.ID)
+		if err != nil || days < 0 || days > maxAutoDeleteDays {
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Please provide a valid number of days (0 to %d).", maxAutoDeleteDays), update.Message.ID)
 			b.logCommandHelper(ctx, user, chatID, messageThreadID, "autodelete", update.Message.Text, startTime, false, "Invalid days value", 0)
 			return
 		}
@@ -111,6 +114,9 @@ func (b *Bot) startAutoDeleteWorker(ctx context.Context) {
 	defer ticker.Stop()
 
 	log.Println("Auto-delete worker started (checking every hour)")
+
+	// Run first check immediately on startup
+	b.runAutoDeleteCheck(ctx)
 
 	for {
 		select {
