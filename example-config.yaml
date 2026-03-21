@@ -51,7 +51,7 @@ web:
   token_expiry_minutes: 60 # Token validity duration
   limiter:
     enabled: true # Recommended: Set to true to enable rate limiting
-    max: 3 # Max requests per expiration period (strict 3 RPS recommended)
+    max: 20 # Max requests per expiration period (allows for dashboard page loads and auto-refresh)
     expiration_seconds: 1 # Expiration period in seconds
 
     # Security: IP Banning Settings
