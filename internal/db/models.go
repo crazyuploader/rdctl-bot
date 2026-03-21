@@ -8,8 +8,8 @@ import (
 
 // Chat represents a Telegram chat (private, group, supergroup, channel)
 type Chat struct {
-	ID        uint      `gorm:"primaryKey"`
-	ChatID    int64     `gorm:"uniqueIndex;not null"`
+	ID        uint  `gorm:"primaryKey"`
+	ChatID    int64 `gorm:"uniqueIndex;not null"`
 	Title     string
 	Type      string
 	CreatedAt time.Time
@@ -186,7 +186,7 @@ type KeptTorrent struct {
 	Filename  string
 	KeptByID  int64     `gorm:"index;not null"` // Telegram user ID who kept it
 	KeptAt    time.Time `gorm:"not null"`
-	
+
 	User User `gorm:"foreignKey:KeptByID;references:UserID;constraint:OnDelete:CASCADE"`
 }
 
