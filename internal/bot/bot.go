@@ -39,6 +39,8 @@ type Bot struct {
 	keptRepo       *db.KeptTorrentRepository
 	tokenStore     *web.TokenStore
 	wg             sync.WaitGroup
+	cancel         context.CancelFunc
+	systemUserID   uint
 }
 
 // NewBot creates and returns a fully configured Bot.
@@ -110,7 +112,7 @@ func NewBot(cfg *config.Config, database *gorm.DB, proxyURL, ipTestURL, ipVerify
 		log.Printf("Loaded %d supported host regexes", len(supportedRegex))
 	}
 
-	return &Bot{
+	b := &Bot{
 		api:            api,
 		rdClient:       rdClient,
 		middleware:     middleware,
@@ -124,22 +126,35 @@ func NewBot(cfg *config.Config, database *gorm.DB, proxyURL, ipTestURL, ipVerify
 		commandRepo:    db.NewCommandRepository(database),
 		settingRepo:    db.NewSettingRepository(database),
 		keptRepo:       db.NewKeptTorrentRepository(database),
-	}, nil
+	}
+
+	// Create or retrieve system user for automated operations
+	systemUser, err := b.userRepo.GetOrCreateUser(context.Background(), 0, "system", "System", "Bot", false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create system user: %w", err)
+	}
+	b.systemUserID = systemUser.ID
+
+	return b, nil
 }
 
 // Start begins processing updates
 func (b *Bot) Start(ctx context.Context) error {
 	b.registerHandlers()
 
+	// Create a cancellable context for the bot's lifecycle
+	botCtx, cancel := context.WithCancel(ctx)
+	b.cancel = cancel
+
 	// Start auto-delete background worker
 	b.wg.Add(1)
 	go func() {
 		defer b.wg.Done()
-		b.startAutoDeleteWorker(ctx)
+		b.startAutoDeleteWorker(botCtx)
 	}()
 
 	log.Println("Bot started. Waiting for messages...")
-	b.api.Start(ctx)
+	b.api.Start(botCtx)
 	return nil
 }
 
@@ -171,6 +186,11 @@ func (b *Bot) registerHandlers() {
 // Stop gracefully stops the bot and closes the database connection
 func (b *Bot) Stop() {
 	log.Println("Bot stopping...")
+
+	// Cancel the bot context to signal all workers to stop
+	if b.cancel != nil {
+		b.cancel()
+	}
 
 	// Wait for background workers to finish
 	b.wg.Wait()

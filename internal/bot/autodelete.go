@@ -203,8 +203,8 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 		log.Printf("Auto-delete: deleted torrent %s (%s), added on %s", t.ID, t.Filename, t.Added.Format("2006-01-02"))
 		totalDeleted++
 
-		// Log the deletion to the DB for auditing (use system user ID 0)
-		if err := b.torrentRepo.LogTorrentActivity(ctx, 0, 0, t.ID, t.Hash, t.Filename, "", "delete", "auto_deleted", t.Bytes, t.Progress, true, "", map[string]interface{}{"auto_delete_days": days}); err != nil {
+		// Log the deletion to the DB for auditing (use system user ID)
+		if err := b.torrentRepo.LogTorrentActivity(ctx, b.systemUserID, 0, t.ID, t.Hash, t.Filename, "", "delete", "auto_deleted", t.Bytes, t.Progress, true, "", map[string]interface{}{"auto_delete_days": days}); err != nil {
 			log.Printf("Auto-delete: failed to log torrent deletion: %v", err)
 		}
 	}

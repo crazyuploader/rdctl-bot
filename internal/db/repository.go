@@ -297,14 +297,17 @@ func (r *SettingRepository) GetSetting(ctx context.Context, key string) (string,
 
 // SetSetting creates or updates a setting value by key.
 func (r *SettingRepository) SetSetting(ctx context.Context, key, value string) error {
+	now := time.Now().UTC()
 	setting := Setting{
-		Key:   key,
-		Value: value,
+		Key:       key,
+		Value:     value,
+		UpdatedAt: now,
 	}
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "key"}},
 		DoUpdates: clause.Assignments(map[string]interface{}{
-			"value": value,
+			"value":      value,
+			"updated_at": now,
 		}),
 	}).Create(&setting).Error
 }
