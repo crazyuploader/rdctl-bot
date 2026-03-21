@@ -26,6 +26,7 @@ app:
   rate_limit:
     messages_per_second: 25 # Stay under Telegram's 30/s limit
     burst: 5
+  max_kept_torrents: 10 # Max kept torrents per non-admin user (0 = unlimited, admins always have unlimited)
 
 database:
   # Database host

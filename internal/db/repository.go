@@ -373,9 +373,27 @@ func (r *KeptTorrentRepository) GetKeptTorrentIDs(ctx context.Context) (map[stri
 	return result, nil
 }
 
-// ListKeptTorrents returns all kept torrents with details
-func (r *KeptTorrentRepository) ListKeptTorrents(ctx context.Context) ([]KeptTorrent, error) {
-	var keptTorrents []KeptTorrent
-	err := r.db.WithContext(ctx).Order("kept_at DESC").Find(&keptTorrents).Error
-	return keptTorrents, err
+// KeptTorrentWithUser represents a kept torrent with user information
+type KeptTorrentWithUser struct {
+	KeptTorrent
+	KeptByUsername string
+}
+
+// ListKeptTorrents returns all kept torrents with user details
+func (r *KeptTorrentRepository) ListKeptTorrents(ctx context.Context) ([]KeptTorrentWithUser, error) {
+	var results []KeptTorrentWithUser
+	err := r.db.WithContext(ctx).
+		Table("kept_torrents").
+		Select("kept_torrents.*, users.username as kept_by_username").
+		Joins("LEFT JOIN users ON users.user_id = kept_torrents.kept_by_id").
+		Order("kept_torrents.kept_at DESC").
+		Scan(&results).Error
+	return results, err
+}
+
+// CountKeptByUser returns the number of torrents kept by a specific user
+func (r *KeptTorrentRepository) CountKeptByUser(ctx context.Context, userID int64) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&KeptTorrent{}).Where("kept_by_id = ?", userID).Count(&count).Error
+	return count, err
 }

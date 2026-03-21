@@ -1164,10 +1164,10 @@ function renderTorrents(filterText = null, preserveSelection = false) {
             <div class="flex items-center gap-1">
               <!-- Keep/Unkeep Button -->
               <button class="p-2 ${isKept ? 'text-blue-400 bg-blue-500/10' : 'text-slate-500 hover:text-blue-400 hover:bg-blue-500/10'} rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
-                      onclick="event.stopPropagation(); toggleKeep('${
-                        t.id
-                      }', ${JSON.stringify(t.filename)})"
-                      title="${isKept ? "Remove from kept" : "Keep (exempt from auto-delete)"}">
+                      data-id="${t.id}"
+                      data-filename="${escapeHtml(t.filename)}"
+                      onclick="event.stopPropagation(); toggleKeep(this.dataset.id, this.dataset.filename)"
+                      title="${isKept ? 'Remove from kept' : 'Keep (exempt from auto-delete)'}">
                 ${isKept 
                   ? '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>'
                   : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>'
@@ -1177,9 +1177,11 @@ function renderTorrents(filterText = null, preserveSelection = false) {
               <!-- Individual Delete Action -->
               ${
                 isAdmin
-                  ? `<button class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100" onclick="event.stopPropagation(); confirmDelete('torrent', '${
-                      t.id
-                    }', '${escapeHtml(t.filename)}')" title="Delete">
+                  ? `<button class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100" 
+                      data-id="${t.id}"
+                      data-filename="${escapeHtml(t.filename)}"
+                      onclick="event.stopPropagation(); confirmDelete('torrent', this.dataset.id, this.dataset.filename)" 
+                      title="Delete">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
               </svg>
@@ -1347,9 +1349,11 @@ function renderDownloads(filterText = null) {
               </a>
             ${
               isAdmin
-                ? `<button class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100" onclick="confirmDelete('download', '${
-                    d.id
-                  }', '${escapeHtml(d.filename)}')" title="Delete">
+                ? `<button class="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100" 
+                    data-id="${d.id}"
+                    data-filename="${escapeHtml(d.filename)}"
+                    onclick="event.stopPropagation(); confirmDelete('download', this.dataset.id, this.dataset.filename)" 
+                    title="Delete">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
               </svg>

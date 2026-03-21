@@ -824,15 +824,59 @@ func (b *Bot) handleKeepCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 
 		parts := strings.Fields(update.Message.Text)
 		if len(parts) < 2 {
-			b.sendHTMLMessage(ctx, chatID, messageThreadID, "<b>Usage:</b> /keep &lt;torrent_id&gt;", update.Message.ID)
+			// Show list of kept torrents
+			keptTorrents, err := b.keptRepo.ListKeptTorrents(ctx)
+			if err != nil {
+				b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Failed to fetch kept torrents: %s", html.EscapeString(err.Error())), update.Message.ID)
+				return
+			}
+
+			var text strings.Builder
+			text.WriteString("<b>Kept Torrents</b>\n")
+			text.WriteString("<i>Torrents excluded from auto-delete</i>\n\n")
+
+			if len(keptTorrents) == 0 {
+				text.WriteString("<i>No torrents are currently kept.</i>\n")
+				text.WriteString("<i>Use /keep &lt;torrent_id&gt; to keep a torrent.</i>")
+			} else {
+				for _, kt := range keptTorrents {
+					keptAt := kt.KeptAt.Format("2006-01-02 15:04")
+					keptBy := kt.KeptByUsername
+					if keptBy == "" {
+						keptBy = fmt.Sprintf("User #%d", kt.KeptByID)
+					}
+					text.WriteString(fmt.Sprintf("<code>%s</code> - %s\n<i>Kept by %s on %s</i>\n\n", html.EscapeString(kt.TorrentID), html.EscapeString(kt.Filename), html.EscapeString(keptBy), keptAt))
+				}
+				text.WriteString("<i>Use /unkeep &lt;torrent_id&gt; to remove.</i>")
+			}
+
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
 			if user != nil {
-				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "keep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, "Missing arguments", 0); err != nil {
-					log.Printf("Warning: failed to log keep missing args: %v", err)
+				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "keep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0); err != nil {
+					log.Printf("Warning: failed to log keep list: %v", err)
 				}
 			}
 			return
 		}
 		torrentID := parts[1]
+
+		// Check kept torrent limit for non-admins
+		if !isSuperAdmin && b.config.App.MaxKeptTorrents > 0 {
+			currentCount, err := b.keptRepo.CountKeptByUser(ctx, int64(user.ID))
+			if err != nil {
+				b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Failed to check kept torrent count: %s", html.EscapeString(err.Error())), update.Message.ID)
+				return
+			}
+			if currentCount >= int64(b.config.App.MaxKeptTorrents) {
+				b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> You have reached the maximum limit of %d kept torrents. Use /unkeep &lt;torrent_id&gt; to remove one first.", b.config.App.MaxKeptTorrents), update.Message.ID)
+				if user != nil {
+					if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "keep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, "Max kept torrents exceeded", 0); err != nil {
+						log.Printf("Warning: failed to log keep limit exceeded: %v", err)
+					}
+				}
+				return
+			}
+		}
 
 		// Get torrent info for filename
 		torrent, err := b.rdClient.GetTorrentInfo(torrentID)
@@ -878,10 +922,34 @@ func (b *Bot) handleUnkeepCommand(ctx context.Context, tgBot *bot.Bot, update *m
 
 		parts := strings.Fields(update.Message.Text)
 		if len(parts) < 2 {
-			b.sendHTMLMessage(ctx, chatID, messageThreadID, "<b>Usage:</b> /unkeep &lt;torrent_id&gt;", update.Message.ID)
+			// Show list of kept torrents
+			keptTorrents, err := b.keptRepo.ListKeptTorrents(ctx)
+			if err != nil {
+				b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Failed to fetch kept torrents: %s", html.EscapeString(err.Error())), update.Message.ID)
+				return
+			}
+
+			var text strings.Builder
+			text.WriteString("<b>Kept Torrents</b>\n")
+			text.WriteString("<i>Use /unkeep &lt;torrent_id&gt; to remove</i>\n\n")
+
+			if len(keptTorrents) == 0 {
+				text.WriteString("<i>No torrents are currently kept.</i>")
+			} else {
+				for _, kt := range keptTorrents {
+					keptAt := kt.KeptAt.Format("2006-01-02 15:04")
+					keptBy := kt.KeptByUsername
+					if keptBy == "" {
+						keptBy = fmt.Sprintf("User #%d", kt.KeptByID)
+					}
+					text.WriteString(fmt.Sprintf("<code>%s</code> - %s\n<i>Kept by %s on %s</i>\n\n", html.EscapeString(kt.TorrentID), html.EscapeString(kt.Filename), html.EscapeString(keptBy), keptAt))
+				}
+			}
+
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
 			if user != nil {
-				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "unkeep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, "Missing arguments", 0); err != nil {
-					log.Printf("Warning: failed to log unkeep missing args: %v", err)
+				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "unkeep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0); err != nil {
+					log.Printf("Warning: failed to log unkeep list: %v", err)
 				}
 			}
 			return

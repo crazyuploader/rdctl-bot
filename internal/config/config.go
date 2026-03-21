@@ -66,8 +66,9 @@ type RealDebridConfig struct {
 
 // AppConfig holds application settings
 type AppConfig struct {
-	LogLevel  string          `mapstructure:"log_level"`
-	RateLimit RateLimitConfig `mapstructure:"rate_limit"`
+	LogLevel        string          `mapstructure:"log_level"`
+	RateLimit       RateLimitConfig `mapstructure:"rate_limit"`
+	MaxKeptTorrents int             `mapstructure:"max_kept_torrents"` // Max kept torrents per non-admin user (0 = unlimited, admins always unlimited)
 }
 
 // RateLimitConfig holds rate limiting settings
