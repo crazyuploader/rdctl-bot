@@ -184,8 +184,8 @@ function showApp() {
 
 // Fetch all data
 async function fetchAllData() {
+  await fetchAuthInfo();
   await Promise.all([
-    fetchAuthInfo(),
     fetchStatus(),
     fetchTorrents(),
     fetchDownloads(),
