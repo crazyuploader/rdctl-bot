@@ -860,22 +860,10 @@ func (b *Bot) handleKeepCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		}
 		torrentID := parts[1]
 
-		// Check kept torrent limit for non-admins
-		if !isSuperAdmin && b.config.App.MaxKeptTorrents > 0 {
-			currentCount, err := b.keptRepo.CountKeptByUser(ctx, int64(user.UserID))
-			if err != nil {
-				b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Failed to check kept torrent count: %s", html.EscapeString(err.Error())), update.Message.ID)
-				return
-			}
-			if currentCount >= int64(b.config.App.MaxKeptTorrents) {
-				b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> You have reached the maximum limit of %d kept torrents. Use /unkeep &lt;torrent_id&gt; to remove one first.", b.config.App.MaxKeptTorrents), update.Message.ID)
-				if user != nil {
-					if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "keep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, "Max kept torrents exceeded", 0); err != nil {
-						log.Printf("Warning: failed to log keep limit exceeded: %v", err)
-					}
-				}
-				return
-			}
+		// Determine the keep limit (0 = unlimited for admins)
+		maxKept := 0
+		if !isSuperAdmin {
+			maxKept = b.config.App.MaxKeptTorrents
 		}
 
 		// Get torrent info for filename
@@ -890,8 +878,8 @@ func (b *Bot) handleKeepCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 			return
 		}
 
-		// Mark torrent as kept
-		if err := b.keptRepo.KeepTorrent(ctx, torrentID, torrent.Filename, int64(user.UserID)); err != nil {
+		// Mark torrent as kept (limit is enforced atomically inside the transaction)
+		if err := b.keptRepo.KeepTorrent(ctx, torrentID, torrent.Filename, int64(user.UserID), maxKept); err != nil {
 			b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Failed to keep torrent: %s", html.EscapeString(err.Error())), update.Message.ID)
 			if user != nil {
 				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "keep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, err.Error(), 0); err != nil {

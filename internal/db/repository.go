@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -421,8 +422,10 @@ func NewKeptTorrentRepository(db *gorm.DB) *KeptTorrentRepository {
 	return &KeptTorrentRepository{db: db}
 }
 
-// KeepTorrent marks a torrent as kept (excluded from auto-delete)
-func (r *KeptTorrentRepository) KeepTorrent(ctx context.Context, torrentID, filename string, keptByID int64) error {
+// KeepTorrent marks a torrent as kept (excluded from auto-delete).
+// If maxKept > 0, the limit is enforced atomically inside the transaction
+// to prevent TOCTOU races from concurrent requests.
+func (r *KeptTorrentRepository) KeepTorrent(ctx context.Context, torrentID, filename string, keptByID int64, maxKept int) error {
 	now := time.Now().UTC()
 	keptTorrent := KeptTorrent{
 		TorrentID: torrentID,
@@ -432,6 +435,17 @@ func (r *KeptTorrentRepository) KeepTorrent(ctx context.Context, torrentID, file
 	}
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Atomic limit check inside the transaction
+		if maxKept > 0 {
+			var count int64
+			if err := tx.Model(&KeptTorrent{}).Where("kept_by_id = ?", keptByID).Count(&count).Error; err != nil {
+				return fmt.Errorf("failed to count kept torrents: %w", err)
+			}
+			if count >= int64(maxKept) {
+				return fmt.Errorf("maximum kept torrent limit (%d) reached", maxKept)
+			}
+		}
+
 		if err := tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "torrent_id"}, {Name: "kept_by_id"}},
 			DoUpdates: clause.Assignments(map[string]interface{}{
