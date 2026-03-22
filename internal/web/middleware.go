@@ -5,7 +5,7 @@ import (
 	"crypto/subtle"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // Context keys for storing auth info
@@ -18,7 +18,7 @@ const (
 // APIKeyAuth is a middleware for simple API key authentication (legacy, kept for compatibility)
 func APIKeyAuth(apiKey string) fiber.Handler {
 	apiKeyHash := sha256.Sum256([]byte(apiKey))
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		providedKey := c.Get("X-API-Key")
 		providedKeyHash := sha256.Sum256([]byte(providedKey))
 
@@ -31,7 +31,7 @@ func APIKeyAuth(apiKey string) fiber.Handler {
 
 // DualAuth is a middleware that accepts either API key or token authentication
 func DualAuth(apiKey string, tokenStore *TokenStore, ipManager *IPManager) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		// 1. Try Token Authentication via Headers
 		tokenID := c.Get("X-Auth-Token")
 		if tokenID == "" {
@@ -78,7 +78,7 @@ func DualAuth(apiKey string, tokenStore *TokenStore, ipManager *IPManager) fiber
 
 // AdminOnly is a middleware that restricts access to admin users only
 func AdminOnly(tokenStore *TokenStore, ipManager *IPManager) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		role, ok := c.Locals(ContextKeyRole).(Role)
 		if !ok {
 			// No role set, check if API key auth (which is always admin)
@@ -103,7 +103,7 @@ func AdminOnly(tokenStore *TokenStore, ipManager *IPManager) fiber.Handler {
 }
 
 // GetRole returns the role from context
-func GetRole(c *fiber.Ctx) Role {
+func GetRole(c fiber.Ctx) Role {
 	role, ok := c.Locals(ContextKeyRole).(Role)
 	if !ok {
 		return RoleViewer // Default to viewer if not set
@@ -112,7 +112,7 @@ func GetRole(c *fiber.Ctx) Role {
 }
 
 // GetToken returns the token from context
-func GetToken(c *fiber.Ctx) *Token {
+func GetToken(c fiber.Ctx) *Token {
 	token, _ := c.Locals(ContextKeyToken).(*Token)
 	return token
 }

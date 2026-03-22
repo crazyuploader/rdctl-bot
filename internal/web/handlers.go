@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	"github.com/crazyuploader/rdctl-bot/internal/realdebrid"
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // GetAuthInfo returns information about the current authenticated user
-func (d *Dependencies) GetAuthInfo(c *fiber.Ctx) error {
+func (d *Dependencies) GetAuthInfo(c fiber.Ctx) error {
 	authType, _ := c.Locals(ContextKeyAuthType).(string)
 	role := GetRole(c)
 	token := GetToken(c)
@@ -33,7 +33,7 @@ func (d *Dependencies) GetAuthInfo(c *fiber.Ctx) error {
 }
 
 // GetStatus retrieves the Real-Debrid account status
-func (d *Dependencies) GetStatus(c *fiber.Ctx) error {
+func (d *Dependencies) GetStatus(c fiber.Ctx) error {
 	user, err := d.RDClient.GetUser()
 	if err != nil {
 		return err
@@ -42,7 +42,7 @@ func (d *Dependencies) GetStatus(c *fiber.Ctx) error {
 }
 
 // GetTorrents retrieves the list of active torrents
-func (d *Dependencies) GetTorrents(c *fiber.Ctx) error {
+func (d *Dependencies) GetTorrents(c fiber.Ctx) error {
 	limit, _ := strconv.Atoi(c.Query("limit", "50"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
 
@@ -64,7 +64,7 @@ func (d *Dependencies) GetTorrents(c *fiber.Ctx) error {
 }
 
 // GetTorrentInfo retrieves detailed information about a single torrent
-func (d *Dependencies) GetTorrentInfo(c *fiber.Ctx) error {
+func (d *Dependencies) GetTorrentInfo(c fiber.Ctx) error {
 	id := c.Params("id")
 	if id == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "Torrent ID is required")
@@ -78,11 +78,11 @@ func (d *Dependencies) GetTorrentInfo(c *fiber.Ctx) error {
 }
 
 // AddTorrent adds a new torrent from a magnet link
-func (d *Dependencies) AddTorrent(c *fiber.Ctx) error {
+func (d *Dependencies) AddTorrent(c fiber.Ctx) error {
 	var body struct {
 		Magnet string `json:"magnet"`
 	}
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
 	}
 
@@ -105,7 +105,7 @@ func (d *Dependencies) AddTorrent(c *fiber.Ctx) error {
 }
 
 // DeleteTorrent deletes a torrent
-func (d *Dependencies) DeleteTorrent(c *fiber.Ctx) error {
+func (d *Dependencies) DeleteTorrent(c fiber.Ctx) error {
 	id := c.Params("id")
 	if id == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "id parameter is required")
@@ -118,7 +118,7 @@ func (d *Dependencies) DeleteTorrent(c *fiber.Ctx) error {
 }
 
 // GetDownloads retrieves the download history
-func (d *Dependencies) GetDownloads(c *fiber.Ctx) error {
+func (d *Dependencies) GetDownloads(c fiber.Ctx) error {
 	limit, _ := strconv.Atoi(c.Query("limit", "50"))
 	offset, _ := strconv.Atoi(c.Query("offset", "0"))
 
@@ -134,11 +134,11 @@ func (d *Dependencies) GetDownloads(c *fiber.Ctx) error {
 }
 
 // UnrestrictLink unrestricts a hoster link
-func (d *Dependencies) UnrestrictLink(c *fiber.Ctx) error {
+func (d *Dependencies) UnrestrictLink(c fiber.Ctx) error {
 	var body struct {
 		Link string `json:"link"`
 	}
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
 	}
 
@@ -155,7 +155,7 @@ func (d *Dependencies) UnrestrictLink(c *fiber.Ctx) error {
 }
 
 // DeleteDownload deletes a download from history
-func (d *Dependencies) DeleteDownload(c *fiber.Ctx) error {
+func (d *Dependencies) DeleteDownload(c fiber.Ctx) error {
 	id := c.Params("id")
 	if id == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "id is required")
@@ -167,7 +167,7 @@ func (d *Dependencies) DeleteDownload(c *fiber.Ctx) error {
 }
 
 // GetUserStats retrieves statistics for a user
-func (d *Dependencies) GetUserStats(c *fiber.Ctx) error {
+func (d *Dependencies) GetUserStats(c fiber.Ctx) error {
 	userID, err := strconv.ParseUint(c.Params("id"), 10, 64)
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid user ID")
@@ -184,11 +184,11 @@ func (d *Dependencies) GetUserStats(c *fiber.Ctx) error {
 }
 
 // ExchangeToken exchanges a short-lived code for a real token
-func (d *Dependencies) ExchangeToken(c *fiber.Ctx) error {
+func (d *Dependencies) ExchangeToken(c fiber.Ctx) error {
 	var body struct {
 		Code string `json:"code"`
 	}
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
 	}
 
@@ -212,7 +212,7 @@ func (d *Dependencies) ExchangeToken(c *fiber.Ctx) error {
 }
 
 // GetKeptTorrents returns all kept torrents
-func (d *Dependencies) GetKeptTorrents(c *fiber.Ctx) error {
+func (d *Dependencies) GetKeptTorrents(c fiber.Ctx) error {
 	keptTorrents, err := d.KeptRepo.ListKeptTorrents(c.Context())
 	if err != nil {
 		return err
@@ -224,7 +224,7 @@ func (d *Dependencies) GetKeptTorrents(c *fiber.Ctx) error {
 }
 
 // KeepTorrent marks a torrent as kept (excluded from auto-delete)
-func (d *Dependencies) KeepTorrent(c *fiber.Ctx) error {
+func (d *Dependencies) KeepTorrent(c fiber.Ctx) error {
 	id := c.Params("id")
 	if id == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "Torrent ID is required")
@@ -261,7 +261,7 @@ func (d *Dependencies) KeepTorrent(c *fiber.Ctx) error {
 }
 
 // UnkeepTorrent removes the keep mark from a torrent
-func (d *Dependencies) UnkeepTorrent(c *fiber.Ctx) error {
+func (d *Dependencies) UnkeepTorrent(c fiber.Ctx) error {
 	id := c.Params("id")
 	if id == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "Torrent ID is required")
@@ -287,7 +287,7 @@ func (d *Dependencies) UnkeepTorrent(c *fiber.Ctx) error {
 }
 
 // GetAutoDeleteSetting returns the current auto-delete setting
-func (d *Dependencies) GetAutoDeleteSetting(c *fiber.Ctx) error {
+func (d *Dependencies) GetAutoDeleteSetting(c fiber.Ctx) error {
 	value, err := d.SettingRepo.GetSetting(c.Context(), "auto_delete_days")
 	if err != nil {
 		return err
@@ -307,11 +307,11 @@ func (d *Dependencies) GetAutoDeleteSetting(c *fiber.Ctx) error {
 }
 
 // SetAutoDeleteSetting updates the auto-delete setting
-func (d *Dependencies) SetAutoDeleteSetting(c *fiber.Ctx) error {
+func (d *Dependencies) SetAutoDeleteSetting(c fiber.Ctx) error {
 	var body struct {
 		Value string `json:"value"`
 	}
-	if err := c.BodyParser(&body); err != nil {
+	if err := c.Bind().Body(&body); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
 	}
 

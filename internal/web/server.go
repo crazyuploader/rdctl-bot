@@ -2,28 +2,30 @@ package web
 
 import (
 	"context"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"errors"
+	"io/fs"
 	"log"
-	"net/http"
 	"time"
 
-	"github.com/ansrivas/fiberprometheus/v2"
+	"github.com/Jeckerson/fiberprometheus/v3"
 	"github.com/crazyuploader/rdctl-bot/internal/config"
 	"github.com/crazyuploader/rdctl-bot/internal/db"
 	"github.com/crazyuploader/rdctl-bot/internal/realdebrid"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/adaptor"
-	"github.com/gofiber/fiber/v2/middleware/basicauth"
-	"github.com/gofiber/fiber/v2/middleware/compress"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/earlydata"
-	"github.com/gofiber/fiber/v2/middleware/favicon"
-	"github.com/gofiber/fiber/v2/middleware/filesystem"
-	"github.com/gofiber/fiber/v2/middleware/healthcheck"
-	"github.com/gofiber/fiber/v2/middleware/limiter"
-	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/adaptor"
+	"github.com/gofiber/fiber/v3/middleware/basicauth"
+	"github.com/gofiber/fiber/v3/middleware/compress"
+	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/gofiber/fiber/v3/middleware/earlydata"
+	"github.com/gofiber/fiber/v3/middleware/favicon"
+	"github.com/gofiber/fiber/v3/middleware/healthcheck"
+	"github.com/gofiber/fiber/v3/middleware/limiter"
+	"github.com/gofiber/fiber/v3/middleware/logger"
+	"github.com/gofiber/fiber/v3/middleware/recover"
+	"github.com/gofiber/fiber/v3/middleware/static"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -56,9 +58,8 @@ type Server struct {
 // NewServer creates a new web server instance
 func NewServer(deps Dependencies) *Server {
 	app := fiber.New(fiber.Config{
-		DisableStartupMessage: true,
-		ProxyHeader:           "X-Forwarded-For", // Standard proxy header
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ProxyHeader: "X-Forwarded-For", // Standard proxy header
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			// Status code defaults to 500
 			code := fiber.StatusInternalServerError
 
@@ -99,12 +100,12 @@ func NewServer(deps Dependencies) *Server {
 	app.Use(earlydata.New())
 	app.Use(favicon.New(
 		favicon.Config{
-			FileSystem: http.FS(staticFiles),
+			FileSystem: staticFiles,
 			File:       "static/favicon.svg",
 			URL:        "/favicon.svg",
 		},
 	))
-	app.Use(healthcheck.New())
+	app.Get(healthcheck.LivenessEndpoint, healthcheck.New())
 	app.Use(logger.New())
 	app.Use(recover.New())
 	app.Use(cors.New())
@@ -127,9 +128,10 @@ func NewServer(deps Dependencies) *Server {
 		registry.MustRegister(collector)
 
 		// Serve our dedicated registry
+		hashedPassword := sha256.Sum256([]byte(deps.Config.Web.Metrics.Password))
 		app.Get("/metrics", basicauth.New(basicauth.Config{
 			Users: map[string]string{
-				deps.Config.Web.Metrics.User: deps.Config.Web.Metrics.Password,
+				deps.Config.Web.Metrics.User: hex.EncodeToString(hashedPassword[:]),
 			},
 		}), adaptor.HTTPHandler(promhttp.HandlerFor(registry, promhttp.HandlerOpts{})))
 	}
@@ -142,7 +144,7 @@ func NewServer(deps Dependencies) *Server {
 	)
 
 	// Health check endpoint
-	app.Get("/health", func(c *fiber.Ctx) error {
+	app.Get("/health", func(c fiber.Ctx) error {
 		return c.SendString("OK")
 	})
 
@@ -158,7 +160,7 @@ func NewServer(deps Dependencies) *Server {
 			Max:               deps.Config.Web.Limiter.Max,
 			Expiration:        time.Duration(deps.Config.Web.Limiter.ExpirationSeconds) * time.Second,
 			LimiterMiddleware: limiter.SlidingWindow{},
-			LimitReached: func(c *fiber.Ctx) error {
+			LimitReached: func(c fiber.Ctx) error {
 				return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 					"success": false,
 					"error":   "Too many requests, please try again later.",
@@ -200,10 +202,10 @@ func NewServer(deps Dependencies) *Server {
 
 	// Embed static files - Place this last to ensure API routes are matched first
 	// or properly fall through if not found.
-	app.Use("/", filesystem.New(filesystem.Config{
-		Root:       http.FS(staticFiles),
-		PathPrefix: "static",
-		Browse:     false,
+	staticFS, _ := fs.Sub(staticFiles, "static")
+	app.Use("/*", static.New("", static.Config{
+		FS:     staticFS,
+		Browse: false,
 	}))
 
 	return &Server{

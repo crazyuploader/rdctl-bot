@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // IPManager handles IP banning and tracking
@@ -32,7 +32,7 @@ func NewIPManager(banDurationSeconds, failLimit, failWindowSeconds int) *IPManag
 
 // Middleware checks if an IP is banned
 func (m *IPManager) Middleware() fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		ip := c.IP()
 		if m.IsBanned(ip) {
 			log.Printf("Blocked request from banned IP: %s", ip)
@@ -97,7 +97,7 @@ func (m *IPManager) IsBanned(ip string) bool {
 
 // GetClientIP gets the client IP dealing with proxies if needed
 // Assuming fiber.Config ProxyHeader is set elsewhere or use c.IP() directly which handles it
-func GetClientIP(c *fiber.Ctx) string {
+func GetClientIP(c fiber.Ctx) string {
 	// If X-Forwarded-For is set and trusted, it might contain multiple IPs "client, proxy1, proxy2"
 	// We want the first one (client)
 	ips := c.Get("X-Forwarded-For")
