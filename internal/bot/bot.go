@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/crazyuploader/rdctl-bot/internal/config"
@@ -21,10 +22,29 @@ import (
 	"gorm.io/gorm"
 )
 
+// RealDebridClient defines the required interface for Real-Debrid operations.
+// This allows for mocking in unit tests.
+type RealDebridClient interface {
+	GetTorrents(limit, offset int) ([]realdebrid.Torrent, error)
+	GetTorrentsWithCount(limit, offset int) (*realdebrid.TorrentsResult, error)
+	GetTorrentInfo(torrentID string) (*realdebrid.Torrent, error)
+	AddMagnet(magnetURL string) (*realdebrid.AddMagnetResponse, error)
+	SelectFiles(torrentID string, fileIDs []int) error
+	SelectAllFiles(torrentID string) error
+	DeleteTorrent(torrentID string) error
+	CheckInstantAvailability(hashes []string) (realdebrid.InstantAvailability, error)
+	GetUser() (*realdebrid.User, error)
+	GetDownloads(limit, offset int) ([]realdebrid.Download, error)
+	GetDownloadsWithCount(limit, offset int) (*realdebrid.DownloadsResult, error)
+	UnrestrictLink(link string) (*realdebrid.UnrestrictedLink, error)
+	DeleteDownload(downloadID string) error
+	GetSupportedRegex() ([]string, error)
+}
+
 // Bot represents the Telegram bot
 type Bot struct {
 	api            *bot.Bot
-	rdClient       *realdebrid.Client
+	rdClient       RealDebridClient
 	middleware     *Middleware
 	supportedRegex []*regexp.Regexp
 	config         *config.Config
@@ -34,7 +54,13 @@ type Bot struct {
 	torrentRepo    *db.TorrentRepository
 	downloadRepo   *db.DownloadRepository
 	commandRepo    *db.CommandRepository
+	settingRepo    *db.SettingRepository
+	keptRepo       *db.KeptTorrentRepository
+	chatRepo       *db.ChatRepository
 	tokenStore     *web.TokenStore
+	wg             sync.WaitGroup
+	cancel         context.CancelFunc
+	systemUserID   uint
 }
 
 // NewBot creates and returns a fully configured Bot.
@@ -106,7 +132,7 @@ func NewBot(cfg *config.Config, database *gorm.DB, proxyURL, ipTestURL, ipVerify
 		log.Printf("Loaded %d supported host regexes", len(supportedRegex))
 	}
 
-	return &Bot{
+	b := &Bot{
 		api:            api,
 		rdClient:       rdClient,
 		middleware:     middleware,
@@ -118,14 +144,38 @@ func NewBot(cfg *config.Config, database *gorm.DB, proxyURL, ipTestURL, ipVerify
 		torrentRepo:    db.NewTorrentRepository(database),
 		downloadRepo:   db.NewDownloadRepository(database),
 		commandRepo:    db.NewCommandRepository(database),
-	}, nil
+		settingRepo:    db.NewSettingRepository(database),
+		keptRepo:       db.NewKeptTorrentRepository(database),
+		chatRepo:       db.NewChatRepository(database),
+	}
+
+	// Create or retrieve system user for automated operations
+	systemUser, err := b.userRepo.GetOrCreateUser(context.Background(), 0, "system", "System", "Bot", false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create system user: %w", err)
+	}
+	b.systemUserID = systemUser.ID
+
+	return b, nil
 }
 
 // Start begins processing updates
 func (b *Bot) Start(ctx context.Context) error {
 	b.registerHandlers()
+
+	// Create a cancellable context for the bot's lifecycle
+	botCtx, cancel := context.WithCancel(ctx)
+	b.cancel = cancel
+
+	// Start auto-delete background worker
+	b.wg.Add(1)
+	go func() {
+		defer b.wg.Done()
+		b.startAutoDeleteWorker(botCtx)
+	}()
+
 	log.Println("Bot started. Waiting for messages...")
-	b.api.Start(ctx)
+	b.api.Start(botCtx)
 	return nil
 }
 
@@ -144,6 +194,9 @@ func (b *Bot) registerHandlers() {
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/removelink", bot.MatchTypePrefix, b.handleRemoveLinkCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/status", bot.MatchTypeExact, b.handleStatusCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/dashboard", bot.MatchTypeExact, b.handleDashboardCommand)
+	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/autodelete", bot.MatchTypePrefix, b.handleAutoDeleteCommand)
+	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/keep", bot.MatchTypePrefix, b.handleKeepCommand)
+	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/unkeep", bot.MatchTypePrefix, b.handleUnkeepCommand)
 
 	// Message handlers for links
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "magnet:?", bot.MatchTypeContains, b.handleMagnetLink)
@@ -154,6 +207,15 @@ func (b *Bot) registerHandlers() {
 // Stop gracefully stops the bot and closes the database connection
 func (b *Bot) Stop() {
 	log.Println("Bot stopping...")
+
+	// Cancel the bot context to signal all workers to stop
+	if b.cancel != nil {
+		b.cancel()
+	}
+
+	// Wait for background workers to finish
+	b.wg.Wait()
+
 	if err := db.Close(b.db); err != nil {
 		log.Printf("Error closing database: %v", err)
 	}
@@ -202,11 +264,41 @@ func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThr
 	return
 }
 
+// getChatFromUpdate extracts chat info from an update
+func (b *Bot) getChatFromUpdate(update *models.Update) (chatID int64, title, chatType string) {
+	var chat *models.Chat
+	if update.Message != nil {
+		chat = &update.Message.Chat
+	} else if update.CallbackQuery != nil && update.CallbackQuery.Message.Message != nil {
+		chat = &update.CallbackQuery.Message.Message.Chat
+	}
+	if chat != nil {
+		chatID = chat.ID
+		title = chat.Title
+		chatType = string(chat.Type)
+		if title == "" {
+			title = chat.Username
+		}
+		if title == "" {
+			title = strings.TrimSpace(chat.FirstName + " " + chat.LastName)
+		}
+	}
+	return
+}
+
 // withAuth is a middleware to check authorization and execute the handler
 func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User)) {
 	chatID, messageThreadID, username, firstName, lastName, userID := b.getUserFromUpdate(update)
+	_, title, chatType := b.getChatFromUpdate(update)
 
 	isAllowed, isSuperAdmin := b.middleware.CheckAuthorization(chatID, userID)
+
+	if chatID != 0 {
+		_, err := b.chatRepo.GetOrCreateChat(ctx, chatID, title, chatType)
+		if err != nil {
+			log.Printf("Warning: failed to automatically log chat ID: %v", err)
+		}
+	}
 
 	user, err := b.userRepo.GetOrCreateUser(ctx, userID, username, firstName, lastName, isSuperAdmin)
 	if err != nil {
@@ -228,7 +320,7 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 		b.middleware.LogUnauthorized(username, chatID, userID)
 		b.sendUnauthorizedMessage(ctx, chatID, messageThreadID, userID)
 		if user != nil {
-			if err := b.activityRepo.LogActivity(ctx, user.ID, chatID, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil); err != nil {
+			if err := b.activityRepo.LogActivity(ctx, "", user.ID, chatID, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil); err != nil {
 				log.Printf("Warning: failed to log unauthorized activity: %v", err)
 			}
 		}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -58,6 +59,48 @@ func (r *UserRepository) GetOrCreateUser(ctx context.Context, userID int64, user
 	return &updatedUser, nil
 }
 
+// ChatRepository handles chat operations
+type ChatRepository struct {
+	db *gorm.DB
+}
+
+// NewChatRepository creates a ChatRepository using the provided gorm.DB.
+func NewChatRepository(db *gorm.DB) *ChatRepository {
+	return &ChatRepository{db: db}
+}
+
+// GetOrCreateChat gets or creates a chat based on its Telegram chat ID
+func (r *ChatRepository) GetOrCreateChat(ctx context.Context, chatID int64, title, chatType string) (*Chat, error) {
+	now := time.Now().UTC()
+	chat := Chat{
+		ChatID:    chatID,
+		Title:     title,
+		Type:      chatType,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	result := r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "chat_id"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			"title":      title,
+			"type":       chatType,
+			"updated_at": now,
+		}),
+	}).Create(&chat)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	var updatedChat Chat
+	if err := r.db.WithContext(ctx).Where("chat_id = ?", chatID).First(&updatedChat).Error; err != nil {
+		return nil, err
+	}
+
+	return &updatedChat, nil
+}
+
 // ActivityRepository handles activity logging
 type ActivityRepository struct {
 	db *gorm.DB
@@ -69,13 +112,14 @@ func NewActivityRepository(db *gorm.DB) *ActivityRepository {
 }
 
 // LogActivity logs a general activity
-func (r *ActivityRepository) LogActivity(ctx context.Context, userID uint, chatID int64, username string, activityType ActivityType, command string, messageThreadID int, success bool, errorMsg string, metadata map[string]interface{}) error {
+func (r *ActivityRepository) LogActivity(ctx context.Context, requestID string, userID uint, chatID int64, username string, activityType ActivityType, command string, messageThreadID int, success bool, errorMsg string, metadata map[string]interface{}) error {
 	metadataJSON, err := json.Marshal(metadata)
 	if err != nil {
 		metadataJSON = []byte("{}")
 	}
 
 	activity := ActivityLog{
+		RequestID:       requestID,
 		UserID:          userID,
 		ChatID:          chatID,
 		Username:        username,
@@ -102,7 +146,7 @@ func NewTorrentRepository(db *gorm.DB) *TorrentRepository {
 }
 
 // LogTorrentActivity logs torrent-specific activity
-func (r *TorrentRepository) LogTorrentActivity(ctx context.Context, userID uint, chatID int64, torrentID, torrentHash, torrentName, magnetLink, action, status string, fileSize int64, progress float64, success bool, errorMsg string, metadata map[string]interface{}) error {
+func (r *TorrentRepository) LogTorrentActivity(ctx context.Context, requestID string, userID uint, chatID int64, torrentID, torrentHash, torrentName, magnetLink, action, status string, fileSize int64, progress float64, success bool, errorMsg string, metadata map[string]interface{}) error {
 	// Ensure metadata is never nil
 	if metadata == nil {
 		metadata = make(map[string]interface{})
@@ -116,6 +160,7 @@ func (r *TorrentRepository) LogTorrentActivity(ctx context.Context, userID uint,
 	selectedFiles := "[]"
 
 	activity := TorrentActivity{
+		RequestID:     requestID,
 		UserID:        userID,
 		ChatID:        chatID,
 		TorrentID:     torrentID,
@@ -164,7 +209,7 @@ func NewDownloadRepository(db *gorm.DB) *DownloadRepository {
 }
 
 // LogDownloadActivity logs download/unrestrict activity with optional torrent association
-func (r *DownloadRepository) LogDownloadActivity(ctx context.Context, userID uint, chatID int64, downloadID, originalLink, fileName, host, action string, fileSize int64, success bool, errorMsg string, metadata map[string]interface{}, torrentActivityID *uint) error {
+func (r *DownloadRepository) LogDownloadActivity(ctx context.Context, requestID string, userID uint, chatID int64, downloadID, originalLink, fileName, host, action string, fileSize int64, success bool, errorMsg string, metadata map[string]interface{}, torrentActivityID *uint) error {
 	// Ensure metadata is never nil
 	if metadata == nil {
 		metadata = make(map[string]interface{})
@@ -175,6 +220,7 @@ func (r *DownloadRepository) LogDownloadActivity(ctx context.Context, userID uin
 	}
 
 	activity := DownloadActivity{
+		RequestID:         requestID,
 		UserID:            userID,
 		ChatID:            chatID,
 		DownloadID:        downloadID,
@@ -270,4 +316,251 @@ func (r *CommandRepository) GetUserStats(ctx context.Context, userID uint) (map[
 	}
 
 	return stats, nil
+}
+
+// SettingRepository handles runtime configuration settings
+type SettingRepository struct {
+	db *gorm.DB
+}
+
+// NewSettingRepository creates a new SettingRepository backed by the provided GORM DB handle.
+func NewSettingRepository(db *gorm.DB) *SettingRepository {
+	return &SettingRepository{db: db}
+}
+
+// GetSetting retrieves a setting value by key. Returns empty string if not found.
+func (r *SettingRepository) GetSetting(ctx context.Context, key string) (string, error) {
+	var setting Setting
+	err := r.db.WithContext(ctx).Where("key = ?", key).First(&setting).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return setting.Value, nil
+}
+
+// SetSetting creates or updates a setting value by key.
+func (r *SettingRepository) SetSetting(ctx context.Context, key, value string) error {
+	now := time.Now().UTC()
+	setting := Setting{
+		Key:       key,
+		Value:     value,
+		UpdatedAt: now,
+	}
+	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "key"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"value":      value,
+			"updated_at": now,
+		}),
+	}).Create(&setting).Error
+}
+
+// SetSettingWithAudit creates or updates a setting and logs the change
+func (r *SettingRepository) SetSettingWithAudit(ctx context.Context, key, value string, changedBy int64, chatID int64) error {
+	now := time.Now().UTC()
+	setting := Setting{
+		Key:       key,
+		Value:     value,
+		UpdatedAt: now,
+	}
+
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Read existing setting inside transaction
+		var oldSetting Setting
+		oldValue := ""
+		err := tx.Where("key = ?", key).First(&oldSetting).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err == nil {
+			oldValue = oldSetting.Value
+		}
+
+		if err := tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "key"}},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"value":      value,
+				"updated_at": now,
+			}),
+		}).Create(&setting).Error; err != nil {
+			return err
+		}
+
+		audit := SettingAudit{
+			Key:       key,
+			OldValue:  oldValue,
+			NewValue:  value,
+			ChangedBy: changedBy,
+			ChatID:    &chatID,
+			ChangedAt: now,
+		}
+		return tx.Create(&audit).Error
+	})
+}
+
+// GetSettingHistory retrieves the audit history for a setting key
+func (r *SettingRepository) GetSettingHistory(ctx context.Context, key string, limit int) ([]SettingAudit, error) {
+	var audits []SettingAudit
+	query := r.db.WithContext(ctx).Where("key = ?", key).Order("changed_at DESC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	err := query.Find(&audits).Error
+	return audits, err
+}
+
+// KeptTorrentRepository handles kept torrent operations
+type KeptTorrentRepository struct {
+	db *gorm.DB
+}
+
+// NewKeptTorrentRepository creates a new KeptTorrentRepository backed by the provided gorm.DB.
+func NewKeptTorrentRepository(db *gorm.DB) *KeptTorrentRepository {
+	return &KeptTorrentRepository{db: db}
+}
+
+// KeepTorrent marks a torrent as kept (excluded from auto-delete).
+// If maxKept > 0, the limit is enforced atomically inside the transaction
+// to prevent TOCTOU races from concurrent requests.
+func (r *KeptTorrentRepository) KeepTorrent(ctx context.Context, torrentID, filename string, keptByID int64, maxKept int) error {
+	now := time.Now().UTC()
+
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var user User
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ?", keptByID).First(&user).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("cannot keep torrent: actor user %d not found", keptByID)
+			}
+			return fmt.Errorf("failed to load actor user %d: %w", keptByID, err)
+		}
+
+		// Atomic limit check inside the transaction
+		if maxKept > 0 {
+			var count int64
+			if err := tx.Model(&KeptTorrent{}).Where("kept_by_id = ? AND torrent_id != ?", user.ID, torrentID).Count(&count).Error; err != nil {
+				return fmt.Errorf("failed to count kept torrents: %w", err)
+			}
+			if count >= int64(maxKept) {
+				return fmt.Errorf("maximum kept torrent limit (%d) reached", maxKept)
+			}
+		}
+
+		keptTorrent := KeptTorrent{
+			TorrentID: torrentID,
+			Filename:  filename,
+			KeptByID:  user.ID,
+			KeptAt:    now,
+		}
+
+		if err := tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "torrent_id"}, {Name: "kept_by_id"}},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"filename": filename,
+				"kept_at":  now,
+			}),
+		}).Create(&keptTorrent).Error; err != nil {
+			return err
+		}
+
+		action := KeptTorrentAction{
+			TorrentID: torrentID,
+			Action:    "keep",
+			UserID:    user.ID,
+			Username:  user.Username,
+			CreatedAt: now,
+		}
+		return tx.Create(&action).Error
+	})
+}
+
+// UnkeepTorrent removes the keep mark from a torrent
+func (r *KeptTorrentRepository) UnkeepTorrent(ctx context.Context, torrentID string, unkeptByID int64, isAdmin bool) error {
+	now := time.Now().UTC()
+
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var user User
+		if err := tx.Where("user_id = ?", unkeptByID).First(&user).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("cannot unkeep torrent: actor user %d not found", unkeptByID)
+			}
+			return fmt.Errorf("failed to load actor user %d: %w", unkeptByID, err)
+		}
+
+		query := tx.Where("torrent_id = ?", torrentID)
+		if !isAdmin {
+			query = query.Where("kept_by_id = ?", user.ID)
+		}
+
+		res := query.Delete(&KeptTorrent{})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return fmt.Errorf("torrent is not kept or you don't have permission to unkeep it")
+		}
+
+		action := KeptTorrentAction{
+			TorrentID: torrentID,
+			Action:    "unkeep",
+			UserID:    user.ID,
+			Username:  user.Username,
+			CreatedAt: now,
+		}
+		return tx.Create(&action).Error
+	})
+}
+
+// IsKept checks if a torrent is marked as kept
+func (r *KeptTorrentRepository) IsKept(ctx context.Context, torrentID string) (bool, error) {
+	var keptTorrent KeptTorrent
+	err := r.db.WithContext(ctx).Where("torrent_id = ?", torrentID).First(&keptTorrent).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// GetKeptTorrentIDs returns a map of all kept torrent IDs for quick lookup
+func (r *KeptTorrentRepository) GetKeptTorrentIDs(ctx context.Context) (map[string]bool, error) {
+	var keptTorrents []KeptTorrent
+	err := r.db.WithContext(ctx).Find(&keptTorrents).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]bool)
+	for _, kt := range keptTorrents {
+		result[kt.TorrentID] = true
+	}
+	return result, nil
+}
+
+// ListKeptTorrents returns all kept torrents with user details
+func (r *KeptTorrentRepository) ListKeptTorrents(ctx context.Context) ([]KeptTorrent, error) {
+	var results []KeptTorrent
+	err := r.db.WithContext(ctx).
+		Preload("User").
+		Order("kept_at DESC").
+		Find(&results).Error
+	return results, err
+}
+
+// CountKeptByUser returns the number of torrents kept by a specific user
+func (r *KeptTorrentRepository) CountKeptByUser(ctx context.Context, userID int64) (int64, error) {
+	var count int64
+	var user User
+	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	err := r.db.WithContext(ctx).Model(&KeptTorrent{}).Where("kept_by_id = ?", user.ID).Count(&count).Error
+	return count, err
 }

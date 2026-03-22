@@ -210,3 +210,133 @@ func (d *Dependencies) ExchangeToken(c *fiber.Ctx) error {
 		"token":   tokenID,
 	})
 }
+
+// GetKeptTorrents returns all kept torrents
+func (d *Dependencies) GetKeptTorrents(c *fiber.Ctx) error {
+	keptTorrents, err := d.KeptRepo.ListKeptTorrents(c.Context())
+	if err != nil {
+		return err
+	}
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    keptTorrents,
+	})
+}
+
+// KeepTorrent marks a torrent as kept (excluded from auto-delete)
+func (d *Dependencies) KeepTorrent(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if id == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "Torrent ID is required")
+	}
+
+	// Get torrent info for filename
+	torrent, err := d.RDClient.GetTorrentInfo(id)
+	if err != nil {
+		return err
+	}
+
+	// Get user ID from token or context
+	userID := int64(0)
+	if token := GetToken(c); token != nil {
+		userID = token.UserID
+	}
+
+	// Determine the keep limit (0 = unlimited for admins)
+	role := GetRole(c)
+	maxKept := 0
+	if role != RoleAdmin {
+		maxKept = d.Config.App.MaxKeptTorrents
+	}
+
+	// Keep torrent (limit is enforced atomically inside the transaction)
+	if err := d.KeptRepo.KeepTorrent(c.Context(), id, torrent.Filename, userID, maxKept); err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Torrent marked as kept",
+	})
+}
+
+// UnkeepTorrent removes the keep mark from a torrent
+func (d *Dependencies) UnkeepTorrent(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if id == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "Torrent ID is required")
+	}
+
+	// Get user ID from token or context
+	userID := int64(0)
+	if token := GetToken(c); token != nil {
+		userID = token.UserID
+	}
+
+	role := GetRole(c)
+	isAdmin := role == RoleAdmin
+
+	if err := d.KeptRepo.UnkeepTorrent(c.Context(), id, userID, isAdmin); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Torrent unmarked as kept",
+	})
+}
+
+// GetAutoDeleteSetting returns the current auto-delete setting
+func (d *Dependencies) GetAutoDeleteSetting(c *fiber.Ctx) error {
+	value, err := d.SettingRepo.GetSetting(c.Context(), "auto_delete_days")
+	if err != nil {
+		return err
+	}
+
+	if value == "" {
+		if d.Config.App.AutoDeleteDays > 0 {
+			value = strconv.Itoa(d.Config.App.AutoDeleteDays)
+		} else {
+			value = "0"
+		}
+	}
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data":    value,
+	})
+}
+
+// SetAutoDeleteSetting updates the auto-delete setting
+func (d *Dependencies) SetAutoDeleteSetting(c *fiber.Ctx) error {
+	var body struct {
+		Value string `json:"value"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
+	}
+
+	// Validate the value is a valid integer
+	days, err := strconv.Atoi(body.Value)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "Value must be a valid integer")
+	}
+
+	// Validate range: must be non-negative and within reasonable upper bound
+	if days < 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "Value must be non-negative (>= 0)")
+	}
+
+	if days > 3650 {
+		return fiber.NewError(fiber.StatusBadRequest, "Value must not exceed 3650 days")
+	}
+
+	// Store the validated value (as string to match existing interface)
+	if err := d.SettingRepo.SetSetting(c.Context(), "auto_delete_days", body.Value); err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Auto-delete setting updated",
+	})
+}

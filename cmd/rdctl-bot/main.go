@@ -218,6 +218,8 @@ func runBot(cmd *cobra.Command, args []string) {
 		TorrentRepo:  db.NewTorrentRepository(database),
 		DownloadRepo: db.NewDownloadRepository(database),
 		CommandRepo:  db.NewCommandRepository(database),
+		SettingRepo:  db.NewSettingRepository(database),
+		KeptRepo:     db.NewKeptTorrentRepository(database),
 		Config:       cfg,
 		TokenStore:   tokenStore,
 	}
