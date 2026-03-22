@@ -30,7 +30,7 @@ async function checkLogin() {
   if (code) {
     // Exchange code for token
     try {
-      const response = await fetch(`${API_BASE_URL}/api/exchange-token`, {
+      const response = await fetch(`${API_BASE_URL}/exchange-token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
