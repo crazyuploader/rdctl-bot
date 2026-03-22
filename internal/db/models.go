@@ -95,9 +95,9 @@ type TorrentActivity struct {
 	CreatedAt     time.Time `gorm:"index;not null"`
 	SelectedFiles string    `gorm:"type:json;not null;default:'[]'"` // Stores selected files as JSON array
 
-	User               User               `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
+	User               User               `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 	Chat               Chat               `gorm:"foreignKey:ChatID;references:ChatID;constraint:OnDelete:CASCADE"`
-	DownloadActivities []DownloadActivity `gorm:"foreignKey:TorrentActivityID;references:ID;constraint:OnDelete:CASCADE"`
+	DownloadActivities []DownloadActivity `gorm:"foreignKey:TorrentActivityID"`
 }
 
 // DownloadActivity tracks download/unrestrict activities
