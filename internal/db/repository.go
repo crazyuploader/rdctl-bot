@@ -359,8 +359,6 @@ func (r *SettingRepository) SetSetting(ctx context.Context, key, value string) e
 
 // SetSettingWithAudit creates or updates a setting and logs the change
 func (r *SettingRepository) SetSettingWithAudit(ctx context.Context, key, value string, changedBy int64, chatID int64) error {
-	oldValue, _ := r.GetSetting(ctx, key)
-
 	now := time.Now().UTC()
 	setting := Setting{
 		Key:       key,
@@ -369,6 +367,17 @@ func (r *SettingRepository) SetSettingWithAudit(ctx context.Context, key, value 
 	}
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Read existing setting inside transaction
+		var oldSetting Setting
+		oldValue := ""
+		err := tx.Where("key = ?", key).First(&oldSetting).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err == nil {
+			oldValue = oldSetting.Value
+		}
+
 		if err := tx.Clauses(clause.OnConflict{
 			Columns: []clause.Column{{Name: "key"}},
 			DoUpdates: clause.Assignments(map[string]interface{}{
@@ -384,7 +393,7 @@ func (r *SettingRepository) SetSettingWithAudit(ctx context.Context, key, value 
 			OldValue:  oldValue,
 			NewValue:  value,
 			ChangedBy: changedBy,
-			ChatID:    chatID,
+			ChatID:    &chatID,
 			ChangedAt: now,
 		}
 		return tx.Create(&audit).Error
@@ -424,11 +433,10 @@ func (r *KeptTorrentRepository) KeepTorrent(ctx context.Context, torrentID, file
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "torrent_id"}},
+			Columns: []clause.Column{{Name: "torrent_id"}, {Name: "kept_by_id"}},
 			DoUpdates: clause.Assignments(map[string]interface{}{
-				"filename":   filename,
-				"kept_by_id": keptByID,
-				"kept_at":    now,
+				"filename": filename,
+				"kept_at":  now,
 			}),
 		}).Create(&keptTorrent).Error; err != nil {
 			return err
@@ -456,7 +464,7 @@ func (r *KeptTorrentRepository) UnkeepTorrent(ctx context.Context, torrentID str
 	now := time.Now().UTC()
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("torrent_id = ?", torrentID).Delete(&KeptTorrent{}).Error; err != nil {
+		if err := tx.Where("torrent_id = ? AND kept_by_id = ?", torrentID, unkeptByID).Delete(&KeptTorrent{}).Error; err != nil {
 			return err
 		}
 

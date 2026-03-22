@@ -182,9 +182,9 @@ func (Setting) TableName() string {
 // KeptTorrent represents a torrent that a user has marked to be kept (excluded from auto-delete)
 type KeptTorrent struct {
 	ID        uint   `gorm:"primaryKey"`
-	TorrentID string `gorm:"uniqueIndex;not null"` // Real-Debrid torrent ID
+	TorrentID string `gorm:"uniqueIndex:idx_torrent_user;not null"` // Real-Debrid torrent ID
 	Filename  string
-	KeptByID  int64     `gorm:"index;not null"` // Telegram user ID who kept it
+	KeptByID  int64     `gorm:"uniqueIndex:idx_torrent_user;index;not null"` // Telegram user ID who kept it
 	KeptAt    time.Time `gorm:"not null"`
 
 	User User `gorm:"foreignKey:KeptByID;references:UserID;constraint:OnDelete:CASCADE"`
@@ -217,7 +217,7 @@ type SettingAudit struct {
 	OldValue  string
 	NewValue  string
 	ChangedBy int64     `gorm:"index;not null"` // User who made change
-	ChatID    int64     `gorm:"index"`          // Chat where change was made
+	ChatID    *int64    `gorm:"index"`          // Chat where change was made
 	ChangedAt time.Time `gorm:"index;not null"`
 
 	User User `gorm:"foreignKey:ChangedBy;references:UserID;constraint:OnDelete:CASCADE"`

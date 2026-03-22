@@ -22,9 +22,52 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ─── Login / Auth ─────────────────────────────────────────────────────────────
-function checkLogin() {
+async function checkLogin() {
+  // Check for authorization code in URL (from dashboard link)
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+
+  if (code) {
+    // Exchange code for token
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/exchange`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.token) {
+          window.authToken = result.token;
+          localStorage.setItem("authToken", result.token);
+
+          // Remove code from URL
+          params.delete("code");
+          const newUrl = params.toString()
+            ? `${window.location.pathname}?${params.toString()}`
+            : window.location.pathname;
+          history.replaceState(null, "", newUrl);
+
+          showApp();
+          fetchAllData().then(() => startAutoRefresh());
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("Token exchange failed:", error);
+    }
+  }
+
+  // Fall back to stored token or API key
+  const authToken = localStorage.getItem("authToken");
   const apiKey = localStorage.getItem("apiKey");
-  if (apiKey) {
+
+  if (authToken) {
+    window.authToken = authToken;
+    showApp();
+    fetchAllData().then(() => startAutoRefresh());
+  } else if (apiKey) {
     window.apiKey = apiKey;
     showApp();
     fetchAllData().then(() => startAutoRefresh());
@@ -65,7 +108,9 @@ async function handleLogin(e) {
 
 function handleLogout() {
   localStorage.removeItem("apiKey");
+  localStorage.removeItem("authToken");
   window.apiKey = null;
+  window.authToken = null;
   stopAutoRefresh();
   cachedTorrents = [];
   cachedDownloads = [];
@@ -97,12 +142,9 @@ async function fetchAllData() {
   await fetchAuthInfo();
   // Fetch kept torrent IDs first so renderTorrents() already has them when it runs
   await fetchKeptTorrents();
-  await Promise.all([
-    fetchStatus(),
-    fetchTorrents(),
-    fetchDownloads(),
-    fetchAutoDeleteSetting(),
-  ]);
+  // Stagger remaining requests to avoid exceeding rate limiter
+  await Promise.all([fetchStatus(), fetchTorrents()]);
+  await Promise.all([fetchDownloads(), fetchAutoDeleteSetting()]);
 }
 
 async function fetchAuthInfo() {
@@ -217,7 +259,7 @@ function renderTorrents(filterStr) {
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1">
                 <span class="truncate text-sm font-medium">${escapeHtml(t.filename)}</span>
-                ${isKept ? '<span class="badge badge-info" title="Kept — protected from auto-delete"><i data-lucide="shield" class="w-3 h-3" aria-hidden="true"></i></span>' : ""}
+                ${isKept ? '<span class="badge badge-info badge-kept" data-badge="kept" title="Kept — protected from auto-delete"><i data-lucide="shield" class="w-3 h-3" aria-hidden="true"></i></span>' : ""}
               </div>
               <div class="flex items-center gap-3 text-xs text-[#71717a]" style="font-variant-numeric: tabular-nums">
                 <span>${formatBytes(t.bytes)}</span>
@@ -226,18 +268,18 @@ function renderTorrents(filterStr) {
               </div>
             </div>
             <div class="flex items-center gap-1">
+              <button
+                data-id="${t.id}"
+                data-filename="${escapeHtml(t.filename)}"
+                onclick="toggleKeep(this.dataset.id, this.dataset.filename)"
+                class="btn btn-ghost p-2"
+                aria-label="${isKept ? "Unkeep" : "Keep"} ${escapeHtml(t.filename)}"
+              >
+                <i data-lucide="${isKept ? "shield-check" : "shield"}" class="w-4 h-4" aria-hidden="true"></i>
+              </button>
               ${
                 isAdmin
                   ? `
-                <button
-                  data-id="${t.id}"
-                  data-filename="${escapeHtml(t.filename)}"
-                  onclick="toggleKeep(this.dataset.id, this.dataset.filename)"
-                  class="btn btn-ghost p-2"
-                  aria-label="${isKept ? "Unkeep" : "Keep"} ${escapeHtml(t.filename)}"
-                >
-                  <i data-lucide="${isKept ? "shield-check" : "shield"}" class="w-4 h-4" aria-hidden="true"></i>
-                </button>
                 <button
                   data-id="${t.id}"
                   data-filename="${escapeHtml(t.filename)}"
@@ -496,13 +538,13 @@ function updateKeepStatus() {
       );
     }
 
-    const existingBadge = item.querySelector(".badge-info");
+    const existingBadge = item.querySelector('[data-badge="kept"]');
     if (isKept && !existingBadge) {
       const titleDiv = item.querySelector(".flex.items-center.gap-2.mb-1");
       if (titleDiv) {
         titleDiv.insertAdjacentHTML(
           "beforeend",
-          '<span class="badge badge-info" title="Kept — protected from auto-delete"><i data-lucide="shield" class="w-3 h-3" aria-hidden="true"></i></span>',
+          '<span class="badge badge-info badge-kept" data-badge="kept" title="Kept — protected from auto-delete"><i data-lucide="shield" class="w-3 h-3" aria-hidden="true"></i></span>',
         );
         lucide.createIcons();
       }
@@ -872,13 +914,21 @@ function setupEventListeners() {
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 async function apiFetch(url, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+
+  // Prefer token-based auth if available, fall back to API key
+  if (window.authToken) {
+    headers["Authorization"] = `Bearer ${window.authToken}`;
+  } else if (window.apiKey) {
+    headers["X-API-Key"] = window.apiKey;
+  }
+
   const res = await fetch(url, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Key": window.apiKey || "",
-      ...(options.headers || {}),
-    },
+    headers,
   });
 
   if (res.status === 401) {
