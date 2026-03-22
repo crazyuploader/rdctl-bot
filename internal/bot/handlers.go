@@ -945,7 +945,7 @@ func (b *Bot) handleUnkeepCommand(ctx context.Context, tgBot *bot.Bot, update *m
 		torrentID := parts[1]
 
 		// Remove keep mark from torrent
-		if err := b.keptRepo.UnkeepTorrent(ctx, torrentID, user.UserID); err != nil {
+		if err := b.keptRepo.UnkeepTorrent(ctx, torrentID, int64(user.UserID), isSuperAdmin); err != nil {
 			b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Failed to unkeep torrent: %s", html.EscapeString(err.Error())), update.Message.ID)
 			if user != nil {
 				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "unkeep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, err.Error(), 0); err != nil {

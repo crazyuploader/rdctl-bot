@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -153,7 +154,12 @@ func Load(cfgFile string) (*Config, error) {
 	}
 
 	// Validate configuration
-	// Validation is now the responsibility of the caller to allow for different modes (e.g. web-only)
+	if cfg.App.MaxKeptTorrents < 0 {
+		return nil, errors.New("invalid configuration: App.MaxKeptTorrents must be >= 0")
+	}
+	if cfg.App.AutoDeleteDays < 0 {
+		return nil, errors.New("invalid configuration: App.AutoDeleteDays must be >= 0")
+	}
 
 	return cfg, nil
 }

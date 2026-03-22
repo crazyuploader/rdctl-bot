@@ -273,8 +273,11 @@ func (d *Dependencies) UnkeepTorrent(c *fiber.Ctx) error {
 		userID = token.UserID
 	}
 
-	if err := d.KeptRepo.UnkeepTorrent(c.Context(), id, userID); err != nil {
-		return err
+	role := GetRole(c)
+	isAdmin := role == RoleAdmin
+
+	if err := d.KeptRepo.UnkeepTorrent(c.Context(), id, userID, isAdmin); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
 	}
 
 	return c.JSON(fiber.Map{

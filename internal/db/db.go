@@ -195,14 +195,13 @@ func seedLegacyChats(db *gorm.DB) error {
 	log.Println("Seeding legacy chat IDs to satisfy foreign key constraints...")
 
 	tables := []string{"activity_logs", "command_logs", "torrent_activities", "download_activities", "setting_audits"}
-	uniqueChatIDs := make(map[int64]bool)
+	uniqueChatIDs := map[int64]bool{0: true}
 
 	for _, table := range tables {
 		if db.Migrator().HasTable(table) {
 			var ids []int64
 			if err := db.Table(table).Where("chat_id != 0").Distinct("chat_id").Pluck("chat_id", &ids).Error; err != nil {
-				log.Printf("Warning: failed to fetch distinct chat IDs from %s: %v", table, err)
-				continue
+				return fmt.Errorf("failed to fetch distinct chat IDs from %s: %w", table, err)
 			}
 			for _, id := range ids {
 				uniqueChatIDs[id] = true
@@ -220,7 +219,7 @@ func seedLegacyChats(db *gorm.DB) error {
 			UpdatedAt: now,
 		}
 		if err := db.Where("chat_id = ?", chatID).FirstOrCreate(&chat).Error; err != nil {
-			log.Printf("Warning: failed to seed legacy chat %d: %v", chatID, err)
+			return fmt.Errorf("failed to seed legacy chat %d: %w", chatID, err)
 		}
 	}
 

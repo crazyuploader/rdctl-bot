@@ -81,7 +81,7 @@ func TestKeptTorrentRepository(t *testing.T) {
 	})
 
 	t.Run("UnkeepTorrent successful", func(t *testing.T) {
-		err := keptRepo.UnkeepTorrent(ctx, "torrent1", 123)
+		err := keptRepo.UnkeepTorrent(ctx, "torrent1", 123, false)
 		assert.NoError(t, err)
 
 		isKept, err := keptRepo.IsKept(ctx, "torrent1")

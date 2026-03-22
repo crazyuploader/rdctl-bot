@@ -476,7 +476,7 @@ func (r *KeptTorrentRepository) KeepTorrent(ctx context.Context, torrentID, file
 }
 
 // UnkeepTorrent removes the keep mark from a torrent
-func (r *KeptTorrentRepository) UnkeepTorrent(ctx context.Context, torrentID string, unkeptByID int64) error {
+func (r *KeptTorrentRepository) UnkeepTorrent(ctx context.Context, torrentID string, unkeptByID int64, isAdmin bool) error {
 	now := time.Now().UTC()
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -488,8 +488,17 @@ func (r *KeptTorrentRepository) UnkeepTorrent(ctx context.Context, torrentID str
 			return fmt.Errorf("failed to load actor user %d: %w", unkeptByID, err)
 		}
 
-		if err := tx.Where("torrent_id = ? AND kept_by_id = ?", torrentID, unkeptByID).Delete(&KeptTorrent{}).Error; err != nil {
-			return err
+		query := tx.Where("torrent_id = ?", torrentID)
+		if !isAdmin {
+			query = query.Where("kept_by_id = ?", unkeptByID)
+		}
+
+		res := query.Delete(&KeptTorrent{})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return fmt.Errorf("torrent is not kept or you don't have permission to unkeep it")
 		}
 
 		action := KeptTorrentAction{

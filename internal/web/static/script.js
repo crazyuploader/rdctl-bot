@@ -30,7 +30,7 @@ async function checkLogin() {
   if (code) {
     // Exchange code for token
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/exchange`, {
+      const response = await fetch(`${API_BASE_URL}/api/exchange-token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
@@ -49,8 +49,13 @@ async function checkLogin() {
             : window.location.pathname;
           history.replaceState(null, "", newUrl);
 
-          showApp();
-          fetchAllData().then(() => startAutoRefresh());
+          try {
+            showApp();
+            await fetchAllData();
+            startAutoRefresh();
+          } catch (error) {
+            // handleLogout already called on 401
+          }
           return;
         }
       }
@@ -65,12 +70,18 @@ async function checkLogin() {
 
   if (authToken) {
     window.authToken = authToken;
-    showApp();
-    fetchAllData().then(() => startAutoRefresh());
   } else if (apiKey) {
     window.apiKey = apiKey;
+  } else {
+    return;
+  }
+
+  try {
     showApp();
-    fetchAllData().then(() => startAutoRefresh());
+    await fetchAllData();
+    startAutoRefresh();
+  } catch (error) {
+    // handleLogout already called on 401
   }
 }
 
@@ -164,6 +175,7 @@ async function fetchAuthInfo() {
     }
   } catch (error) {
     console.error("Auth error:", error);
+    throw error;
   }
 }
 
@@ -404,7 +416,10 @@ async function fetchDownloads() {
           !old ||
           old.id !== d.id ||
           old.filename !== d.filename ||
-          old.filesize !== d.filesize
+          old.filesize !== d.filesize ||
+          old.host !== d.host ||
+          old.download !== d.download ||
+          old.generated !== d.generated
         );
       });
 
@@ -658,6 +673,9 @@ function confirmDelete(type, id, filename) {
 function showConfirmModal() {
   const overlay = document.getElementById("confirm-modal");
   overlay.classList.add("show");
+  overlay.removeAttribute("hidden");
+  overlay.setAttribute("aria-hidden", "false");
+  overlay.removeAttribute("inert");
   // Focus first focusable element in modal
   requestAnimationFrame(() => {
     const focusable = overlay.querySelectorAll(
@@ -670,6 +688,9 @@ function showConfirmModal() {
 function hideConfirmModal() {
   const overlay = document.getElementById("confirm-modal");
   overlay.classList.remove("show");
+  overlay.setAttribute("hidden", "true");
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.setAttribute("inert", "true");
   confirmCallback = null;
   // Restore focus to triggering element
   if (lastFocusedElement) {
