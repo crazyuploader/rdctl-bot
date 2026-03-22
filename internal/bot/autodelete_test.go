@@ -56,8 +56,13 @@ func (m *MockRDClient) DeleteDownload(downloadID string) error { return nil }
 func (m *MockRDClient) GetSupportedRegex() ([]string, error)   { return nil, nil }
 
 func setupTestBot(t *testing.T) (*Bot, *MockRDClient, *gorm.DB) {
-	database, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	database.AutoMigrate(&db.User{}, &db.Setting{}, &db.KeptTorrent{}, &db.KeptTorrentAction{}, &db.TorrentActivity{}, &db.Chat{})
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("failed to open database: %v", err)
+	}
+	if err := database.AutoMigrate(&db.User{}, &db.Setting{}, &db.KeptTorrent{}, &db.KeptTorrentAction{}, &db.TorrentActivity{}, &db.Chat{}); err != nil {
+		t.Fatalf("failed to migrate database: %v", err)
+	}
 
 	cfg := &config.Config{
 		App: config.AppConfig{

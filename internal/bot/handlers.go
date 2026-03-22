@@ -114,19 +114,19 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 			progress := fmt.Sprintf("%.1f%%", t.Progress)
 			added := t.Added.Format("2006-01-02 15:04")
 
-			entry.WriteString(fmt.Sprintf("<i>File:</i> <code>%s</code>\n", html.EscapeString(t.Filename)))
-			entry.WriteString(fmt.Sprintf("<i>ID:</i> <code>%s</code>\n", t.ID))
-			entry.WriteString(fmt.Sprintf("<i>Status:</i> %s\n", status))
-			entry.WriteString(fmt.Sprintf("<i>Size:</i> %s\n", size))
-			entry.WriteString(fmt.Sprintf("<i>Progress:</i> %s\n", progress))
-			entry.WriteString(fmt.Sprintf("<i>Added:</i> %s\n", added))
+			fmt.Fprintf(&entry, "<i>File:</i> <code>%s</code>\n", html.EscapeString(t.Filename))
+			fmt.Fprintf(&entry, "<i>ID:</i> <code>%s</code>\n", t.ID)
+			fmt.Fprintf(&entry, "<i>Status:</i> %s\n", status)
+			fmt.Fprintf(&entry, "<i>Size:</i> %s\n", size)
+			fmt.Fprintf(&entry, "<i>Progress:</i> %s\n", progress)
+			fmt.Fprintf(&entry, "<i>Added:</i> %s\n", added)
 
 			if t.Speed > 0 {
 				speed := realdebrid.FormatSize(t.Speed) + "/s"
-				entry.WriteString(fmt.Sprintf("<i>Speed:</i> %s\n", speed))
+				fmt.Fprintf(&entry, "<i>Speed:</i> %s\n", speed)
 			}
 			if t.Seeders > 0 {
-				entry.WriteString(fmt.Sprintf("<i>Seeders:</i> %d\n", t.Seeders))
+				fmt.Fprintf(&entry, "<i>Seeders:</i> %d\n", t.Seeders)
 			}
 			entry.WriteString("\n")
 
@@ -139,7 +139,7 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		}
 
 		if hitLengthLimit {
-			text.WriteString(fmt.Sprintf("<i>Showing the first %d torrents to avoid exceeding message length limits.</i>\n\n", torrentsShown))
+			fmt.Fprintf(&text, "<i>Showing the first %d torrents to avoid exceeding message length limits.</i>\n\n", torrentsShown)
 		}
 
 		text.WriteString("Use <code>/info &lt;id&gt;</code> for more details on a specific torrent.")
@@ -270,19 +270,19 @@ func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID
 
 	var text strings.Builder
 	text.WriteString("<b>Torrent Details</b>\n\n")
-	text.WriteString(fmt.Sprintf("<i>Name:</i> <code>%s</code>\n", html.EscapeString(torrent.Filename)))
-	text.WriteString(fmt.Sprintf("<i>ID:</i> <code>%s</code>\n", torrent.ID))
-	text.WriteString(fmt.Sprintf("<i>Status:</i> %s\n", status))
-	text.WriteString(fmt.Sprintf("<i>Size:</i> %s\n", size))
-	text.WriteString(fmt.Sprintf("<i>Progress:</i> %s\n", progress))
-	text.WriteString(fmt.Sprintf("<i>Hash:</i> <code>%s</code>\n", torrent.Hash))
+	fmt.Fprintf(&text, "<i>Name:</i> <code>%s</code>\n", html.EscapeString(torrent.Filename))
+	fmt.Fprintf(&text, "<i>ID:</i> <code>%s</code>\n", torrent.ID)
+	fmt.Fprintf(&text, "<i>Status:</i> %s\n", status)
+	fmt.Fprintf(&text, "<i>Size:</i> %s\n", size)
+	fmt.Fprintf(&text, "<i>Progress:</i> %s\n", progress)
+	fmt.Fprintf(&text, "<i>Hash:</i> <code>%s</code>\n", torrent.Hash)
 
 	if torrent.Speed > 0 {
 		speed := realdebrid.FormatSize(torrent.Speed) + "/s"
-		text.WriteString(fmt.Sprintf("<i>Speed:</i> %s\n", speed))
+		fmt.Fprintf(&text, "<i>Speed:</i> %s\n", speed)
 	}
 	if torrent.Seeders > 0 {
-		text.WriteString(fmt.Sprintf("<i>Seeders:</i> %d\n", torrent.Seeders))
+		fmt.Fprintf(&text, "<i>Seeders:</i> %d\n", torrent.Seeders)
 	}
 
 	// Send message
@@ -448,17 +448,17 @@ func (b *Bot) handleDownloadsCommand(ctx context.Context, tgBot *bot.Bot, update
 		for _, d := range downloads {
 			entry := strings.Builder{}
 			size := realdebrid.FormatSize(d.Filesize)
-			entry.WriteString(fmt.Sprintf("<i>File:</i> <code>%s</code>\n", html.EscapeString(d.Filename)))
-			entry.WriteString(fmt.Sprintf("<i>ID:</i> <code>%s</code>\n", d.ID))
-			entry.WriteString(fmt.Sprintf("<i>Size:</i> %s\n", size))
-			entry.WriteString(fmt.Sprintf("<i>Host:</i> %s\n", html.EscapeString(d.Host)))
+			fmt.Fprintf(&entry, "<i>File:</i> <code>%s</code>\n", html.EscapeString(d.Filename))
+			fmt.Fprintf(&entry, "<i>ID:</i> <code>%s</code>\n", d.ID)
+			fmt.Fprintf(&entry, "<i>Size:</i> %s\n", size)
+			fmt.Fprintf(&entry, "<i>Host:</i> %s\n", html.EscapeString(d.Host))
 			if !d.Generated.IsZero() {
-				entry.WriteString(fmt.Sprintf("<i>Generated:</i> %s\n", d.Generated.Format("2006-01-02 15:04")))
+				fmt.Fprintf(&entry, "<i>Generated:</i> %s\n", d.Generated.Format("2006-01-02 15:04"))
 			}
 			entry.WriteString("\n")
 
 			if text.Len()+entry.Len() > maxMsgLen {
-				text.WriteString(fmt.Sprintf("<i>Showing the first %d downloads to avoid exceeding message limits.</i>\n\n", downloadsShown))
+				fmt.Fprintf(&text, "<i>Showing the first %d downloads to avoid exceeding message limits.</i>\n\n", downloadsShown)
 				break
 			}
 			text.WriteString(entry.String())
@@ -553,23 +553,23 @@ func (b *Bot) handleStatusCommand(ctx context.Context, tgBot *bot.Bot, update *m
 
 		var text strings.Builder
 		text.WriteString("<b>Account Status</b>\n\n")
-		text.WriteString(fmt.Sprintf("<i>Username:</i> <code>%s</code>\n", html.EscapeString(b.maskUsername(rdUser.Username))))
-		text.WriteString(fmt.Sprintf("<i>Email:</i> <code>%s</code>\n", html.EscapeString(rdUser.Email)))
-		text.WriteString(fmt.Sprintf("<i>Account Type:</i> %s\n", html.EscapeString(cases.Title(language.English).String(rdUser.Type))))
+		fmt.Fprintf(&text, "<i>Username:</i> <code>%s</code>\n", html.EscapeString(b.maskUsername(rdUser.Username)))
+		fmt.Fprintf(&text, "<i>Email:</i> <code>%s</code>\n", html.EscapeString(rdUser.Email))
+		fmt.Fprintf(&text, "<i>Account Type:</i> %s\n", html.EscapeString(cases.Title(language.English).String(rdUser.Type)))
 
 		if rdUser.Points > 0 {
-			text.WriteString(fmt.Sprintf("<i>Fidelity Points:</i> %d\n", rdUser.Points))
+			fmt.Fprintf(&text, "<i>Fidelity Points:</i> %d\n", rdUser.Points)
 		}
 
 		if rdUser.Premium > 0 {
 			duration := rdUser.GetPremiumDuration()
 			days := int(duration.Hours() / 24)
 			hours := int(duration.Hours()) % 24
-			text.WriteString(fmt.Sprintf("<i>Premium Remaining:</i> %d days, %d hours\n", days, hours))
+			fmt.Fprintf(&text, "<i>Premium Remaining:</i> %d days, %d hours\n", days, hours)
 		}
 
 		if expTime, err := rdUser.GetExpirationTime(); err == nil && !expTime.IsZero() {
-			text.WriteString(fmt.Sprintf("<i>Expires On:</i> %s\n", expTime.Local().Format("2006-01-02 15:04 MST")))
+			fmt.Fprintf(&text, "<i>Expires On:</i> %s\n", expTime.Local().Format("2006-01-02 15:04 MST"))
 		}
 
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
@@ -845,7 +845,7 @@ func (b *Bot) handleKeepCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 					if keptBy == "" {
 						keptBy = fmt.Sprintf("User #%d", kt.KeptByID)
 					}
-					text.WriteString(fmt.Sprintf("<code>%s</code> - %s\n<i>Kept by %s on %s</i>\n\n", html.EscapeString(kt.TorrentID), html.EscapeString(kt.Filename), html.EscapeString(keptBy), keptAt))
+					fmt.Fprintf(&text, "<code>%s</code> - %s\n<i>Kept by %s on %s</i>\n\n", html.EscapeString(kt.TorrentID), html.EscapeString(kt.Filename), html.EscapeString(keptBy), keptAt)
 				}
 				text.WriteString("<i>Use /unkeep &lt;torrent_id&gt; to remove.</i>")
 			}
@@ -930,7 +930,7 @@ func (b *Bot) handleUnkeepCommand(ctx context.Context, tgBot *bot.Bot, update *m
 					if keptBy == "" {
 						keptBy = fmt.Sprintf("User #%d", kt.KeptByID)
 					}
-					text.WriteString(fmt.Sprintf("<code>%s</code> - %s\n<i>Kept by %s on %s</i>\n\n", html.EscapeString(kt.TorrentID), html.EscapeString(kt.Filename), html.EscapeString(keptBy), keptAt))
+					fmt.Fprintf(&text, "<code>%s</code> - %s\n<i>Kept by %s on %s</i>\n\n", html.EscapeString(kt.TorrentID), html.EscapeString(kt.Filename), html.EscapeString(keptBy), keptAt)
 				}
 			}
 
