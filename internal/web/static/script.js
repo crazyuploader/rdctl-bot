@@ -824,7 +824,7 @@ function setupEventListeners() {
       try {
         await apiFetch(`${API_BASE_URL}/torrents`, {
           method: "POST",
-          body: JSON.stringify({ link }),
+          body: JSON.stringify({ magnet: link }),
         });
         input.value = "";
         showToast("Torrent added", "success");

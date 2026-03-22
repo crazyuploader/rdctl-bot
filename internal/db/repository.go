@@ -435,6 +435,14 @@ func (r *KeptTorrentRepository) KeepTorrent(ctx context.Context, torrentID, file
 	}
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var user User
+		if err := tx.Where("user_id = ?", keptByID).First(&user).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("cannot keep torrent: actor user %d not found", keptByID)
+			}
+			return fmt.Errorf("failed to load actor user %d: %w", keptByID, err)
+		}
+
 		// Atomic limit check inside the transaction
 		if maxKept > 0 {
 			var count int64
@@ -456,17 +464,11 @@ func (r *KeptTorrentRepository) KeepTorrent(ctx context.Context, torrentID, file
 			return err
 		}
 
-		var user User
-		username := ""
-		if err := tx.Where("user_id = ?", keptByID).First(&user).Error; err == nil {
-			username = user.Username
-		}
-
 		action := KeptTorrentAction{
 			TorrentID: torrentID,
 			Action:    "keep",
 			UserID:    user.ID,
-			Username:  username,
+			Username:  user.Username,
 			CreatedAt: now,
 		}
 		return tx.Create(&action).Error
@@ -478,21 +480,23 @@ func (r *KeptTorrentRepository) UnkeepTorrent(ctx context.Context, torrentID str
 	now := time.Now().UTC()
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("torrent_id = ? AND kept_by_id = ?", torrentID, unkeptByID).Delete(&KeptTorrent{}).Error; err != nil {
-			return err
+		var user User
+		if err := tx.Where("user_id = ?", unkeptByID).First(&user).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("cannot unkeep torrent: actor user %d not found", unkeptByID)
+			}
+			return fmt.Errorf("failed to load actor user %d: %w", unkeptByID, err)
 		}
 
-		var user User
-		username := ""
-		if err := tx.Where("user_id = ?", unkeptByID).First(&user).Error; err == nil {
-			username = user.Username
+		if err := tx.Where("torrent_id = ? AND kept_by_id = ?", torrentID, unkeptByID).Delete(&KeptTorrent{}).Error; err != nil {
+			return err
 		}
 
 		action := KeptTorrentAction{
 			TorrentID: torrentID,
 			Action:    "unkeep",
 			UserID:    user.ID,
-			Username:  username,
+			Username:  user.Username,
 			CreatedAt: now,
 		}
 		return tx.Create(&action).Error
