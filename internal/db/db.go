@@ -46,10 +46,9 @@ func Init(dsn string) (*gorm.DB, error) {
 	if cfg != nil && cfg.Database.IsSQLite() {
 		// Use SQLite
 		db, err = gorm.Open(sqlite.Open(dsn), &gorm.Config{
-			Logger: newLogger,
-			NowFunc: func() time.Time {
-				return time.Now().UTC()
-			},
+			Logger:                                   newLogger,
+			NowFunc:                                  func() time.Time { return time.Now().UTC() },
+			DisableForeignKeyConstraintWhenMigrating: true,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to SQLite database: %w", err)
@@ -73,10 +72,9 @@ func Init(dsn string) (*gorm.DB, error) {
 	} else {
 		// Use PostgreSQL
 		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
-			Logger: newLogger,
-			NowFunc: func() time.Time {
-				return time.Now().UTC()
-			},
+			Logger:                                   newLogger,
+			NowFunc:                                  func() time.Time { return time.Now().UTC() },
+			DisableForeignKeyConstraintWhenMigrating: true,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to PostgreSQL database: %w", err)
@@ -158,22 +156,40 @@ func runMigrations(db *gorm.DB) error {
 
 	// Step 5: Migrate KeptTorrent table (no dependencies)
 	log.Println("Migrating kept_torrents table...")
-	if err := db.AutoMigrate(&KeptTorrent{}); err != nil {
-		return fmt.Errorf("failed to migrate kept_torrents table: %w", err)
+	if !db.Migrator().HasTable(&KeptTorrent{}) {
+		if err := db.AutoMigrate(&KeptTorrent{}); err != nil {
+			return fmt.Errorf("failed to migrate kept_torrents table: %w", err)
+		}
+	} else {
+		log.Println("kept_torrents table already exists, skipping...")
 	}
 
 	// Step 6: Migrate Action/Audit tables
 	log.Println("Migrating kept_torrent_actions table...")
-	if err := db.AutoMigrate(&KeptTorrentAction{}); err != nil {
-		return fmt.Errorf("failed to migrate kept_torrent_actions table: %w", err)
+	if !db.Migrator().HasTable(&KeptTorrentAction{}) {
+		if err := db.AutoMigrate(&KeptTorrentAction{}); err != nil {
+			return fmt.Errorf("failed to migrate kept_torrent_actions table: %w", err)
+		}
+	} else {
+		log.Println("kept_torrent_actions table already exists, skipping...")
 	}
 
 	log.Println("Migrating setting_audits table...")
-	if err := db.AutoMigrate(&SettingAudit{}); err != nil {
-		return fmt.Errorf("failed to migrate setting_audits table: %w", err)
+	if !db.Migrator().HasTable(&SettingAudit{}) {
+		if err := db.AutoMigrate(&SettingAudit{}); err != nil {
+			return fmt.Errorf("failed to migrate setting_audits table: %w", err)
+		}
+	} else {
+		log.Println("setting_audits table already exists, skipping...")
 	}
 
 	log.Println("All migrations completed successfully!")
+
+	// Create foreign key constraints manually (GORM AutoMigrate has bugs with FK direction)
+	if err := createForeignKeys(db); err != nil {
+		return fmt.Errorf("failed to create foreign key constraints: %w", err)
+	}
+
 	return nil
 }
 
@@ -187,6 +203,63 @@ func Close(db *gorm.DB) error {
 		return err
 	}
 	return sqlDB.Close()
+}
+
+// createForeignKeys manually creates foreign key constraints that GORM AutoMigrate gets wrong.
+func createForeignKeys(db *gorm.DB) error {
+	log.Println("Creating foreign key constraints...")
+
+	foreignKeys := []struct {
+		table      string
+		column     string
+		references string
+		onDelete   string
+	}{
+		{"activity_logs", "user_id", "users(id)", "CASCADE"},
+		{"activity_logs", "chat_id", "chats(chat_id)", "CASCADE"},
+		{"torrent_activities", "user_id", "users(id)", "CASCADE"},
+		{"torrent_activities", "chat_id", "chats(chat_id)", "CASCADE"},
+		{"command_logs", "user_id", "users(id)", "CASCADE"},
+		{"command_logs", "chat_id", "chats(chat_id)", "CASCADE"},
+		{"download_activities", "user_id", "users(id)", "CASCADE"},
+		{"download_activities", "chat_id", "chats(chat_id)", "CASCADE"},
+		{"download_activities", "torrent_activity_id", "torrent_activities(id)", "SET NULL"},
+		{"kept_torrents", "kept_by_id", "users(id)", "CASCADE"},
+		{"kept_torrent_actions", "user_id", "users(id)", "CASCADE"},
+		{"setting_audits", "changed_by", "users(user_id)", "CASCADE"},
+		{"setting_audits", "chat_id", "chats(chat_id)", "SET NULL"},
+	}
+
+	for _, fk := range foreignKeys {
+		constraintName := fmt.Sprintf("fk_%s_%s", fk.table, fk.column)
+
+		// Check if constraint already exists
+		var count int64
+		db.Raw(`
+			SELECT COUNT(*) FROM information_schema.table_constraints
+			WHERE constraint_name = ? AND table_schema = 'public'
+		`, constraintName).Scan(&count)
+
+		if count > 0 {
+			log.Printf("Constraint %s already exists, skipping...", constraintName)
+			continue
+		}
+
+		// Create the foreign key
+		sql := fmt.Sprintf(
+			`ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s ON DELETE %s`,
+			fk.table, constraintName, fk.column, fk.references, fk.onDelete,
+		)
+
+		if err := db.Exec(sql).Error; err != nil {
+			log.Printf("Warning: failed to create constraint %s: %v", constraintName, err)
+			continue
+		}
+		log.Printf("Created constraint: %s", constraintName)
+	}
+
+	log.Println("Foreign key constraints created successfully!")
+	return nil
 }
 
 // seedLegacyChats extracts all distinct chat_ids from existing logs and creates dummy Chat entries
