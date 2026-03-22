@@ -22,10 +22,29 @@ import (
 	"gorm.io/gorm"
 )
 
+// RealDebridClient defines the required interface for Real-Debrid operations.
+// This allows for mocking in unit tests.
+type RealDebridClient interface {
+	GetTorrents(limit, offset int) ([]realdebrid.Torrent, error)
+	GetTorrentsWithCount(limit, offset int) (*realdebrid.TorrentsResult, error)
+	GetTorrentInfo(torrentID string) (*realdebrid.Torrent, error)
+	AddMagnet(magnetURL string) (*realdebrid.AddMagnetResponse, error)
+	SelectFiles(torrentID string, fileIDs []int) error
+	SelectAllFiles(torrentID string) error
+	DeleteTorrent(torrentID string) error
+	CheckInstantAvailability(hashes []string) (realdebrid.InstantAvailability, error)
+	GetUser() (*realdebrid.User, error)
+	GetDownloads(limit, offset int) ([]realdebrid.Download, error)
+	GetDownloadsWithCount(limit, offset int) (*realdebrid.DownloadsResult, error)
+	UnrestrictLink(link string) (*realdebrid.UnrestrictedLink, error)
+	DeleteDownload(downloadID string) error
+	GetSupportedRegex() ([]string, error)
+}
+
 // Bot represents the Telegram bot
 type Bot struct {
 	api            *bot.Bot
-	rdClient       *realdebrid.Client
+	rdClient       RealDebridClient
 	middleware     *Middleware
 	supportedRegex []*regexp.Regexp
 	config         *config.Config
