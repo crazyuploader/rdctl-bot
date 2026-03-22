@@ -112,6 +112,12 @@ func Init(dsn string) (*gorm.DB, error) {
 func runMigrations(db *gorm.DB) error {
 	log.Println("Starting database migrations...")
 
+	// Clean up any malformed foreign key constraints from previous failed migrations
+	if err := cleanupMalformedConstraints(db); err != nil {
+		log.Printf("Warning: failed to clean up malformed constraints: %v", err)
+		// Don't fail, continue with migrations
+	}
+
 	// Step 1: Migrate Chat and User tables first (no dependencies)
 	log.Println("Migrating chats table...")
 	if err := db.AutoMigrate(&Chat{}); err != nil {
@@ -174,6 +180,39 @@ func runMigrations(db *gorm.DB) error {
 	}
 
 	log.Println("All migrations completed successfully!")
+	return nil
+}
+
+// cleanupMalformedConstraints drops any incorrectly defined foreign key constraints
+// that may have been created in previous failed migration attempts, particularly
+// the fk_torrent_activities_user constraint on the users table which is backwards.
+func cleanupMalformedConstraints(db *gorm.DB) error {
+	// Check if we're using PostgreSQL
+	if db.Dialector.Name() != "postgres" {
+		return nil // SQLite doesn't have the same constraint naming/management issues
+	}
+
+	// Drop the malformed constraint if it exists
+	constraintName := "fk_torrent_activities_user"
+	result := db.Exec(`
+		ALTER TABLE users 
+		DROP CONSTRAINT IF EXISTS ? CASCADE
+	`, constraintName)
+
+	if result.Error != nil {
+		// Try alternative syntax
+		result = db.Exec(fmt.Sprintf(`
+			ALTER TABLE users 
+			DROP CONSTRAINT IF EXISTS "%s" CASCADE
+		`, constraintName))
+	}
+
+	if result.Error != nil {
+		log.Printf("Could not drop constraint %s (might not exist): %v", constraintName, result.Error)
+		return nil // Don't fail if constraint doesn't exist
+	}
+
+	log.Printf("Cleaned up malformed constraint: %s", constraintName)
 	return nil
 }
 
