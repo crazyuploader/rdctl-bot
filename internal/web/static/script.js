@@ -50,6 +50,7 @@ async function checkLogin() {
           history.replaceState(null, "", newUrl);
 
           try {
+            await fetchAuthInfo();
             showApp();
             await fetchAllData();
             startAutoRefresh();
@@ -77,6 +78,7 @@ async function checkLogin() {
   }
 
   try {
+    await fetchAuthInfo();
     showApp();
     await fetchAllData();
     startAutoRefresh();
@@ -100,6 +102,7 @@ async function handleLogin(e) {
   localStorage.setItem("apiKey", apiKey);
 
   try {
+    await fetchAuthInfo();
     showApp();
     await fetchAllData();
     startAutoRefresh();
@@ -150,7 +153,6 @@ function showApp() {
 
 // ─── Data Fetching ────────────────────────────────────────────────────────────
 async function fetchAllData() {
-  await fetchAuthInfo();
   // Fetch kept torrent IDs first so renderTorrents() already has them when it runs
   await fetchKeptTorrents();
   // Stagger remaining requests to avoid exceeding rate limiter
