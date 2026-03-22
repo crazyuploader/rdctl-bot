@@ -24,7 +24,7 @@ builds:
       - arm
     goarm:
       - "6"
-    ignores:
+    ignore:
       - goos: windows
         goarch: arm
         goarm: "6"
