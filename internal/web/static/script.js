@@ -756,8 +756,10 @@ function setupTabs() {
   if (tablist) {
     tablist.addEventListener("keydown", (e) => {
       const tabsArr = Array.from(tabs);
-      const activeIdx = tabsArr.findIndex((t) => t.classList.contains("active"));
-      
+      const activeIdx = tabsArr.findIndex((t) =>
+        t.classList.contains("active"),
+      );
+
       let nextIdx = activeIdx;
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         nextIdx = (activeIdx + 1) % tabsArr.length;
@@ -768,7 +770,7 @@ function setupTabs() {
       } else {
         return;
       }
-      
+
       const targetTab = tabsArr[nextIdx];
       switchTab(targetTab.dataset.tab);
       targetTab.focus();
