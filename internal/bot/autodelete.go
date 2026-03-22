@@ -27,7 +27,7 @@ const (
 )
 
 // handleAutoDeleteCommand handles the /autodelete command (superadmin only)
-func (b *Bot) handleAutoDeleteCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleAutoDeleteCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "autodelete")

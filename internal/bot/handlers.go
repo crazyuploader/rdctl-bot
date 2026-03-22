@@ -19,7 +19,7 @@ import (
 )
 
 // handleStartCommand handles the /start command
-func (b *Bot) handleStartCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleStartCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "start")
@@ -41,7 +41,7 @@ func (b *Bot) handleStartCommand(ctx context.Context, tgBot *bot.Bot, update *mo
 }
 
 // handleHelpCommand handles the /help command
-func (b *Bot) handleHelpCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleHelpCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "help")
@@ -68,15 +68,13 @@ func (b *Bot) handleHelpCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
 
 		// Log command
-
-		// Log command
 		b.logCommandHelper(ctx, user, chatID, messageThreadID, "help", update.Message.Text, startTime, true, "", len(text))
 		b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeCommandHelp, "help", true, "", nil)
 	})
 }
 
 // handleListCommand handles the /list command
-func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleListCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "list")
@@ -153,7 +151,7 @@ func (b *Bot) handleListCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 }
 
 // handleAddCommand handles the /add command
-func (b *Bot) handleAddCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleAddCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "add")
@@ -221,7 +219,7 @@ func (b *Bot) handleAddCommand(ctx context.Context, tgBot *bot.Bot, update *mode
 }
 
 // handleInfoCommand handles the /info command
-func (b *Bot) handleInfoCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleInfoCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "info")
@@ -296,7 +294,7 @@ func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID
 }
 
 // handleDeleteCommand handles the /delete command
-func (b *Bot) handleDeleteCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleDeleteCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "delete")
@@ -351,7 +349,7 @@ func (b *Bot) handleDeleteCommand(ctx context.Context, tgBot *bot.Bot, update *m
 }
 
 // handleUnrestrictCommand handles the /unrestrict command
-func (b *Bot) handleUnrestrictCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleUnrestrictCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "unrestrict")
@@ -406,7 +404,7 @@ func (b *Bot) handleUnrestrictCommand(ctx context.Context, tgBot *bot.Bot, updat
 }
 
 // handleDownloadsCommand handles the /downloads command
-func (b *Bot) handleDownloadsCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleDownloadsCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "downloads")
@@ -476,7 +474,7 @@ func (b *Bot) handleDownloadsCommand(ctx context.Context, tgBot *bot.Bot, update
 }
 
 // handleRemoveLinkCommand handles the /removelink command
-func (b *Bot) handleRemoveLinkCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleRemoveLinkCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "removelink")
@@ -531,7 +529,7 @@ func (b *Bot) handleRemoveLinkCommand(ctx context.Context, tgBot *bot.Bot, updat
 }
 
 // handleStatusCommand handles the /status command
-func (b *Bot) handleStatusCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleStatusCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "status")
@@ -582,7 +580,7 @@ func (b *Bot) handleStatusCommand(ctx context.Context, tgBot *bot.Bot, update *m
 }
 
 // handleMagnetLink handles magnet links sent as messages
-func (b *Bot) handleMagnetLink(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleMagnetLink(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "magnet_link")
@@ -637,7 +635,7 @@ func (b *Bot) handleMagnetLink(ctx context.Context, tgBot *bot.Bot, update *mode
 }
 
 // handleHosterLink handles hoster links sent as messages
-func (b *Bot) handleHosterLink(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleHosterLink(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "hoster_link")
@@ -697,7 +695,7 @@ func (b *Bot) handleHosterLink(ctx context.Context, tgBot *bot.Bot, update *mode
 }
 
 // handleDashboardCommand handles the /dashboard command
-func (b *Bot) handleDashboardCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleDashboardCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "dashboard")
@@ -816,48 +814,65 @@ func (b *Bot) logActivityHelper(ctx context.Context, user *db.User, chatID int64
 	}
 }
 
+// sendKeptTorrentsList fetches and sends the list of kept torrents to the user.
+// Returns true if the list was sent successfully.
+func (b *Bot) sendKeptTorrentsList(ctx context.Context, chatID int64, messageThreadID int, messageID int, unkeepHint bool) bool {
+	keptTorrents, err := b.keptRepo.ListKeptTorrents(ctx)
+	if err != nil {
+		b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Failed to fetch kept torrents: %s", html.EscapeString(err.Error())), messageID)
+		return false
+	}
+
+	var text strings.Builder
+	text.WriteString("<b>Kept Torrents</b>\n")
+	if unkeepHint {
+		text.WriteString("<i>Use /unkeep &lt;torrent_id&gt; to remove</i>\n\n")
+	} else {
+		text.WriteString("<i>Torrents excluded from auto-delete</i>\n\n")
+	}
+
+	if len(keptTorrents) == 0 {
+		text.WriteString("<i>No torrents are currently kept.</i>\n")
+		if !unkeepHint {
+			text.WriteString("<i>Use /keep &lt;torrent_id&gt; to keep a torrent.</i>")
+		}
+		b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), messageID)
+		return true
+	}
+
+	for _, kt := range keptTorrents {
+		keptAt := kt.KeptAt.Format("2006-01-02 15:04")
+		keptBy := kt.User.Username
+		if keptBy == "" {
+			keptBy = fmt.Sprintf("User #%d", kt.KeptByID)
+		}
+		item := fmt.Sprintf("<code>%s</code> - %s\n<i>Kept by %s on %s</i>\n\n", html.EscapeString(kt.TorrentID), html.EscapeString(kt.Filename), html.EscapeString(keptBy), keptAt)
+		if text.Len()+len(item) > 4000 {
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), messageID)
+			text.Reset()
+		}
+		text.WriteString(item)
+	}
+	if text.Len() > 0 {
+		if unkeepHint {
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), messageID)
+		} else {
+			text.WriteString("<i>Use /unkeep &lt;torrent_id&gt; to remove.</i>")
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), messageID)
+		}
+	}
+	return true
+}
+
 // handleKeepCommand handles the /keep command
-func (b *Bot) handleKeepCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleKeepCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "keep")
 
 		parts := strings.Fields(update.Message.Text)
 		if len(parts) < 2 {
-			// Show list of kept torrents
-			keptTorrents, err := b.keptRepo.ListKeptTorrents(ctx)
-			if err != nil {
-				b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Failed to fetch kept torrents: %s", html.EscapeString(err.Error())), update.Message.ID)
-				return
-			}
-
-			var text strings.Builder
-			text.WriteString("<b>Kept Torrents</b>\n")
-			text.WriteString("<i>Torrents excluded from auto-delete</i>\n\n")
-
-			if len(keptTorrents) == 0 {
-				text.WriteString("<i>No torrents are currently kept.</i>\n")
-				text.WriteString("<i>Use /keep &lt;torrent_id&gt; to keep a torrent.</i>")
-				b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
-			} else {
-				for _, kt := range keptTorrents {
-					keptAt := kt.KeptAt.Format("2006-01-02 15:04")
-					keptBy := kt.User.Username
-					if keptBy == "" {
-						keptBy = fmt.Sprintf("User #%d", kt.KeptByID)
-					}
-					item := fmt.Sprintf("<code>%s</code> - %s\n<i>Kept by %s on %s</i>\n\n", html.EscapeString(kt.TorrentID), html.EscapeString(kt.Filename), html.EscapeString(keptBy), keptAt)
-					if text.Len()+len(item) > 4000 {
-						b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
-						text.Reset()
-					}
-					text.WriteString(item)
-				}
-				if text.Len() > 0 {
-					text.WriteString("<i>Use /unkeep &lt;torrent_id&gt; to remove.</i>")
-					b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
-				}
-			}
+			b.sendKeptTorrentsList(ctx, chatID, messageThreadID, update.Message.ID, false)
 			if user != nil {
 				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "keep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0); err != nil {
 					log.Printf("Warning: failed to log keep list: %v", err)
@@ -910,45 +925,14 @@ func (b *Bot) handleKeepCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 }
 
 // handleUnkeepCommand handles the /unkeep command
-func (b *Bot) handleUnkeepCommand(ctx context.Context, tgBot *bot.Bot, update *models.Update) {
+func (b *Bot) handleUnkeepCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "unkeep")
 
 		parts := strings.Fields(update.Message.Text)
 		if len(parts) < 2 {
-			// Show list of kept torrents
-			keptTorrents, err := b.keptRepo.ListKeptTorrents(ctx)
-			if err != nil {
-				b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Failed to fetch kept torrents: %s", html.EscapeString(err.Error())), update.Message.ID)
-				return
-			}
-
-			var text strings.Builder
-			text.WriteString("<b>Kept Torrents</b>\n")
-			text.WriteString("<i>Use /unkeep &lt;torrent_id&gt; to remove</i>\n\n")
-
-			if len(keptTorrents) == 0 {
-				text.WriteString("<i>No torrents are currently kept.</i>")
-				b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
-			} else {
-				for _, kt := range keptTorrents {
-					keptAt := kt.KeptAt.Format("2006-01-02 15:04")
-					keptBy := kt.User.Username
-					if keptBy == "" {
-						keptBy = fmt.Sprintf("User #%d", kt.KeptByID)
-					}
-					item := fmt.Sprintf("<code>%s</code> - %s\n<i>Kept by %s on %s</i>\n\n", html.EscapeString(kt.TorrentID), html.EscapeString(kt.Filename), html.EscapeString(keptBy), keptAt)
-					if text.Len()+len(item) > 4000 {
-						b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
-						text.Reset()
-					}
-					text.WriteString(item)
-				}
-				if text.Len() > 0 {
-					b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
-				}
-			}
+			b.sendKeptTorrentsList(ctx, chatID, messageThreadID, update.Message.ID, true)
 			if user != nil {
 				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "unkeep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0); err != nil {
 					log.Printf("Warning: failed to log unkeep list: %v", err)
