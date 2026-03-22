@@ -28,9 +28,6 @@ builds:
       - goos: windows
         goarch: arm
         goarm: "6"
-      - goos: linux
-        goarch: arm
-        goarm: "6"
     ldflags:
       - -s -w
       - -X main.Version={{.Version}}
