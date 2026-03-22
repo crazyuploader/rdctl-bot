@@ -20,12 +20,14 @@ The bot uses `config.yaml`. See `example-config.yaml` for a template.
 - `app.log_level`: Logging level (`debug`, `info`, `warn`, `error`).
 - `app.rate_limit.messages_per_second`: Max messages/sec to Telegram.
 - `app.rate_limit.burst`: Max message burst to Telegram.
+- `app.max_kept_torrents`: Max kept torrents per non-admin user (0 = unlimited).
+- `app.auto_delete_days`: Default auto-delete days fallback when not set in UI/DB (0 = disabled).
 - `database.host`, `port`, `user`, `password`, `dbname`, `sslmode`: Database connection details.
 - `web.listen_addr`: Web server address (default: `:8089`).
 - `web.dashboard_url`: Base URL for dashboard links.
 - `web.token_expiry_minutes`: Session validity (default: 60 min).
 - `web.limiter.enabled`: Enable rate limiting (default: `true`).
-- `web.limiter.max`: Max requests per window (default: `3`).
+- `web.limiter.max`: Max requests per window (default: `20`).
 - `web.limiter.expiration_seconds`: Rate limit window (default: `1`).
 - `web.limiter.ban_duration_seconds`: Ban duration for auth failures (default: `3600`).
 - `web.limiter.auth_fail_limit`: Max failed login attempts (default: `10`).
