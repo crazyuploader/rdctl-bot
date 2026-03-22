@@ -99,7 +99,7 @@ func (b *Bot) handleAutoDeleteCommand(ctx context.Context, tgBot *bot.Bot, updat
 		}
 
 		// Save setting to DB
-		if err := b.settingRepo.SetSetting(ctx, settingAutoDeleteDays, strconv.Itoa(days)); err != nil {
+		if err := b.settingRepo.SetSettingWithAudit(ctx, settingAutoDeleteDays, strconv.Itoa(days), user.UserID, chatID); err != nil {
 			text := fmt.Sprintf("<b>[ERROR]</b> Failed to save setting: %s", html.EscapeString(err.Error()))
 			b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
 			b.logCommandHelper(ctx, user, chatID, messageThreadID, "autodelete", update.Message.Text, startTime, false, err.Error(), 0)
@@ -221,6 +221,14 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 	}
 
 	for i, t := range oldTorrents {
+		// Re-validate if the torrent was kept since we captured the initial IDs snapshot
+		isKept, err := b.keptRepo.IsKept(ctx, t.ID)
+		if err == nil && isKept {
+			log.Printf("Auto-delete: skipped %s as it was recently marked to be kept", t.ID)
+			totalSkipped++
+			continue
+		}
+
 		// Retry deletion with exponential backoff for transient errors
 		var deleteErr error
 		maxRetries := 3

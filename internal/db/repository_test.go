@@ -10,10 +10,16 @@ import (
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to open database: %v", err)
 	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("failed to get sql db: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
 
 	// Auto-migrate all models
 	err = db.AutoMigrate(

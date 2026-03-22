@@ -27,7 +27,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
     />
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="https://unpkg.com/lucide@0.577.0/dist/umd/lucide.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -627,6 +627,7 @@
                 name="autodelete-days"
                 class="input w-20 py-1.5 text-center text-sm"
                 min="0"
+                max="365"
                 placeholder="0"
                 autocomplete="off"
                 style="font-variant-numeric: tabular-nums"
@@ -651,6 +652,7 @@
             aria-selected="true"
             aria-controls="torrents-panel"
             id="tab-torrents"
+            tabindex="0"
           >
             <span class="flex items-center gap-2">
               <i data-lucide="file-down" class="w-4 h-4" aria-hidden="true"></i>
@@ -664,6 +666,7 @@
             aria-selected="false"
             aria-controls="downloads-panel"
             id="tab-downloads"
+            tabindex="-1"
           >
             <span class="flex items-center gap-2">
               <i data-lucide="package" class="w-4 h-4" aria-hidden="true"></i>

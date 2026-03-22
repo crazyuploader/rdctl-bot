@@ -184,10 +184,10 @@ type KeptTorrent struct {
 	ID        uint   `gorm:"primaryKey"`
 	TorrentID string `gorm:"uniqueIndex:idx_torrent_user;not null"` // Real-Debrid torrent ID
 	Filename  string
-	KeptByID  int64     `gorm:"uniqueIndex:idx_torrent_user;index;not null"` // Telegram user ID who kept it
+	KeptByID  uint      `gorm:"uniqueIndex:idx_torrent_user;index;not null"` // Internal ID of user who kept it
 	KeptAt    time.Time `gorm:"not null"`
 
-	User User `gorm:"foreignKey:KeptByID;references:UserID;constraint:OnDelete:CASCADE"`
+	User User `gorm:"foreignKey:KeptByID;references:ID;constraint:OnDelete:CASCADE"`
 }
 
 func (KeptTorrent) TableName() string {
@@ -220,8 +220,8 @@ type SettingAudit struct {
 	ChatID    *int64    `gorm:"index"`          // Chat where change was made
 	ChangedAt time.Time `gorm:"index;not null"`
 
-	User User `gorm:"foreignKey:ChangedBy;references:UserID;constraint:OnDelete:CASCADE"`
-	Chat Chat `gorm:"foreignKey:ChatID;references:ChatID;constraint:OnDelete:SET NULL"`
+	User User  `gorm:"foreignKey:ChangedBy;references:UserID;constraint:OnDelete:CASCADE"`
+	Chat *Chat `gorm:"foreignKey:ChatID;references:ChatID;constraint:OnDelete:SET NULL"`
 }
 
 func (SettingAudit) TableName() string {

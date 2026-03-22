@@ -744,10 +744,36 @@ function setupModalKeyboard() {
 }
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
 function setupTabs() {
-  document.querySelectorAll(".tab").forEach((tab) => {
+  const tabs = document.querySelectorAll(".tab");
+  tabs.forEach((tab) => {
     tab.addEventListener("click", () => switchTab(tab.dataset.tab));
   });
+
+  // Roving tabindex arrow key navigation
+  const tablist = document.querySelector('[role="tablist"]');
+  if (tablist) {
+    tablist.addEventListener("keydown", (e) => {
+      const tabsArr = Array.from(tabs);
+      const activeIdx = tabsArr.findIndex((t) => t.classList.contains("active"));
+      
+      let nextIdx = activeIdx;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        nextIdx = (activeIdx + 1) % tabsArr.length;
+        e.preventDefault();
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        nextIdx = (activeIdx - 1 + tabsArr.length) % tabsArr.length;
+        e.preventDefault();
+      } else {
+        return;
+      }
+      
+      const targetTab = tabsArr[nextIdx];
+      switchTab(targetTab.dataset.tab);
+      targetTab.focus();
+    });
+  }
 
   // Sync tab from URL on load
   const params = new URLSearchParams(window.location.search);
@@ -770,11 +796,12 @@ function switchTab(name) {
     : window.location.pathname;
   history.replaceState(null, "", newUrl);
 
-  // Update tab styles + ARIA
+  // Update tab styles + ARIA + tabindex
   document.querySelectorAll(".tab").forEach((t) => {
     const isActive = t.dataset.tab === name;
     t.classList.toggle("active", isActive);
     t.setAttribute("aria-selected", isActive ? "true" : "false");
+    t.setAttribute("tabindex", isActive ? "0" : "-1");
   });
 
   // Show/hide panels

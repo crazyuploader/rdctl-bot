@@ -199,6 +199,11 @@ func seedLegacyChats(db *gorm.DB) error {
 
 	for _, table := range tables {
 		if db.Migrator().HasTable(table) {
+			// Backfill legacy NULL chat_ids to the synthetic system chat (0)
+			if err := db.Table(table).Where("chat_id IS NULL").Update("chat_id", 0).Error; err != nil {
+				return fmt.Errorf("failed to backfill NULL chat IDs in %s: %w", table, err)
+			}
+
 			var ids []int64
 			if err := db.Table(table).Where("chat_id != 0").Distinct("chat_id").Pluck("chat_id", &ids).Error; err != nil {
 				return fmt.Errorf("failed to fetch distinct chat IDs from %s: %w", table, err)

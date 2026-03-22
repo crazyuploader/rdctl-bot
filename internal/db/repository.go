@@ -427,16 +427,10 @@ func NewKeptTorrentRepository(db *gorm.DB) *KeptTorrentRepository {
 // to prevent TOCTOU races from concurrent requests.
 func (r *KeptTorrentRepository) KeepTorrent(ctx context.Context, torrentID, filename string, keptByID int64, maxKept int) error {
 	now := time.Now().UTC()
-	keptTorrent := KeptTorrent{
-		TorrentID: torrentID,
-		Filename:  filename,
-		KeptByID:  keptByID,
-		KeptAt:    now,
-	}
 
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var user User
-		if err := tx.Where("user_id = ?", keptByID).First(&user).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ?", keptByID).First(&user).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return fmt.Errorf("cannot keep torrent: actor user %d not found", keptByID)
 			}
@@ -446,12 +440,19 @@ func (r *KeptTorrentRepository) KeepTorrent(ctx context.Context, torrentID, file
 		// Atomic limit check inside the transaction
 		if maxKept > 0 {
 			var count int64
-			if err := tx.Model(&KeptTorrent{}).Where("kept_by_id = ?", keptByID).Count(&count).Error; err != nil {
+			if err := tx.Model(&KeptTorrent{}).Where("kept_by_id = ? AND torrent_id != ?", user.ID, torrentID).Count(&count).Error; err != nil {
 				return fmt.Errorf("failed to count kept torrents: %w", err)
 			}
 			if count >= int64(maxKept) {
 				return fmt.Errorf("maximum kept torrent limit (%d) reached", maxKept)
 			}
+		}
+
+		keptTorrent := KeptTorrent{
+			TorrentID: torrentID,
+			Filename:  filename,
+			KeptByID:  user.ID,
+			KeptAt:    now,
 		}
 
 		if err := tx.Clauses(clause.OnConflict{
@@ -490,7 +491,7 @@ func (r *KeptTorrentRepository) UnkeepTorrent(ctx context.Context, torrentID str
 
 		query := tx.Where("torrent_id = ?", torrentID)
 		if !isAdmin {
-			query = query.Where("kept_by_id = ?", unkeptByID)
+			query = query.Where("kept_by_id = ?", user.ID)
 		}
 
 		res := query.Delete(&KeptTorrent{})
@@ -553,6 +554,13 @@ func (r *KeptTorrentRepository) ListKeptTorrents(ctx context.Context) ([]KeptTor
 // CountKeptByUser returns the number of torrents kept by a specific user
 func (r *KeptTorrentRepository) CountKeptByUser(ctx context.Context, userID int64) (int64, error) {
 	var count int64
-	err := r.db.WithContext(ctx).Model(&KeptTorrent{}).Where("kept_by_id = ?", userID).Count(&count).Error
+	var user User
+	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	err := r.db.WithContext(ctx).Model(&KeptTorrent{}).Where("kept_by_id = ?", user.ID).Count(&count).Error
 	return count, err
 }

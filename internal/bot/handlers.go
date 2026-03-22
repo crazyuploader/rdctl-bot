@@ -838,6 +838,7 @@ func (b *Bot) handleKeepCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 			if len(keptTorrents) == 0 {
 				text.WriteString("<i>No torrents are currently kept.</i>\n")
 				text.WriteString("<i>Use /keep &lt;torrent_id&gt; to keep a torrent.</i>")
+				b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
 			} else {
 				for _, kt := range keptTorrents {
 					keptAt := kt.KeptAt.Format("2006-01-02 15:04")
@@ -845,12 +846,18 @@ func (b *Bot) handleKeepCommand(ctx context.Context, tgBot *bot.Bot, update *mod
 					if keptBy == "" {
 						keptBy = fmt.Sprintf("User #%d", kt.KeptByID)
 					}
-					fmt.Fprintf(&text, "<code>%s</code> - %s\n<i>Kept by %s on %s</i>\n\n", html.EscapeString(kt.TorrentID), html.EscapeString(kt.Filename), html.EscapeString(keptBy), keptAt)
+					item := fmt.Sprintf("<code>%s</code> - %s\n<i>Kept by %s on %s</i>\n\n", html.EscapeString(kt.TorrentID), html.EscapeString(kt.Filename), html.EscapeString(keptBy), keptAt)
+					if text.Len()+len(item) > 4000 {
+						b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
+						text.Reset()
+					}
+					text.WriteString(item)
 				}
-				text.WriteString("<i>Use /unkeep &lt;torrent_id&gt; to remove.</i>")
+				if text.Len() > 0 {
+					text.WriteString("<i>Use /unkeep &lt;torrent_id&gt; to remove.</i>")
+					b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
+				}
 			}
-
-			b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
 			if user != nil {
 				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "keep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0); err != nil {
 					log.Printf("Warning: failed to log keep list: %v", err)
@@ -923,6 +930,7 @@ func (b *Bot) handleUnkeepCommand(ctx context.Context, tgBot *bot.Bot, update *m
 
 			if len(keptTorrents) == 0 {
 				text.WriteString("<i>No torrents are currently kept.</i>")
+				b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
 			} else {
 				for _, kt := range keptTorrents {
 					keptAt := kt.KeptAt.Format("2006-01-02 15:04")
@@ -930,11 +938,17 @@ func (b *Bot) handleUnkeepCommand(ctx context.Context, tgBot *bot.Bot, update *m
 					if keptBy == "" {
 						keptBy = fmt.Sprintf("User #%d", kt.KeptByID)
 					}
-					fmt.Fprintf(&text, "<code>%s</code> - %s\n<i>Kept by %s on %s</i>\n\n", html.EscapeString(kt.TorrentID), html.EscapeString(kt.Filename), html.EscapeString(keptBy), keptAt)
+					item := fmt.Sprintf("<code>%s</code> - %s\n<i>Kept by %s on %s</i>\n\n", html.EscapeString(kt.TorrentID), html.EscapeString(kt.Filename), html.EscapeString(keptBy), keptAt)
+					if text.Len()+len(item) > 4000 {
+						b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
+						text.Reset()
+					}
+					text.WriteString(item)
+				}
+				if text.Len() > 0 {
+					b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
 				}
 			}
-
-			b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
 			if user != nil {
 				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "unkeep", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0); err != nil {
 					log.Printf("Warning: failed to log unkeep list: %v", err)
