@@ -10,6 +10,7 @@ The bot uses `config.yaml`. See `example-config.yaml` for a template.
 
 - `telegram.bot_token`: Your Telegram bot token.
 - `telegram.allowed_chat_ids`: List of allowed chat IDs.
+- `telegram.allowed_topic_ids`: Map of chat IDs to list of allowed topic IDs. If set for a chat, bot only responds in those topics. Leave empty to allow all topics.
 - `telegram.super_admin_ids`: List of super admin chat IDs.
 - `realdebrid.api_token`: Your Real-Debrid API token.
 - `realdebrid.base_url`: API base URL (default: `https://api.real-debrid.com/rest/1.0`).
