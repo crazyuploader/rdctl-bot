@@ -908,6 +908,37 @@ function setupEventListeners() {
       }
     });
 
+  // Check domain
+  document
+    .getElementById("check-domain-form")
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = document.getElementById("domain-input");
+      const btn = document.getElementById("check-domain-btn");
+      const resultDiv = document.getElementById("domain-result");
+      const domain = input.value.trim().toLowerCase();
+      if (!domain) return;
+
+      btn.disabled = true;
+      resultDiv.classList.add("hidden");
+      try {
+        const res = await apiFetch(
+          `${API_BASE_URL}/check-domain?domain=${encodeURIComponent(domain)}`,
+        );
+        resultDiv.classList.remove("hidden");
+        const displayDomain = res.checked_domain || domain;
+        if (res.supported) {
+          resultDiv.innerHTML = `<span class="text-green-400">✓ ${escapeHtml(displayDomain)} is supported</span>`;
+        } else {
+          resultDiv.innerHTML = `<span class="text-red-400">✗ ${escapeHtml(domain)} is not supported</span>`;
+        }
+      } catch (error) {
+        showToast(error.message || "Failed to check domain", "error");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
   // Auto-delete save
   document
     .getElementById("autodelete-save")

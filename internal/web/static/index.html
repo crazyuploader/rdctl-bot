@@ -705,6 +705,44 @@
               </button>
             </div>
           </form>
+
+          <!-- Check Domain -->
+          <form id="check-domain-form" class="card p-4" novalidate>
+            <div class="flex items-center gap-2 mb-3">
+              <i
+                data-lucide="globe"
+                class="w-4 h-4 text-green-400"
+                aria-hidden="true"
+              ></i>
+              <h2 class="text-sm font-semibold">Check Domain</h2>
+            </div>
+            <div class="flex gap-2">
+              <label for="domain-input" class="sr-only">Domain to check</label>
+              <input
+                type="text"
+                id="domain-input"
+                name="domain"
+                class="input min-w-0 flex-1"
+                placeholder="e.g., dropbox, 1fichier.com"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button
+                type="submit"
+                class="btn btn-primary"
+                id="check-domain-btn"
+                aria-label="Check domain"
+              >
+                <i data-lucide="search" class="w-4 h-4" aria-hidden="true"></i>
+                <span>Check</span>
+              </button>
+            </div>
+            <div
+              id="domain-result"
+              class="mt-2 text-sm hidden"
+              aria-live="polite"
+            ></div>
+          </form>
         </div>
 
         <!-- Auto-Delete Settings (Admin Only) -->
