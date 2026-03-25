@@ -18,14 +18,14 @@
     <!-- Font preload -->
     <link
       rel="preload"
-      href="https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiA.woff2"
+      href="https://fonts.gstatic.com/s/manrope/v15/xn7gYHE41ni1AdIRggexSg.woff2"
       as="font"
       type="font/woff2"
       crossorigin
     />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap"
     />
     <script src="https://unpkg.com/lucide@0.577.0/dist/umd/lucide.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -41,27 +41,29 @@
               muted: "#71717a",
             },
             fontFamily: {
-              sans: ["Inter", "system-ui", "sans-serif"],
+              sans: ["Manrope", "system-ui", "sans-serif"],
             },
           },
         },
       };
     </script>
     <style>
-      * {
+      *,
+      *::before,
+      *::after {
         box-sizing: border-box;
       }
 
       body {
         background: #0a0a0b;
         color: #fafafa;
-        font-family: "Inter", system-ui, sans-serif;
+        font-family: "Manrope", system-ui, sans-serif;
         min-height: 100vh;
         -webkit-tap-highlight-color: transparent;
         overflow-x: hidden;
       }
 
-      /* Skip link */
+      /* ── Skip link ── */
       .skip-link {
         position: absolute;
         top: -40px;
@@ -79,9 +81,10 @@
         top: 0;
       }
 
+      /* ── Scrollbar ── */
       ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 5px;
+        height: 5px;
       }
       ::-webkit-scrollbar-track {
         background: transparent;
@@ -94,24 +97,27 @@
         background: #52525b;
       }
 
+      /* ── Card ── */
       .card {
         background: #141416;
         border: 1px solid #27272a;
-        border-radius: 12px;
+        border-radius: 14px;
         transition: border-color 0.2s ease;
       }
       .card:hover {
         border-color: #3f3f46;
       }
 
+      /* ── Buttons ── */
       .btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 6px;
-        padding: 8px 16px;
-        border-radius: 8px;
-        font-weight: 500;
+        padding: 0 16px;
+        height: 44px;
+        border-radius: 10px;
+        font-weight: 600;
         font-size: 14px;
         transition:
           background-color 0.15s ease,
@@ -121,7 +127,8 @@
         cursor: pointer;
         border: none;
         touch-action: manipulation;
-        position: relative;
+        white-space: nowrap;
+        flex-shrink: 0;
       }
       .btn:focus-visible {
         outline: none;
@@ -176,63 +183,79 @@
       }
 
       .btn:disabled {
-        opacity: 0.5;
+        opacity: 0.45;
         cursor: not-allowed;
         pointer-events: none;
       }
 
+      .btn-icon {
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        border-radius: 10px;
+      }
+
+      /* ── Inputs ── */
       .input {
-        background: #0a0a0b;
+        background: #0f0f11;
         border: 1px solid #27272a;
-        border-radius: 8px;
-        padding: 10px 14px;
+        border-radius: 10px;
+        padding: 0 14px;
+        height: 44px;
         color: #fafafa;
-        font-size: 14px;
+        font-size: 16px; /* Prevents iOS zoom */
         width: 100%;
         transition:
           border-color 0.15s ease,
           box-shadow 0.15s ease;
         touch-action: manipulation;
+        font-family: inherit;
       }
-      .input:focus {
-        outline: none;
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-      }
+      .input:focus,
       .input:focus-visible {
         outline: none;
         border-color: #3b82f6;
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
       }
       .input::placeholder {
-        color: #52525b;
+        color: #3f3f46;
       }
 
+      /* Smaller variant */
+      .input-sm {
+        height: 36px;
+        font-size: 14px;
+        padding: 0 12px;
+        border-radius: 8px;
+      }
+
+      /* ── Badges ── */
       .badge {
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        padding: 2px 8px;
+        padding: 3px 10px;
         border-radius: 9999px;
         font-size: 11px;
-        font-weight: 500;
+        font-weight: 600;
         text-transform: uppercase;
+        letter-spacing: 0.03em;
         font-variant-numeric: tabular-nums;
       }
       .badge-success {
-        background: rgba(22, 101, 52, 0.2);
+        background: rgba(22, 101, 52, 0.25);
         color: #4ade80;
       }
       .badge-warning {
-        background: rgba(202, 138, 4, 0.2);
+        background: rgba(202, 138, 4, 0.25);
         color: #facc15;
       }
       .badge-error {
-        background: rgba(220, 38, 38, 0.2);
+        background: rgba(220, 38, 38, 0.25);
         color: #f87171;
       }
       .badge-info {
-        background: rgba(37, 99, 235, 0.2);
+        background: rgba(37, 99, 235, 0.25);
         color: #60a5fa;
       }
       .badge-muted {
@@ -240,9 +263,10 @@
         color: #a1a1aa;
       }
 
+      /* ── Torrent items ── */
       .torrent-item {
-        padding: 12px 16px;
-        border-bottom: 1px solid #27272a;
+        padding: 14px 16px;
+        border-bottom: 1px solid #1e1e21;
         transition: background-color 0.1s ease;
         content-visibility: auto;
         contain-intrinsic-size: 0 80px;
@@ -251,17 +275,20 @@
         border-bottom: none;
       }
       .torrent-item:hover {
-        background: #1c1c1e;
+        background: #18181b;
       }
       .torrent-item.kept {
         border-left: 3px solid #3b82f6;
+        padding-left: 13px;
       }
 
+      /* ── Progress bar ── */
       .progress-bar {
-        height: 4px;
+        height: 3px;
         background: #27272a;
         border-radius: 2px;
         overflow: hidden;
+        margin-top: 6px;
       }
       .progress-fill {
         height: 100%;
@@ -274,22 +301,27 @@
         background: #22c55e;
       }
 
-      /* Modal */
+      /* ── Modal ── */
       .modal-overlay {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.8);
-        backdrop-filter: blur(4px);
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
         display: flex;
-        align-items: center;
+        align-items: flex-end; /* bottom sheet default */
         justify-content: center;
         z-index: 50;
         opacity: 0;
         pointer-events: none;
-        transition: opacity 0.2s ease;
+        transition: opacity 0.25s ease;
         overscroll-behavior: contain;
-        padding: env(safe-area-inset-top) env(safe-area-inset-right)
-          env(safe-area-inset-bottom) env(safe-area-inset-left);
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      @media (min-width: 480px) {
+        .modal-overlay {
+          align-items: center;
+        }
       }
       .modal-overlay.show {
         opacity: 1;
@@ -298,34 +330,53 @@
       .modal {
         background: #141416;
         border: 1px solid #27272a;
-        border-radius: 16px;
-        padding: 24px;
-        max-width: 400px;
-        width: 90%;
-        transform: scale(0.95);
-        transition: transform 0.2s ease;
+        border-radius: 20px 20px 0 0;
+        padding: 24px 20px calc(20px + env(safe-area-inset-bottom));
+        width: 100%;
+        max-width: 100%;
+        transform: translateY(20px);
+        transition: transform 0.25s ease;
+      }
+      @media (min-width: 480px) {
+        .modal {
+          border-radius: 16px;
+          padding: 28px 24px;
+          max-width: 400px;
+          transform: scale(0.96) translateY(0);
+        }
       }
       .modal-overlay.show .modal {
-        transform: scale(1);
+        transform: translateY(0);
+      }
+      @media (min-width: 480px) {
+        .modal-overlay.show .modal {
+          transform: scale(1);
+        }
       }
 
-      /* Toast */
+      /* ── Toast ── */
       .toast {
         position: fixed;
-        bottom: calc(24px + env(safe-area-inset-bottom));
+        bottom: calc(20px + env(safe-area-inset-bottom));
         left: 50%;
-        transform: translateX(-50%) translateY(100px);
-        background: #141416;
-        border: 1px solid #27272a;
+        transform: translateX(-50%) translateY(20px);
+        background: #1c1c1f;
+        border: 1px solid #3f3f46;
         border-radius: 12px;
         padding: 12px 20px;
-        font-size: 14px;
+        font-size: 13px;
+        font-weight: 500;
         z-index: 100;
         opacity: 0;
         transition:
           transform 0.3s ease,
           opacity 0.3s ease;
         pointer-events: none;
+        max-width: calc(100vw - 32px);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
       }
       .toast.show {
         transform: translateX(-50%) translateY(0);
@@ -333,18 +384,21 @@
       }
       .toast.error {
         border-color: #dc2626;
+        color: #fca5a5;
       }
       .toast.success {
         border-color: #22c55e;
+        color: #86efac;
       }
 
-      /* Tabs */
+      /* ── Tabs ── */
       .tab {
-        padding: 8px 16px;
+        flex: 1;
+        padding: 10px 8px;
         border-radius: 8px;
         font-size: 13px;
-        font-weight: 500;
-        color: #71717a;
+        font-weight: 600;
+        color: #52525b;
         cursor: pointer;
         transition:
           background-color 0.15s ease,
@@ -352,6 +406,12 @@
         touch-action: manipulation;
         border: none;
         background: transparent;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 44px;
       }
       .tab:hover {
         color: #a1a1aa;
@@ -368,17 +428,17 @@
           0 0 0 4px #3b82f6;
       }
 
-      /* Skeleton */
+      /* ── Skeleton ── */
       .skeleton {
         background: linear-gradient(
           90deg,
           #1c1c1e 25%,
-          #27272a 50%,
+          #242427 50%,
           #1c1c1e 75%
         );
         background-size: 200% 100%;
         animation: shimmer 1.5s infinite;
-        border-radius: 4px;
+        border-radius: 8px;
       }
       @keyframes shimmer {
         0% {
@@ -389,12 +449,12 @@
         }
       }
 
-      /* Spinner for login button */
+      /* ── Login spinner ── */
       .btn-spinner {
         display: none;
-        width: 14px;
-        height: 14px;
-        border: 2px solid rgba(255, 255, 255, 0.3);
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.25);
         border-top-color: white;
         border-radius: 50%;
         animation: spin 0.6s linear infinite;
@@ -411,7 +471,21 @@
         }
       }
 
-      /* Reduced motion */
+      /* ── Divider handle for bottom sheet ── */
+      .sheet-handle {
+        width: 40px;
+        height: 4px;
+        background: #3f3f46;
+        border-radius: 2px;
+        margin: 0 auto 16px;
+      }
+      @media (min-width: 480px) {
+        .sheet-handle {
+          display: none;
+        }
+      }
+
+      /* ── Reduced motion ── */
       @media (prefers-reduced-motion: reduce) {
         .skeleton {
           animation: none;
@@ -433,15 +507,29 @@
         }
       }
 
-      /* Safe area header */
+      /* ── Safe-area header ── */
       header {
         padding-top: env(safe-area-inset-top);
       }
 
-      @media (max-width: 640px) {
-        .hide-mobile {
-          display: none !important;
-        }
+      /* ── List control row stacking ── */
+      .list-controls {
+        padding: 10px 14px;
+        border-bottom: 1px solid #27272a;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+      .list-controls .search-wrap {
+        flex: 1 1 160px;
+        min-width: 0;
+      }
+      .list-controls .actions-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
       }
     </style>
   </head>
@@ -449,19 +537,26 @@
     <!-- Skip to main content -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
 
-    <!-- Login Screen -->
+    <!-- ─────────────── Login Screen ─────────────── -->
     <div
       id="login-screen"
       class="min-h-screen flex items-center justify-center p-4"
     >
-      <div class="w-full max-w-sm">
+      <div class="w-full max-w-xs">
         <div class="text-center mb-8">
-          <h1 class="text-2xl font-semibold mb-1" style="text-wrap: balance">
-            Rdctl Bot
-          </h1>
-          <p class="text-[#71717a] text-sm">Enter your API key to continue</p>
+          <div
+            class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-600/15 mb-4"
+          >
+            <i
+              data-lucide="zap"
+              class="w-6 h-6 text-blue-400"
+              aria-hidden="true"
+            ></i>
+          </div>
+          <h1 class="text-xl font-bold mb-1">Rdctl Bot</h1>
+          <p class="text-[#52525b] text-sm">Enter your API key to continue</p>
         </div>
-        <form id="login-form" class="space-y-4" novalidate>
+        <form id="login-form" class="space-y-3" novalidate>
           <div>
             <label for="api-key-input" class="sr-only">API Key</label>
             <input
@@ -479,7 +574,8 @@
           <button
             type="submit"
             id="login-btn"
-            class="btn btn-primary w-full py-3"
+            class="btn btn-primary w-full"
+            style="height: 48px; font-size: 15px"
           >
             <span class="btn-spinner" aria-hidden="true"></span>
             <span class="btn-label">Sign In</span>
@@ -488,23 +584,28 @@
       </div>
     </div>
 
-    <!-- Main App -->
-    <div id="app-screen" class="hidden min-h-screen">
+    <!-- ─────────────── Main App ─────────────── -->
+    <div id="app-screen" class="hidden min-h-screen flex flex-col">
       <!-- Header -->
       <header
         class="sticky top-0 z-40 bg-[#0a0a0b]/90 backdrop-blur-lg border-b border-[#27272a]"
       >
         <div
-          class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between"
+          class="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3"
         >
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 min-w-0">
+            <i
+              data-lucide="zap"
+              class="w-4 h-4 text-blue-400 flex-shrink-0"
+              aria-hidden="true"
+            ></i>
             <span
               id="user-greeting"
-              class="text-sm text-[#71717a] hide-mobile"
+              class="text-sm font-medium text-[#a1a1aa] truncate"
               aria-live="polite"
             ></span>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-shrink-0">
             <span
               id="status-badge"
               class="badge badge-muted"
@@ -519,7 +620,7 @@
             </span>
             <button
               id="logout-btn"
-              class="btn btn-ghost p-2"
+              class="btn btn-ghost btn-icon"
               aria-label="Log out"
             >
               <i data-lucide="log-out" class="w-4 h-4" aria-hidden="true"></i>
@@ -529,9 +630,13 @@
       </header>
 
       <!-- Content -->
-      <main id="main-content" class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <main
+        id="main-content"
+        class="max-w-4xl mx-auto w-full px-4 py-5 space-y-4 flex-1"
+      >
         <!-- Quick Actions -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <!-- Add Torrent -->
           <form id="add-torrent-form" class="card p-4" novalidate>
             <div class="flex items-center gap-2 mb-3">
               <i
@@ -539,7 +644,7 @@
                 class="w-4 h-4 text-blue-400"
                 aria-hidden="true"
               ></i>
-              <h2 class="text-sm font-medium">Add Torrent</h2>
+              <h2 class="text-sm font-semibold">Add Torrent</h2>
             </div>
             <div class="flex gap-2">
               <label for="magnet-link" class="sr-only"
@@ -549,7 +654,7 @@
                 type="url"
                 id="magnet-link"
                 name="magnet-link"
-                class="input flex-1 min-w-0"
+                class="input min-w-0 flex-1"
                 placeholder="magnet:?xt=urn:btih:…"
                 autocomplete="off"
                 spellcheck="false"
@@ -559,13 +664,15 @@
                 type="submit"
                 class="btn btn-primary"
                 id="add-torrent-btn"
+                aria-label="Add torrent"
               >
                 <i data-lucide="plus" class="w-4 h-4" aria-hidden="true"></i>
-                <span class="hide-mobile">Add</span>
+                <span>Add</span>
               </button>
             </div>
           </form>
 
+          <!-- Unrestrict Link -->
           <form id="unrestrict-form" class="card p-4" novalidate>
             <div class="flex items-center gap-2 mb-3">
               <i
@@ -573,7 +680,7 @@
                 class="w-4 h-4 text-purple-400"
                 aria-hidden="true"
               ></i>
-              <h2 class="text-sm font-medium">Unrestrict Link</h2>
+              <h2 class="text-sm font-semibold">Unrestrict Link</h2>
             </div>
             <div class="flex gap-2">
               <label for="hoster-link" class="sr-only">Hoster link URL</label>
@@ -581,15 +688,20 @@
                 type="url"
                 id="hoster-link"
                 name="hoster-link"
-                class="input flex-1 min-w-0"
+                class="input min-w-0 flex-1"
                 placeholder="https://host.com/file…"
                 autocomplete="off"
                 spellcheck="false"
                 inputmode="url"
               />
-              <button type="submit" class="btn btn-purple" id="unrestrict-btn">
+              <button
+                type="submit"
+                class="btn btn-purple"
+                id="unrestrict-btn"
+                aria-label="Unlock link"
+              >
                 <i data-lucide="key" class="w-4 h-4" aria-hidden="true"></i>
-                <span class="hide-mobile">Unlock</span>
+                <span>Unlock</span>
               </button>
             </div>
           </form>
@@ -602,22 +714,22 @@
           role="region"
           aria-label="Auto-Delete Settings"
         >
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div class="flex items-center gap-2 flex-1 min-w-0">
               <i
                 data-lucide="clock"
-                class="w-4 h-4 text-[#a1a1aa]"
+                class="w-4 h-4 text-[#a1a1aa] flex-shrink-0"
                 aria-hidden="true"
               ></i>
-              <h2 class="text-sm font-medium">Auto-Delete</h2>
-            </div>
-            <div class="flex items-center gap-2">
+              <h2 class="text-sm font-semibold">Auto-Delete</h2>
               <span
                 id="autodelete-value"
-                class="text-sm text-[#71717a]"
+                class="text-xs text-[#71717a] ml-auto sm:ml-0"
                 aria-live="polite"
                 >Not set</span
               >
+            </div>
+            <div class="flex items-center gap-2">
               <label for="autodelete-input" class="sr-only"
                 >Auto-delete after days</label
               >
@@ -625,14 +737,18 @@
                 type="number"
                 id="autodelete-input"
                 name="autodelete-days"
-                class="input w-20 py-1.5 text-center text-sm"
+                class="input input-sm w-24 text-center"
                 min="0"
                 max="365"
-                placeholder="0"
+                placeholder="Days"
                 autocomplete="off"
                 style="font-variant-numeric: tabular-nums"
               />
-              <button id="autodelete-save" class="btn btn-ghost text-sm py-1.5">
+              <button
+                id="autodelete-save"
+                class="btn btn-ghost"
+                style="height: 36px; font-size: 13px; padding: 0 14px"
+              >
                 Save
               </button>
             </div>
@@ -643,7 +759,7 @@
         <div
           role="tablist"
           aria-label="Content sections"
-          class="flex items-center gap-1 border-b border-[#27272a] pb-px -mx-4 px-4"
+          class="flex items-center gap-1 p-1 bg-[#141416] border border-[#27272a] rounded-xl"
         >
           <button
             class="tab active"
@@ -654,10 +770,8 @@
             id="tab-torrents"
             tabindex="0"
           >
-            <span class="flex items-center gap-2">
-              <i data-lucide="file-down" class="w-4 h-4" aria-hidden="true"></i>
-              Torrents
-            </span>
+            <i data-lucide="file-down" class="w-4 h-4" aria-hidden="true"></i>
+            Torrents
           </button>
           <button
             class="tab"
@@ -668,24 +782,20 @@
             id="tab-downloads"
             tabindex="-1"
           >
-            <span class="flex items-center gap-2">
-              <i data-lucide="package" class="w-4 h-4" aria-hidden="true"></i>
-              Downloads
-            </span>
+            <i data-lucide="package" class="w-4 h-4" aria-hidden="true"></i>
+            Downloads
           </button>
         </div>
 
-        <!-- Torrents List -->
+        <!-- Torrents Panel -->
         <div
           id="torrents-panel"
           class="card overflow-hidden"
           role="tabpanel"
           aria-labelledby="tab-torrents"
         >
-          <div
-            class="p-3 border-b border-[#27272a] flex items-center justify-between gap-3"
-          >
-            <div class="flex items-center gap-2 min-w-0">
+          <div class="list-controls">
+            <div class="search-wrap">
               <label for="torrents-search" class="sr-only"
                 >Search torrents</label
               >
@@ -693,28 +803,29 @@
                 type="search"
                 id="torrents-search"
                 name="torrents-search"
-                class="input w-48 text-sm py-2"
-                placeholder="Search…"
+                class="input input-sm"
+                placeholder="Search torrents…"
                 autocomplete="off"
                 spellcheck="false"
               />
             </div>
-            <div class="flex items-center gap-2">
+            <div class="actions-wrap">
               <label
-                class="flex items-center gap-2 text-xs text-[#71717a] cursor-pointer"
+                class="flex items-center gap-1.5 text-xs text-[#71717a] cursor-pointer select-none"
               >
                 <input
                   type="checkbox"
                   id="auto-refresh-torrents"
                   name="auto-refresh-torrents"
-                  class="accent-blue-600"
+                  class="accent-blue-600 w-3.5 h-3.5"
                   checked
                 />
                 Auto-refresh
               </label>
               <button
                 id="refresh-torrents"
-                class="btn btn-ghost p-2"
+                class="btn btn-ghost btn-icon"
+                style="width: 36px; height: 36px"
                 aria-label="Refresh Torrents"
               >
                 <i
@@ -725,17 +836,18 @@
               </button>
             </div>
           </div>
-          <div id="torrents-list" class="max-h-[500px] overflow-y-auto">
-            <!-- Empty state -->
+          <div
+            id="torrents-list"
+            class="max-h-[520px] overflow-y-auto overscroll-contain"
+          >
             <div id="torrents-empty" class="py-16 text-center">
               <i
                 data-lucide="inbox"
-                class="w-12 h-12 mx-auto mb-3 text-[#3f3f46]"
+                class="w-10 h-10 mx-auto mb-3 text-[#3f3f46]"
                 aria-hidden="true"
               ></i>
-              <p class="text-[#71717a]">No torrents yet</p>
+              <p class="text-[#52525b] text-sm">No torrents yet</p>
             </div>
-            <!-- Skeleton -->
             <div
               id="torrents-loading"
               class="hidden p-4 space-y-3"
@@ -749,17 +861,15 @@
           </div>
         </div>
 
-        <!-- Downloads List -->
+        <!-- Downloads Panel -->
         <div
           id="downloads-panel"
           class="card overflow-hidden hidden"
           role="tabpanel"
           aria-labelledby="tab-downloads"
         >
-          <div
-            class="p-3 border-b border-[#27272a] flex items-center justify-between gap-3"
-          >
-            <div class="flex items-center gap-2 min-w-0">
+          <div class="list-controls">
+            <div class="search-wrap">
               <label for="downloads-search" class="sr-only"
                 >Search downloads</label
               >
@@ -767,28 +877,29 @@
                 type="search"
                 id="downloads-search"
                 name="downloads-search"
-                class="input w-48 text-sm py-2"
-                placeholder="Search…"
+                class="input input-sm"
+                placeholder="Search downloads…"
                 autocomplete="off"
                 spellcheck="false"
               />
             </div>
-            <div class="flex items-center gap-2">
+            <div class="actions-wrap">
               <label
-                class="flex items-center gap-2 text-xs text-[#71717a] cursor-pointer"
+                class="flex items-center gap-1.5 text-xs text-[#71717a] cursor-pointer select-none"
               >
                 <input
                   type="checkbox"
                   id="auto-refresh-downloads"
                   name="auto-refresh-downloads"
-                  class="accent-blue-600"
+                  class="accent-blue-600 w-3.5 h-3.5"
                   checked
                 />
                 Auto-refresh
               </label>
               <button
                 id="refresh-downloads"
-                class="btn btn-ghost p-2"
+                class="btn btn-ghost btn-icon"
+                style="width: 36px; height: 36px"
                 aria-label="Refresh Downloads"
               >
                 <i
@@ -799,15 +910,17 @@
               </button>
             </div>
           </div>
-          <div id="downloads-list" class="max-h-[500px] overflow-y-auto">
-            <!-- Empty state -->
+          <div
+            id="downloads-list"
+            class="max-h-[520px] overflow-y-auto overscroll-contain"
+          >
             <div id="downloads-empty" class="py-16 text-center">
               <i
                 data-lucide="package"
-                class="w-12 h-12 mx-auto mb-3 text-[#3f3f46]"
+                class="w-10 h-10 mx-auto mb-3 text-[#3f3f46]"
                 aria-hidden="true"
               ></i>
-              <p class="text-[#71717a]">No downloads yet</p>
+              <p class="text-[#52525b] text-sm">No downloads yet</p>
             </div>
             <div
               id="downloads-loading"
@@ -821,6 +934,18 @@
           </div>
         </div>
       </main>
+
+      <!-- Footer -->
+      <footer class="text-center py-5 text-xs text-[#3f3f46]">
+        <a
+          href="https://github.com/crazyuploader/rdctl-bot"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:text-[#71717a] transition-colors focus-visible:text-[#71717a]"
+        >
+          View on GitHub
+        </a>
+      </footer>
     </div>
 
     <!-- Confirm Modal -->
@@ -832,20 +957,23 @@
       aria-labelledby="confirm-title"
       aria-describedby="confirm-message"
     >
-      <div class="modal">
-        <h3 id="confirm-title" class="text-lg font-semibold mb-2">Confirm</h3>
+      <div class="modal w-full">
+        <div class="sheet-handle"></div>
+        <h3 id="confirm-title" class="text-base font-bold mb-2">Confirm</h3>
         <p
           id="confirm-message"
-          class="text-[#a1a1aa] text-sm mb-6 break-all"
+          class="text-[#a1a1aa] text-sm mb-6 break-all leading-relaxed"
         ></p>
-        <div class="flex justify-end gap-3">
-          <button id="confirm-cancel" class="btn btn-ghost">Cancel</button>
-          <button id="confirm-ok" class="btn btn-danger">Delete</button>
+        <div class="flex gap-3">
+          <button id="confirm-cancel" class="btn btn-ghost flex-1">
+            Cancel
+          </button>
+          <button id="confirm-ok" class="btn btn-danger flex-1">Delete</button>
         </div>
       </div>
     </div>
 
-    <!-- Toast (aria-live region) -->
+    <!-- Toast -->
     <div
       id="toast"
       class="toast"
