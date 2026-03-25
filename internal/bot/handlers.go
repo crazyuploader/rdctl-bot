@@ -752,11 +752,11 @@ func (b *Bot) handleDashboardCommand(ctx context.Context, _ *bot.Bot, update *mo
 
 		text := fmt.Sprintf(
 			"<b>🖥️ Dashboard Access</b>\n\n"+
-				"<b>Your access link:</b>\n"+
-				"<code>%s</code>\n\n"+
+				"<b>Your access link is:</b>\n"+
+				"%s\n\n"+
 				"<b>Role:</b> %s\n"+
 				"<b>Valid for:</b> %d minutes\n\n"+
-				"<i>⚠️ This link is personal and will expire. Do not share it.</i>",
+				"<i>⚠️ This link is personal to you and will expire soon. Please do not share it.</i>",
 			dashboardURL,
 			roleDesc,
 			expiryMinutes,
