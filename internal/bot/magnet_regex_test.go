@@ -76,8 +76,8 @@ func TestMagnetRegex_Matches(t *testing.T) {
 	}
 }
 
-// TestMagnetRegex_FindString verifies that FindString extracts only the magnet portion
-// when the link is embedded in surrounding text.
+// TestMagnetRegex_FindString verifies that FindString extracts the magnet link.
+// Note: magnetRegex's pattern is greedy (ends with .*) and will include trailing text.
 func TestMagnetRegex_FindString(t *testing.T) {
 	input := "Check this out: magnet:?xt=urn:btih:ABC123DEF456 thanks!"
 	match := magnetRegex.FindString(input)
@@ -88,6 +88,13 @@ func TestMagnetRegex_FindString(t *testing.T) {
 	const wantPrefix = "magnet:?xt=urn:btih:"
 	if len(match) < len(wantPrefix) || match[:len(wantPrefix)] != wantPrefix {
 		t.Errorf("FindString() = %q, want prefix %q", match, wantPrefix)
+	}
+
+	// Verify the full extracted value to ensure we understand the greedy behavior.
+	// The regex pattern ends with .* so it captures everything after the hash until end of string.
+	const wantExact = "magnet:?xt=urn:btih:ABC123DEF456 thanks!"
+	if match != wantExact {
+		t.Errorf("FindString() = %q, want exact match %q (regex is greedy and includes trailing text)", match, wantExact)
 	}
 }
 

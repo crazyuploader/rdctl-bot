@@ -1,6 +1,7 @@
 package config
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -80,8 +81,8 @@ func TestGetDSN(t *testing.T) {
 	}
 }
 
-// TestGetDSN_NoSQLiteFields verifies DatabaseConfig no longer has SQLite-related fields.
-// This is a compile-time check: if SQLitePath or IsSQLite existed, this file would fail to compile.
+// TestGetDSN_PostgreSQLOnly verifies that DatabaseConfig produces correct PostgreSQL DSN
+// and does not contain SQLite-related fields (SQLitePath or IsSQLite).
 func TestGetDSN_PostgreSQLOnly(t *testing.T) {
 	cfg := DatabaseConfig{
 		Host:     "localhost",
@@ -100,6 +101,17 @@ func TestGetDSN_PostgreSQLOnly(t *testing.T) {
 		if !strings.Contains(dsn, part) {
 			t.Errorf("GetDSN() = %q, missing required component %q", dsn, part)
 		}
+	}
+
+	// Use reflection to ensure DatabaseConfig does not have SQLite-related fields
+	dbConfigType := reflect.TypeOf(DatabaseConfig{})
+	_, hasSQLitePath := dbConfigType.FieldByName("SQLitePath")
+	if hasSQLitePath {
+		t.Error("DatabaseConfig should not contain SQLitePath field")
+	}
+	_, hasIsSQLite := dbConfigType.FieldByName("IsSQLite")
+	if hasIsSQLite {
+		t.Error("DatabaseConfig should not contain IsSQLite field")
 	}
 }
 
