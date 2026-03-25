@@ -84,12 +84,12 @@ func TestGetDSN(t *testing.T) {
 // This is a compile-time check: if SQLitePath or IsSQLite existed, this file would fail to compile.
 func TestGetDSN_PostgreSQLOnly(t *testing.T) {
 	cfg := DatabaseConfig{
-		Host:    "localhost",
-		Port:    5432,
-		User:    "testuser",
+		Host:     "localhost",
+		Port:     5432,
+		User:     "testuser",
 		Password: "testpass",
-		DBName:  "testdb",
-		SSLMode: "disable",
+		DBName:   "testdb",
+		SSLMode:  "disable",
 	}
 
 	dsn := cfg.GetDSN()
