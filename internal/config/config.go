@@ -50,9 +50,10 @@ type MetricsConfig struct {
 
 // TelegramConfig holds Telegram bot settings
 type TelegramConfig struct {
-	BotToken       string  `mapstructure:"bot_token"`
-	AllowedChatIDs []int64 `mapstructure:"allowed_chat_ids"`
-	SuperAdminIDs  []int64 `mapstructure:"super_admin_ids"`
+	BotToken        string             `mapstructure:"bot_token"`
+	AllowedChatIDs  []int64            `mapstructure:"allowed_chat_ids"`
+	SuperAdminIDs   []int64            `mapstructure:"super_admin_ids"`
+	AllowedTopicIDs map[string][]int64 `mapstructure:"allowed_topic_ids"` // map[chatID][]topicID - if set, bot only responds in these topics for that chat
 }
 
 // RealDebridConfig holds Real-Debrid API settings
@@ -307,4 +308,23 @@ func (c *Config) IsAllowedChat(chatID int64) bool {
 // IsSuperAdmin checks if a user ID belongs to a super admin
 func (c *Config) IsSuperAdmin(userID int64) bool {
 	return slices.Contains(c.Telegram.SuperAdminIDs, userID)
+}
+
+// IsAllowedTopic checks if the given topic is allowed for the given chat.
+// If AllowedTopicIDs is not configured (nil), it returns true (all topics allowed).
+// If the chat is not in the map, it returns true (topic restriction not configured for this chat).
+// If the chat is configured with an empty list, it returns true (all topics allowed for this chat).
+// If the chat is configured with specific IDs, it returns true only if the topicID is in the list.
+func (c *Config) IsAllowedTopic(chatID int64, topicID int) bool {
+	if c.Telegram.AllowedTopicIDs == nil {
+		return true
+	}
+	allowedTopics, ok := c.Telegram.AllowedTopicIDs[fmt.Sprintf("%d", chatID)]
+	if !ok {
+		return true // Chat not in map - topic restriction not configured, allow all
+	}
+	if len(allowedTopics) == 0 {
+		return true // Empty list means all topics allowed for this chat
+	}
+	return slices.Contains(allowedTopics, int64(topicID))
 }
