@@ -417,8 +417,10 @@ func performIPTests(proxyURL, ipTestURL, ipVerifyURL string) error {
 		var ipResponse struct {
 			IP string `json:"ip"`
 		}
-		body, _ := io.ReadAll(resp.Body)
-		if err := json.Unmarshal(body, &ipResponse); err != nil {
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			log.Printf("Warning: Failed to read primary IP test response: %v", readErr)
+		} else if err := json.Unmarshal(body, &ipResponse); err != nil {
 			log.Printf("Warning: Failed to parse primary IP test response: %v", err)
 		} else {
 			primaryIP = ipResponse.IP
@@ -443,7 +445,10 @@ func performIPTests(proxyURL, ipTestURL, ipVerifyURL string) error {
 		var verifyIpResponse struct {
 			IP string `json:"ip"`
 		}
-		verifyBody, _ := io.ReadAll(verifyResp.Body)
+		verifyBody, readErr := io.ReadAll(verifyResp.Body)
+		if readErr != nil {
+			return fmt.Errorf("failed to read IP verification response: %w", readErr)
+		}
 		if err := json.Unmarshal(verifyBody, &verifyIpResponse); err != nil {
 			return fmt.Errorf("failed to parse IP verification test response: %w", err)
 		}

@@ -2,7 +2,6 @@ package web
 
 import (
 	"log"
-	"strings"
 	"sync"
 	"time"
 
@@ -93,17 +92,4 @@ func (m *IPManager) IsBanned(ip string) bool {
 	}
 
 	return true
-}
-
-// GetClientIP gets the client IP dealing with proxies if needed
-// Assuming fiber.Config ProxyHeader is set elsewhere or use c.IP() directly which handles it
-func GetClientIP(c fiber.Ctx) string {
-	// If X-Forwarded-For is set and trusted, it might contain multiple IPs "client, proxy1, proxy2"
-	// We want the first one (client)
-	ips := c.Get("X-Forwarded-For")
-	if ips != "" {
-		parts := strings.Split(ips, ",")
-		return strings.TrimSpace(parts[0])
-	}
-	return c.IP()
 }

@@ -102,7 +102,7 @@ func (c *Client) doRequestWithHeaders(method, endpoint string, body interface{},
 	}
 	defer func() {
 		if cerr := resp.Body.Close(); cerr != nil {
-			fmt.Printf("Warning: failed to close response body: %v\n", cerr)
+			log.Printf("Warning: failed to close response body: %v", cerr)
 		}
 	}()
 
@@ -179,7 +179,7 @@ func (c *Client) POSTForm(endpoint string, formData map[string]string) ([]byte, 
 	}
 	defer func() {
 		if cerr := resp.Body.Close(); cerr != nil {
-			fmt.Printf("Warning: failed to close form response body: %v\n", cerr)
+			log.Printf("Warning: failed to close form response body: %v", cerr)
 		}
 	}()
 

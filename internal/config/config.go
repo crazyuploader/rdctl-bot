@@ -62,8 +62,8 @@ type RealDebridConfig struct {
 	BaseURL     string `mapstructure:"base_url"`
 	Timeout     int    `mapstructure:"timeout"`
 	Proxy       string `mapstructure:"proxy"`
-	IpTestURL   string `mapstructure:"ip_test_url"`
-	IpVerifyURL string `mapstructure:"ip_verify_url"`
+	IPTestURL   string `mapstructure:"ip_test_url"`
+	IPVerifyURL string `mapstructure:"ip_verify_url"`
 }
 
 // AppConfig holds application settings
@@ -201,14 +201,14 @@ func (c *Config) Validate(webOnly bool) error {
 		}
 	}
 
-	if c.RealDebrid.IpTestURL != "" {
-		if _, err := url.Parse(c.RealDebrid.IpTestURL); err != nil {
+	if c.RealDebrid.IPTestURL != "" {
+		if _, err := url.Parse(c.RealDebrid.IPTestURL); err != nil {
 			return fmt.Errorf("invalid real-debrid IP test URL: %w", err)
 		}
 	}
 
-	if c.RealDebrid.IpVerifyURL != "" {
-		if _, err := url.Parse(c.RealDebrid.IpVerifyURL); err != nil {
+	if c.RealDebrid.IPVerifyURL != "" {
+		if _, err := url.Parse(c.RealDebrid.IPVerifyURL); err != nil {
 			return fmt.Errorf("invalid real-debrid IP verify URL: %w", err)
 		}
 	}

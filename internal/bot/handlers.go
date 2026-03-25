@@ -18,6 +18,8 @@ import (
 	"github.com/go-telegram/bot/models"
 )
 
+var magnetRegex = regexp.MustCompile(`magnet:\?xt=urn:btih:[a-zA-Z0-9]+.*`)
+
 // handleStartCommand handles the /start command
 func (b *Bot) handleStartCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
 	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
@@ -82,7 +84,6 @@ func (b *Bot) handleListCommand(ctx context.Context, _ *bot.Bot, update *models.
 		torrents, err := b.rdClient.GetTorrents(10, 0)
 		if err != nil {
 			text := fmt.Sprintf("<b>[ERROR]</b> Failed to retrieve torrents: %s", html.EscapeString(err.Error()))
-			b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
 			b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
 			b.logCommandHelper(ctx, user, chatID, messageThreadID, "list", update.Message.Text, startTime, false, err.Error(), 0)
 			b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeTorrentList, "list", false, err.Error(), nil)
@@ -567,7 +568,7 @@ func (b *Bot) handleStatusCommand(ctx context.Context, _ *bot.Bot, update *model
 		}
 
 		if expTime, err := rdUser.GetExpirationTime(); err == nil && !expTime.IsZero() {
-			fmt.Fprintf(&text, "<i>Expires On:</i> %s\n", expTime.Local().Format("2006-01-02 15:04 MST"))
+			fmt.Fprintf(&text, "<i>Expires On:</i> %s\n", expTime.UTC().Format("2006-01-02 15:04 UTC"))
 		}
 
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
@@ -588,8 +589,7 @@ func (b *Bot) handleMagnetLink(ctx context.Context, _ *bot.Bot, update *models.U
 		magnetLink := update.Message.Text
 		// Extract magnet link if it's not the exact message
 		if !strings.HasPrefix(magnetLink, "magnet:?") || strings.Contains(magnetLink, "\n") || strings.Contains(magnetLink, " ") {
-			re := regexp.MustCompile(`magnet:\?xt=urn:btih:[a-zA-Z0-9]+.*`)
-			match := re.FindString(magnetLink)
+			match := magnetRegex.FindString(magnetLink)
 			if match != "" {
 				magnetLink = match
 				if idx := strings.IndexAny(magnetLink, " \n\t"); idx != -1 {
