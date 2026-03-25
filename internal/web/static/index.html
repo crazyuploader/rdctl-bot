@@ -3,19 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0a0a0b" />
+    <meta name="theme-color" content="#07070a" />
     <title>Rdctl Bot</title>
     <link
       rel="icon"
       type="image/svg+xml"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='2'%3E%3Cpath d='M13 10V3L4 14h7v7l9-11h-7z'/%3E%3C/svg%3E"
     />
-    <!-- Preconnects for external resources -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://unpkg.com" />
-    <link rel="preconnect" href="https://cdn.tailwindcss.com" />
-    <!-- Font preload -->
     <link
       rel="preload"
       href="https://fonts.gstatic.com/s/manrope/v15/xn7gYHE41ni1AdIRggexSg.woff2"
@@ -25,7 +22,7 @@
     />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
     />
     <script src="https://unpkg.com/lucide@0.577.0/dist/umd/lucide.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -35,9 +32,9 @@
         theme: {
           extend: {
             colors: {
-              bg: "#0a0a0b",
-              surface: "#141416",
-              border: "#27272a",
+              bg: "#07070a",
+              surface: "#0e0e11",
+              border: "#1e1e23",
               muted: "#71717a",
             },
             fontFamily: {
@@ -54,13 +51,87 @@
         box-sizing: border-box;
       }
 
+      :root {
+        --bg: #07070a;
+        --surface: #0e0e11;
+        --surface-2: #131317;
+        --border: rgba(255, 255, 255, 0.07);
+        --border-hover: rgba(255, 255, 255, 0.13);
+        --text: #f4f4f5;
+        --text-muted: #71717a;
+        --text-subtle: #3f3f46;
+        --blue: #3b82f6;
+        --blue-dark: #2563eb;
+        --purple: #8b5cf6;
+        --purple-dark: #7c3aed;
+        --green: #22c55e;
+        --red: #ef4444;
+      }
+
       body {
-        background: #0a0a0b;
-        color: #fafafa;
+        background: var(--bg);
+        color: var(--text);
         font-family: "Manrope", system-ui, sans-serif;
         min-height: 100vh;
         -webkit-tap-highlight-color: transparent;
         overflow-x: hidden;
+      }
+
+      /* ── Ambient glow orbs ── */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background:
+          radial-gradient(
+            ellipse 80% 55% at 8% -10%,
+            rgba(59, 130, 246, 0.1) 0%,
+            transparent 58%
+          ),
+          radial-gradient(
+            ellipse 65% 50% at 95% 108%,
+            rgba(139, 92, 246, 0.08) 0%,
+            transparent 58%
+          );
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* ── Dot grid ── */
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: radial-gradient(
+          circle,
+          rgba(255, 255, 255, 0.024) 1px,
+          transparent 1px
+        );
+        background-size: 28px 28px;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      #login-screen,
+      #app-screen {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ── Scrollbar ── */
+      ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #1d1d24;
+        border-radius: 2px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #2e2e3a;
       }
 
       /* ── Skip link ── */
@@ -68,7 +139,7 @@
         position: absolute;
         top: -40px;
         left: 0;
-        background: #2563eb;
+        background: var(--blue-dark);
         color: white;
         padding: 8px 16px;
         border-radius: 0 0 8px 0;
@@ -81,31 +152,109 @@
         top: 0;
       }
 
-      /* ── Scrollbar ── */
-      ::-webkit-scrollbar {
-        width: 5px;
-        height: 5px;
+      /* ── Keyframes ── */
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(16px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
-      ::-webkit-scrollbar-track {
-        background: transparent;
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
       }
-      ::-webkit-scrollbar-thumb {
-        background: #3f3f46;
-        border-radius: 3px;
+      @keyframes shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
       }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #52525b;
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes glow-pulse {
+        0%,
+        100% {
+          opacity: 0.6;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      /* ── Login screen ── */
+      #login-screen {
+        animation: fadeIn 0.5s ease;
+      }
+
+      .login-box {
+        background: rgba(12, 12, 16, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 24px;
+        padding: 38px 30px 34px;
+        backdrop-filter: blur(28px);
+        -webkit-backdrop-filter: blur(28px);
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.025),
+          0 32px 64px rgba(0, 0, 0, 0.55),
+          0 0 80px rgba(59, 130, 246, 0.04);
+        animation: fadeUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+
+      .logo-ring {
+        width: 52px;
+        height: 52px;
+        border-radius: 16px;
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 18px;
+        box-shadow: 0 0 24px rgba(59, 130, 246, 0.12);
+        animation: glow-pulse 3s ease-in-out infinite;
       }
 
       /* ── Card ── */
       .card {
-        background: #141416;
-        border: 1px solid #27272a;
-        border-radius: 14px;
-        transition: border-color 0.2s ease;
+        background: rgba(13, 13, 17, 0.88);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        transition:
+          border-color 0.2s ease,
+          box-shadow 0.2s ease;
+        position: relative;
+        overflow: hidden;
+      }
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: linear-gradient(
+          135deg,
+          rgba(255, 255, 255, 0.025) 0%,
+          transparent 60%
+        );
+        pointer-events: none;
       }
       .card:hover {
-        border-color: #3f3f46;
+        border-color: var(--border-hover);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
       }
 
       /* ── Buttons ── */
@@ -116,74 +265,85 @@
         gap: 6px;
         padding: 0 16px;
         height: 44px;
-        border-radius: 10px;
+        border-radius: 11px;
         font-weight: 600;
         font-size: 14px;
         transition:
-          background-color 0.15s ease,
-          color 0.15s ease,
-          border-color 0.15s ease,
-          box-shadow 0.15s ease;
+          background-color 0.15s,
+          color 0.15s,
+          border-color 0.15s,
+          box-shadow 0.15s,
+          transform 0.1s;
         cursor: pointer;
         border: none;
         touch-action: manipulation;
         white-space: nowrap;
         flex-shrink: 0;
+        font-family: inherit;
       }
       .btn:focus-visible {
         outline: none;
         box-shadow:
-          0 0 0 2px #0a0a0b,
-          0 0 0 4px #3b82f6;
+          0 0 0 2px var(--bg),
+          0 0 0 4px var(--blue);
+      }
+      .btn:active:not(:disabled) {
+        transform: scale(0.97);
       }
 
       .btn-primary {
-        background: #2563eb;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
         color: white;
+        box-shadow:
+          0 2px 14px rgba(59, 130, 246, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.12);
       }
       .btn-primary:hover {
-        background: #1d4ed8;
-      }
-      .btn-primary:active {
-        background: #1e40af;
+        background: linear-gradient(135deg, #4f8ef7 0%, #2d6ef0 100%);
+        box-shadow:
+          0 4px 20px rgba(59, 130, 246, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.12);
       }
 
       .btn-purple {
-        background: #9333ea;
+        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
         color: white;
+        box-shadow:
+          0 2px 14px rgba(139, 92, 246, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1);
       }
       .btn-purple:hover {
-        background: #7e22ce;
-      }
-      .btn-purple:active {
-        background: #6b21a8;
+        background: linear-gradient(135deg, #9b6cf7 0%, #8b4ef8 100%);
+        box-shadow:
+          0 4px 20px rgba(139, 92, 246, 0.38),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1);
       }
 
       .btn-ghost {
         background: transparent;
         color: #a1a1aa;
+        border: 1px solid transparent;
       }
       .btn-ghost:hover {
-        background: #27272a;
-        color: #fafafa;
-      }
-      .btn-ghost:active {
-        background: #3f3f46;
+        background: rgba(255, 255, 255, 0.05);
+        border-color: var(--border);
+        color: var(--text);
       }
 
       .btn-danger {
-        background: #dc2626;
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
         color: white;
+        box-shadow:
+          0 2px 14px rgba(239, 68, 68, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.1);
       }
       .btn-danger:hover {
-        background: #b91c1c;
-      }
-      .btn-danger:active {
-        background: #991b1b;
+        background: linear-gradient(135deg, #f25555 0%, #e53535 100%);
+        box-shadow: 0 4px 20px rgba(239, 68, 68, 0.34);
       }
 
       .btn:disabled {
-        opacity: 0.45;
+        opacity: 0.4;
         cursor: not-allowed;
         pointer-events: none;
       }
@@ -192,82 +352,110 @@
         width: 44px;
         height: 44px;
         padding: 0;
-        border-radius: 10px;
+        border-radius: 11px;
       }
 
       /* ── Inputs ── */
       .input {
-        background: #0f0f11;
-        border: 1px solid #27272a;
-        border-radius: 10px;
+        background: rgba(8, 8, 12, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 11px;
         padding: 0 14px;
         height: 44px;
-        color: #fafafa;
-        font-size: 16px; /* Prevents iOS zoom */
+        color: var(--text);
+        font-size: 16px;
         width: 100%;
         transition:
-          border-color 0.15s ease,
-          box-shadow 0.15s ease;
+          border-color 0.15s,
+          box-shadow 0.15s;
         touch-action: manipulation;
         font-family: inherit;
+        backdrop-filter: blur(8px);
       }
       .input:focus,
       .input:focus-visible {
         outline: none;
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        border-color: rgba(59, 130, 246, 0.55);
+        box-shadow:
+          0 0 0 3px rgba(59, 130, 246, 0.12),
+          inset 0 0 0 1px rgba(59, 130, 246, 0.08);
+        background: rgba(10, 10, 15, 0.9);
       }
       .input::placeholder {
-        color: #3f3f46;
+        color: #2e2e38;
       }
 
-      /* Smaller variant */
       .input-sm {
         height: 36px;
         font-size: 14px;
         padding: 0 12px;
-        border-radius: 8px;
+        border-radius: 9px;
       }
 
       /* ── Badges ── */
       .badge {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        padding: 3px 10px;
-        border-radius: 9999px;
+        gap: 6px;
+        padding: 6px 16px;
+        border-radius: 8px;
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.03em;
+        letter-spacing: 0.04em;
         font-variant-numeric: tabular-nums;
       }
       .badge-success {
-        background: rgba(22, 101, 52, 0.25);
+        background: rgba(22, 101, 52, 0.22);
         color: #4ade80;
+        border: 1px solid rgba(34, 197, 94, 0.18);
       }
       .badge-warning {
-        background: rgba(202, 138, 4, 0.25);
+        background: rgba(202, 138, 4, 0.2);
         color: #facc15;
+        border: 1px solid rgba(250, 204, 21, 0.18);
       }
       .badge-error {
-        background: rgba(220, 38, 38, 0.25);
+        background: rgba(220, 38, 38, 0.2);
         color: #f87171;
+        border: 1px solid rgba(248, 113, 113, 0.18);
       }
       .badge-info {
-        background: rgba(37, 99, 235, 0.25);
+        background: rgba(37, 99, 235, 0.2);
         color: #60a5fa;
+        border: 1px solid rgba(96, 165, 250, 0.18);
       }
       .badge-muted {
-        background: #27272a;
+        background: rgba(255, 255, 255, 0.05);
         color: #a1a1aa;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      /* ── Progress bar ── */
+      .progress-bar {
+        height: 3px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 7px;
+      }
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #3b82f6, #60a5fa);
+        border-radius: 2px;
+        transition: width 0.4s ease;
+        box-shadow: 0 0 8px rgba(59, 130, 246, 0.45);
+      }
+      .progress-fill.complete {
+        background: linear-gradient(90deg, #16a34a, #22c55e);
+        box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
       }
 
       /* ── Torrent items ── */
       .torrent-item {
-        padding: 14px 16px;
-        border-bottom: 1px solid #1e1e21;
-        transition: background-color 0.1s ease;
+        padding: 13px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        transition: background-color 0.12s;
         content-visibility: auto;
         contain-intrinsic-size: 0 80px;
       }
@@ -275,41 +463,141 @@
         border-bottom: none;
       }
       .torrent-item:hover {
-        background: #18181b;
+        background: rgba(255, 255, 255, 0.026);
       }
       .torrent-item.kept {
-        border-left: 3px solid #3b82f6;
-        padding-left: 13px;
+        border-left: 2px solid var(--blue);
+        padding-left: 14px;
+        background: rgba(59, 130, 246, 0.03);
       }
 
-      /* ── Progress bar ── */
-      .progress-bar {
-        height: 3px;
-        background: #27272a;
-        border-radius: 2px;
+      /* ── Tabs ── */
+      .tab {
+        flex: 1;
+        padding: 9px 8px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #52525b;
+        cursor: pointer;
+        transition:
+          background-color 0.15s,
+          color 0.15s;
+        touch-action: manipulation;
+        border: none;
+        background: transparent;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 42px;
+        font-family: inherit;
+      }
+      .tab:hover {
+        color: #a1a1aa;
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .tab.active {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.07);
+        box-shadow:
+          0 1px 8px rgba(0, 0, 0, 0.25),
+          inset 0 1px 0 rgba(255, 255, 255, 0.07);
+      }
+      .tab:focus-visible {
+        outline: none;
+        box-shadow:
+          0 0 0 2px var(--bg),
+          0 0 0 4px var(--blue);
+      }
+
+      /* ── Skeleton ── */
+      .skeleton {
+        background: linear-gradient(
+          90deg,
+          #111115 25%,
+          #18181d 50%,
+          #111115 75%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.6s infinite;
+        border-radius: 10px;
+      }
+
+      /* ── Spinner ── */
+      .btn-spinner {
+        display: none;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.65s linear infinite;
+      }
+      .btn.loading .btn-spinner {
+        display: inline-block;
+      }
+      .btn.loading .btn-label {
+        display: none;
+      }
+
+      /* ── Toast ── */
+      .toast {
+        position: fixed;
+        bottom: calc(22px + env(safe-area-inset-bottom));
+        left: 50%;
+        transform: translateX(-50%) translateY(16px);
+        background: rgba(15, 15, 20, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 14px;
+        padding: 11px 20px;
+        font-size: 13px;
+        font-weight: 500;
+        z-index: 100;
+        opacity: 0;
+        transition:
+          transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+          opacity 0.3s ease;
+        pointer-events: none;
+        max-width: calc(100vw - 32px);
+        white-space: nowrap;
         overflow: hidden;
-        margin-top: 6px;
+        text-overflow: ellipsis;
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        box-shadow:
+          0 8px 32px rgba(0, 0, 0, 0.55),
+          0 0 0 1px rgba(255, 255, 255, 0.04);
       }
-      .progress-fill {
-        height: 100%;
-        background: #3b82f6;
-        border-radius: 2px;
-        transition: width 0.3s ease;
-        font-variant-numeric: tabular-nums;
+      .toast.show {
+        transform: translateX(-50%) translateY(0);
+        opacity: 1;
       }
-      .progress-fill.complete {
-        background: #22c55e;
+      .toast.error {
+        border-color: rgba(239, 68, 68, 0.4);
+        color: #fca5a5;
+        box-shadow:
+          0 8px 32px rgba(0, 0, 0, 0.55),
+          0 0 20px rgba(239, 68, 68, 0.1);
+      }
+      .toast.success {
+        border-color: rgba(34, 197, 94, 0.35);
+        color: #86efac;
+        box-shadow:
+          0 8px 32px rgba(0, 0, 0, 0.55),
+          0 0 20px rgba(34, 197, 94, 0.1);
       }
 
       /* ── Modal ── */
       .modal-overlay {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.75);
-        backdrop-filter: blur(6px);
-        -webkit-backdrop-filter: blur(6px);
+        background: rgba(0, 0, 0, 0.72);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
         display: flex;
-        align-items: flex-end; /* bottom sheet default */
+        align-items: flex-end;
         justify-content: center;
         z-index: 50;
         opacity: 0;
@@ -327,19 +615,23 @@
         opacity: 1;
         pointer-events: auto;
       }
+
       .modal {
-        background: #141416;
-        border: 1px solid #27272a;
-        border-radius: 20px 20px 0 0;
+        background: rgba(12, 12, 16, 0.96);
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 22px 22px 0 0;
         padding: 24px 20px calc(20px + env(safe-area-inset-bottom));
         width: 100%;
         max-width: 100%;
-        transform: translateY(20px);
-        transition: transform 0.25s ease;
+        transform: translateY(24px);
+        transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 -8px 48px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
       }
       @media (min-width: 480px) {
         .modal {
-          border-radius: 16px;
+          border-radius: 18px;
           padding: 28px 24px;
           max-width: 400px;
           transform: scale(0.96) translateY(0);
@@ -354,130 +646,13 @@
         }
       }
 
-      /* ── Toast ── */
-      .toast {
-        position: fixed;
-        bottom: calc(20px + env(safe-area-inset-bottom));
-        left: 50%;
-        transform: translateX(-50%) translateY(20px);
-        background: #1c1c1f;
-        border: 1px solid #3f3f46;
-        border-radius: 12px;
-        padding: 12px 20px;
-        font-size: 13px;
-        font-weight: 500;
-        z-index: 100;
-        opacity: 0;
-        transition:
-          transform 0.3s ease,
-          opacity 0.3s ease;
-        pointer-events: none;
-        max-width: calc(100vw - 32px);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-      }
-      .toast.show {
-        transform: translateX(-50%) translateY(0);
-        opacity: 1;
-      }
-      .toast.error {
-        border-color: #dc2626;
-        color: #fca5a5;
-      }
-      .toast.success {
-        border-color: #22c55e;
-        color: #86efac;
-      }
-
-      /* ── Tabs ── */
-      .tab {
-        flex: 1;
-        padding: 10px 8px;
-        border-radius: 8px;
-        font-size: 13px;
-        font-weight: 600;
-        color: #52525b;
-        cursor: pointer;
-        transition:
-          background-color 0.15s ease,
-          color 0.15s ease;
-        touch-action: manipulation;
-        border: none;
-        background: transparent;
-        text-align: center;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        min-height: 44px;
-      }
-      .tab:hover {
-        color: #a1a1aa;
-        background: #1c1c1e;
-      }
-      .tab.active {
-        color: #fafafa;
-        background: #27272a;
-      }
-      .tab:focus-visible {
-        outline: none;
-        box-shadow:
-          0 0 0 2px #0a0a0b,
-          0 0 0 4px #3b82f6;
-      }
-
-      /* ── Skeleton ── */
-      .skeleton {
-        background: linear-gradient(
-          90deg,
-          #1c1c1e 25%,
-          #242427 50%,
-          #1c1c1e 75%
-        );
-        background-size: 200% 100%;
-        animation: shimmer 1.5s infinite;
-        border-radius: 8px;
-      }
-      @keyframes shimmer {
-        0% {
-          background-position: 200% 0;
-        }
-        100% {
-          background-position: -200% 0;
-        }
-      }
-
-      /* ── Login spinner ── */
-      .btn-spinner {
-        display: none;
-        width: 16px;
-        height: 16px;
-        border: 2px solid rgba(255, 255, 255, 0.25);
-        border-top-color: white;
-        border-radius: 50%;
-        animation: spin 0.6s linear infinite;
-      }
-      .btn.loading .btn-spinner {
-        display: inline-block;
-      }
-      .btn.loading .btn-label {
-        display: none;
-      }
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-
-      /* ── Divider handle for bottom sheet ── */
+      /* ── Sheet handle ── */
       .sheet-handle {
-        width: 40px;
-        height: 4px;
-        background: #3f3f46;
+        width: 36px;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.15);
         border-radius: 2px;
-        margin: 0 auto 16px;
+        margin: 0 auto 18px;
       }
       @media (min-width: 480px) {
         .sheet-handle {
@@ -485,37 +660,15 @@
         }
       }
 
-      /* ── Reduced motion ── */
-      @media (prefers-reduced-motion: reduce) {
-        .skeleton {
-          animation: none;
-          background: #27272a;
-        }
-        .btn-spinner {
-          animation: none;
-        }
-        .modal,
-        .modal-overlay,
-        .toast,
-        .card,
-        .btn,
-        .input,
-        .tab,
-        .progress-fill,
-        .torrent-item {
-          transition: none !important;
-        }
-      }
-
-      /* ── Safe-area header ── */
+      /* ── Header ── */
       header {
         padding-top: env(safe-area-inset-top);
       }
 
-      /* ── List control row stacking ── */
+      /* ── List controls ── */
       .list-controls {
         padding: 10px 14px;
-        border-bottom: 1px solid #27272a;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
         display: flex;
         flex-wrap: wrap;
         align-items: center;
@@ -531,10 +684,38 @@
         gap: 8px;
         flex-shrink: 0;
       }
+
+      /* ── Staggered panel animation ── */
+      .panel-appear {
+        animation: fadeUp 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+
+      /* ── Reduced motion ── */
+      @media (prefers-reduced-motion: reduce) {
+        .skeleton {
+          animation: none;
+          background: #111115;
+        }
+        .btn-spinner {
+          animation: none;
+        }
+        .modal,
+        .modal-overlay,
+        .toast,
+        .card,
+        .btn,
+        .input,
+        .tab,
+        .progress-fill,
+        .torrent-item,
+        .logo-ring {
+          transition: none !important;
+          animation: none !important;
+        }
+      }
     </style>
   </head>
   <body class="antialiased">
-    <!-- Skip to main content -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
 
     <!-- ─────────────── Login Screen ─────────────── -->
@@ -543,44 +724,46 @@
       class="min-h-screen flex items-center justify-center p-4"
     >
       <div class="w-full max-w-xs">
-        <div class="text-center mb-8">
-          <div
-            class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-600/15 mb-4"
-          >
-            <i
-              data-lucide="zap"
-              class="w-6 h-6 text-blue-400"
-              aria-hidden="true"
-            ></i>
+        <div class="login-box">
+          <div class="text-center mb-7">
+            <div class="logo-ring mx-auto">
+              <i
+                data-lucide="zap"
+                class="w-5 h-5 text-blue-400"
+                aria-hidden="true"
+              ></i>
+            </div>
+            <h1 class="text-xl font-extrabold mb-1 tracking-tight">
+              Rdctl Bot
+            </h1>
+            <p class="text-[#52525b] text-sm">Enter your API key to continue</p>
           </div>
-          <h1 class="text-xl font-bold mb-1">Rdctl Bot</h1>
-          <p class="text-[#52525b] text-sm">Enter your API key to continue</p>
+          <form id="login-form" class="space-y-3" novalidate>
+            <div>
+              <label for="api-key-input" class="sr-only">API Key</label>
+              <input
+                type="password"
+                id="api-key-input"
+                name="api-key"
+                class="input"
+                placeholder="Enter your API key…"
+                autocomplete="current-password"
+                spellcheck="false"
+                required
+                autofocus
+              />
+            </div>
+            <button
+              type="submit"
+              id="login-btn"
+              class="btn btn-primary w-full"
+              style="height: 48px; font-size: 15px"
+            >
+              <span class="btn-spinner" aria-hidden="true"></span>
+              <span class="btn-label">Sign In</span>
+            </button>
+          </form>
         </div>
-        <form id="login-form" class="space-y-3" novalidate>
-          <div>
-            <label for="api-key-input" class="sr-only">API Key</label>
-            <input
-              type="password"
-              id="api-key-input"
-              name="api-key"
-              class="input"
-              placeholder="Enter your API key…"
-              autocomplete="current-password"
-              spellcheck="false"
-              required
-              autofocus
-            />
-          </div>
-          <button
-            type="submit"
-            id="login-btn"
-            class="btn btn-primary w-full"
-            style="height: 48px; font-size: 15px"
-          >
-            <span class="btn-spinner" aria-hidden="true"></span>
-            <span class="btn-label">Sign In</span>
-          </button>
-        </form>
       </div>
     </div>
 
@@ -588,20 +771,40 @@
     <div id="app-screen" class="hidden min-h-screen flex flex-col">
       <!-- Header -->
       <header
-        class="sticky top-0 z-40 bg-[#0a0a0b]/90 backdrop-blur-lg border-b border-[#27272a]"
+        class="sticky top-0 z-40"
+        style="
+          background: rgba(7, 7, 10, 0.82);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        "
       >
         <div
-          class="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3"
+          class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-3"
         >
-          <div class="flex items-center gap-2 min-w-0">
-            <i
-              data-lucide="zap"
-              class="w-4 h-4 text-blue-400 flex-shrink-0"
-              aria-hidden="true"
-            ></i>
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div
+              style="
+                width: 28px;
+                height: 28px;
+                border-radius: 9px;
+                background: rgba(59, 130, 246, 0.12);
+                border: 1px solid rgba(59, 130, 246, 0.2);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+              "
+            >
+              <i
+                data-lucide="zap"
+                class="w-3.5 h-3.5 text-blue-400"
+                aria-hidden="true"
+              ></i>
+            </div>
             <span
               id="user-greeting"
-              class="text-sm font-medium text-[#a1a1aa] truncate"
+              class="text-sm font-semibold text-[#a1a1aa] truncate"
               aria-live="polite"
             ></span>
           </div>
@@ -637,7 +840,12 @@
         <!-- Quick Actions -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <!-- Add Torrent -->
-          <form id="add-torrent-form" class="card p-4" novalidate>
+          <form
+            id="add-torrent-form"
+            class="card p-4 panel-appear"
+            style="animation-delay: 0.05s"
+            novalidate
+          >
             <div class="flex items-center gap-2 mb-3">
               <i
                 data-lucide="download"
@@ -673,7 +881,12 @@
           </form>
 
           <!-- Unrestrict Link -->
-          <form id="unrestrict-form" class="card p-4" novalidate>
+          <form
+            id="unrestrict-form"
+            class="card p-4 panel-appear"
+            style="animation-delay: 0.1s"
+            novalidate
+          >
             <div class="flex items-center gap-2 mb-3">
               <i
                 data-lucide="unlock"
@@ -707,7 +920,12 @@
           </form>
 
           <!-- Check Domain -->
-          <form id="check-domain-form" class="card p-4" novalidate>
+          <form
+            id="check-domain-form"
+            class="card p-4 panel-appear"
+            style="animation-delay: 0.15s"
+            novalidate
+          >
             <div class="flex items-center gap-2 mb-3">
               <i
                 data-lucide="globe"
@@ -748,7 +966,8 @@
         <!-- Auto-Delete Settings (Admin Only) -->
         <div
           id="autodelete-card"
-          class="card p-4 hidden"
+          class="card p-4 hidden panel-appear"
+          style="animation-delay: 0.18s"
           role="region"
           aria-label="Auto-Delete Settings"
         >
@@ -797,7 +1016,13 @@
         <div
           role="tablist"
           aria-label="Content sections"
-          class="flex items-center gap-1 p-1 bg-[#141416] border border-[#27272a] rounded-xl"
+          class="panel-appear flex items-center gap-1 p-1.5 rounded-2xl"
+          style="
+            background: rgba(13, 13, 17, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            animation-delay: 0.2s;
+            backdrop-filter: blur(12px);
+          "
         >
           <button
             class="tab active"
@@ -828,7 +1053,8 @@
         <!-- Torrents Panel -->
         <div
           id="torrents-panel"
-          class="card overflow-hidden"
+          class="card overflow-hidden panel-appear"
+          style="animation-delay: 0.25s"
           role="tabpanel"
           aria-labelledby="tab-torrents"
         >
@@ -879,12 +1105,26 @@
             class="max-h-[520px] overflow-y-auto overscroll-contain"
           >
             <div id="torrents-empty" class="py-16 text-center">
-              <i
-                data-lucide="inbox"
-                class="w-10 h-10 mx-auto mb-3 text-[#3f3f46]"
-                aria-hidden="true"
-              ></i>
-              <p class="text-[#52525b] text-sm">No torrents yet</p>
+              <div
+                style="
+                  width: 52px;
+                  height: 52px;
+                  border-radius: 16px;
+                  background: rgba(255, 255, 255, 0.04);
+                  border: 1px solid rgba(255, 255, 255, 0.06);
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  margin: 0 auto 12px;
+                "
+              >
+                <i
+                  data-lucide="inbox"
+                  class="w-6 h-6 text-[#2e2e3a]"
+                  aria-hidden="true"
+                ></i>
+              </div>
+              <p class="text-[#3f3f46] text-sm font-medium">No torrents yet</p>
             </div>
             <div
               id="torrents-loading"
@@ -893,8 +1133,8 @@
               role="status"
             >
               <div class="skeleton h-16"></div>
-              <div class="skeleton h-16"></div>
-              <div class="skeleton h-16"></div>
+              <div class="skeleton h-16" style="opacity: 0.7"></div>
+              <div class="skeleton h-16" style="opacity: 0.45"></div>
             </div>
           </div>
         </div>
@@ -902,7 +1142,8 @@
         <!-- Downloads Panel -->
         <div
           id="downloads-panel"
-          class="card overflow-hidden hidden"
+          class="card overflow-hidden hidden panel-appear"
+          style="animation-delay: 0.25s"
           role="tabpanel"
           aria-labelledby="tab-downloads"
         >
@@ -953,12 +1194,26 @@
             class="max-h-[520px] overflow-y-auto overscroll-contain"
           >
             <div id="downloads-empty" class="py-16 text-center">
-              <i
-                data-lucide="package"
-                class="w-10 h-10 mx-auto mb-3 text-[#3f3f46]"
-                aria-hidden="true"
-              ></i>
-              <p class="text-[#52525b] text-sm">No downloads yet</p>
+              <div
+                style="
+                  width: 52px;
+                  height: 52px;
+                  border-radius: 16px;
+                  background: rgba(255, 255, 255, 0.04);
+                  border: 1px solid rgba(255, 255, 255, 0.06);
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  margin: 0 auto 12px;
+                "
+              >
+                <i
+                  data-lucide="package"
+                  class="w-6 h-6 text-[#2e2e3a]"
+                  aria-hidden="true"
+                ></i>
+              </div>
+              <p class="text-[#3f3f46] text-sm font-medium">No downloads yet</p>
             </div>
             <div
               id="downloads-loading"
@@ -967,26 +1222,25 @@
               role="status"
             >
               <div class="skeleton h-16"></div>
-              <div class="skeleton h-16"></div>
+              <div class="skeleton h-16" style="opacity: 0.65"></div>
             </div>
           </div>
         </div>
       </main>
 
       <!-- Footer -->
-      <footer class="text-center py-5 text-xs text-[#3f3f46]">
+      <footer class="text-center py-6 text-xs text-[#2e2e38]">
         <a
           href="https://github.com/crazyuploader/rdctl-bot"
           target="_blank"
           rel="noopener noreferrer"
-          class="hover:text-[#71717a] transition-colors focus-visible:text-[#71717a]"
+          class="hover:text-[#52525b] transition-colors focus-visible:text-[#52525b] font-medium"
+          >View on GitHub ↗</a
         >
-          View on GitHub
-        </a>
       </footer>
     </div>
 
-    <!-- Confirm Modal -->
+    <!-- ─────────────── Confirm Modal ─────────────── -->
     <div
       id="confirm-modal"
       class="modal-overlay"
@@ -997,12 +1251,33 @@
     >
       <div class="modal w-full">
         <div class="sheet-handle"></div>
-        <h3 id="confirm-title" class="text-base font-bold mb-2">Confirm</h3>
+        <div
+          style="
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 14px;
+          "
+        >
+          <i
+            data-lucide="trash-2"
+            class="w-4 h-4 text-red-400"
+            aria-hidden="true"
+          ></i>
+        </div>
+        <h3 id="confirm-title" class="text-base font-bold mb-2 tracking-tight">
+          Confirm Delete
+        </h3>
         <p
           id="confirm-message"
-          class="text-[#a1a1aa] text-sm mb-6 break-all leading-relaxed"
+          class="text-[#71717a] text-sm mb-6 break-all leading-relaxed"
         ></p>
-        <div class="flex gap-3">
+        <div class="flex gap-2.5">
           <button id="confirm-cancel" class="btn btn-ghost flex-1">
             Cancel
           </button>
@@ -1011,7 +1286,7 @@
       </div>
     </div>
 
-    <!-- Toast -->
+    <!-- ─────────────── Toast ─────────────── -->
     <div
       id="toast"
       class="toast"
