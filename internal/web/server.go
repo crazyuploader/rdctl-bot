@@ -58,7 +58,11 @@ type Server struct {
 // NewServer creates a new web server instance
 func NewServer(deps Dependencies) *Server {
 	app := fiber.New(fiber.Config{
-		ProxyHeader: "X-Forwarded-For", // Standard proxy header
+		ProxyHeader: "X-Forwarded-For",
+		TrustProxy:  true,
+		TrustProxyConfig: fiber.TrustProxyConfig{
+			Proxies: []string{"127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10"},
+		},
 		ErrorHandler: func(c fiber.Ctx, err error) error {
 			// Status code defaults to 500
 			code := fiber.StatusInternalServerError
@@ -223,6 +227,7 @@ func NewServer(deps Dependencies) *Server {
 // Start starts the web server
 func (s *Server) Start() error {
 	log.Printf("Starting web server on %s", s.config.Web.ListenAddr)
+	log.Printf("Proxy support: TrustProxy enabled with proxies: 127.0.0.1, ::1, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10")
 	return s.app.Listen(s.config.Web.ListenAddr)
 }
 

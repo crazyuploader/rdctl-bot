@@ -180,6 +180,12 @@ func runBot(cmd *cobra.Command, args []string) {
 	// Log configuration details
 	log.Printf("Allowed chat IDs: %v", cfg.Telegram.AllowedChatIDs)
 	log.Printf("Super admin IDs: %v", cfg.Telegram.SuperAdminIDs)
+	if len(cfg.Telegram.AllowedTopicIDs) > 0 {
+		log.Printf("Allowed topic IDs: %v", cfg.Telegram.AllowedTopicIDs)
+	}
+	if cfg.App.AutoDeleteWarning.ChatID != 0 {
+		log.Printf("Auto-delete warning: chat_id=%d, topic_id=%d", cfg.App.AutoDeleteWarning.ChatID, cfg.App.AutoDeleteWarning.TopicID)
+	}
 	log.Printf("Rate limit: %d messages/sec (burst: %d)", cfg.App.RateLimit.MessagesPerSecond, cfg.App.RateLimit.Burst)
 	log.Printf("Database: %s:%d/%s", cfg.Database.Host, cfg.Database.Port, cfg.Database.DBName)
 
