@@ -475,12 +475,9 @@ function renderDownloads(filterStr) {
         <div class="flex items-start justify-between gap-4">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1">
-              <a
-                href="${d.download}"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="truncate text-sm font-medium hover:text-blue-400 transition-colors focus-visible:outline-none focus-visible:text-blue-400"
-              >${escapeHtml(d.filename)}</a>
+              <span
+                class="truncate text-sm font-medium"
+              >${escapeHtml(d.filename)}</span>
               <span class="badge badge-muted">${escapeHtml(d.host)}</span>
             </div>
             <div class="flex items-center gap-3 text-xs text-[#71717a]" style="font-variant-numeric: tabular-nums">
@@ -489,15 +486,6 @@ function renderDownloads(filterStr) {
             </div>
           </div>
           <div class="flex items-center gap-1">
-            <a
-              href="${d.download}"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn btn-ghost p-2"
-              aria-label="Download ${escapeHtml(d.filename)}"
-            >
-              <i data-lucide="download" class="w-4 h-4" aria-hidden="true"></i>
-            </a>
             ${
               isAdmin
                 ? `

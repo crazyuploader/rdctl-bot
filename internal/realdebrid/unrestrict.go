@@ -26,7 +26,7 @@ type Download struct {
 	Link      string    `json:"link"`
 	Host      string    `json:"host"`
 	Chunks    int       `json:"chunks"`
-	Download  string    `json:"download"`
+	Download  string    `json:"-"`
 	Generated time.Time `json:"generated"`
 	Type      string    `json:"type"`
 }
