@@ -23,6 +23,9 @@ The bot uses `config.yaml`. See `example-config.yaml` for a template.
 - `app.rate_limit.burst`: Max message burst to Telegram.
 - `app.max_kept_torrents`: Max kept torrents per non-admin user (0 = unlimited).
 - `app.auto_delete_days`: Default auto-delete days fallback when not set in UI/DB (0 = disabled).
+- `app.auto_delete_warning.chat_id`: Chat ID to send warning notifications (0 = disabled).
+- `app.auto_delete_warning.topic_id`: Topic/thread ID for warnings (0 = main chat).
+- `app.auto_delete_warning.hours_before`: Hours before deletion to send warning (default: 6).
 - `database.host`, `port`, `user`, `password`, `dbname`, `sslmode`: Database connection details.
 - `web.listen_addr`: Web server address (default: `:8089`).
 - `web.dashboard_url`: Base URL for dashboard links.
