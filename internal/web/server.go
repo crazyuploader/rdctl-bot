@@ -203,6 +203,10 @@ func NewServer(deps Dependencies) *Server {
 	// Embed static files - Place this last to ensure API routes are matched first
 	// or properly fall through if not found.
 	staticFS, _ := fs.Sub(staticFiles, "static")
+	app.Use("/*", func(c fiber.Ctx) error {
+		c.Set("Cache-Control", "no-store, max-age=0")
+		return c.Next()
+	})
 	app.Use("/*", static.New("", static.Config{
 		FS:     staticFS,
 		Browse: false,
