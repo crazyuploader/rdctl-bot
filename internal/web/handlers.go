@@ -331,7 +331,11 @@ func (d *Dependencies) SetAutoDeleteSetting(c fiber.Ctx) error {
 	}
 
 	// Store the validated value (as string to match existing interface)
-	if err := d.SettingRepo.SetSetting(c.Context(), "auto_delete_days", body.Value); err != nil {
+	userID := int64(0)
+	if token := GetToken(c); token != nil {
+		userID = token.UserID
+	}
+	if err := d.SettingRepo.SetSettingWithAudit(c.Context(), "auto_delete_days", body.Value, userID, 0); err != nil {
 		return err
 	}
 

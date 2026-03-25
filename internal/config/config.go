@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"slices"
 	"strings"
@@ -62,8 +61,8 @@ type RealDebridConfig struct {
 	BaseURL     string `mapstructure:"base_url"`
 	Timeout     int    `mapstructure:"timeout"`
 	Proxy       string `mapstructure:"proxy"`
-	IpTestURL   string `mapstructure:"ip_test_url"`
-	IpVerifyURL string `mapstructure:"ip_verify_url"`
+	IPTestURL   string `mapstructure:"ip_test_url"`
+	IPVerifyURL string `mapstructure:"ip_verify_url"`
 }
 
 // AppConfig holds application settings
@@ -89,28 +88,14 @@ type DatabaseConfig struct {
 	Password string `mapstructure:"password"`
 	DBName   string `mapstructure:"dbname"`
 	SSLMode  string `mapstructure:"sslmode"`
-
-	// SQLite configuration
-	SQLitePath string `mapstructure:"sqlite_path"`
 }
 
 var cfg *Config
 
 // GetDSN returns the PostgreSQL connection DSN
 func (d *DatabaseConfig) GetDSN() string {
-	// If SQLitePath is provided, return it instead
-	if d.SQLitePath != "" {
-		return d.SQLitePath
-	}
-
-	// Return PostgreSQL DSN
 	return fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=%s TimeZone=UTC",
 		d.Host, d.User, d.Password, d.DBName, d.Port, d.SSLMode)
-}
-
-// IsSQLite returns true if SQLite should be used instead of PostgreSQL
-func (d *DatabaseConfig) IsSQLite() bool {
-	return d.SQLitePath != ""
 }
 
 // Load reads configuration into a Config from the specified file or from standard locations,
@@ -201,14 +186,14 @@ func (c *Config) Validate(webOnly bool) error {
 		}
 	}
 
-	if c.RealDebrid.IpTestURL != "" {
-		if _, err := url.Parse(c.RealDebrid.IpTestURL); err != nil {
+	if c.RealDebrid.IPTestURL != "" {
+		if _, err := url.Parse(c.RealDebrid.IPTestURL); err != nil {
 			return fmt.Errorf("invalid real-debrid IP test URL: %w", err)
 		}
 	}
 
-	if c.RealDebrid.IpVerifyURL != "" {
-		if _, err := url.Parse(c.RealDebrid.IpVerifyURL); err != nil {
+	if c.RealDebrid.IPVerifyURL != "" {
+		if _, err := url.Parse(c.RealDebrid.IPVerifyURL); err != nil {
 			return fmt.Errorf("invalid real-debrid IP verify URL: %w", err)
 		}
 	}
@@ -222,31 +207,25 @@ func (c *Config) Validate(webOnly bool) error {
 		c.App.RateLimit.Burst = 5
 	}
 
-	// Database validation
-	if c.Database.SQLitePath != "" {
-		// Using SQLite, no PostgreSQL validation needed
-		log.Println("Using SQLite database:", c.Database.SQLitePath)
-	} else {
-		// Using PostgreSQL, validate PostgreSQL settings
-		if c.Database.Host == "" {
-			c.Database.Host = "localhost"
-		}
+	// Database validation - PostgreSQL settings
+	if c.Database.Host == "" {
+		c.Database.Host = "localhost"
+	}
 
-		if c.Database.Port == 0 {
-			c.Database.Port = 5432
-		}
+	if c.Database.Port == 0 {
+		c.Database.Port = 5432
+	}
 
-		if c.Database.User == "" {
-			c.Database.User = "postgres"
-		}
+	if c.Database.User == "" {
+		c.Database.User = "postgres"
+	}
 
-		if c.Database.DBName == "" {
-			return fmt.Errorf("database name is required")
-		}
+	if c.Database.DBName == "" {
+		return fmt.Errorf("database name is required")
+	}
 
-		if c.Database.SSLMode == "" {
-			c.Database.SSLMode = "disable"
-		}
+	if c.Database.SSLMode == "" {
+		c.Database.SSLMode = "disable"
 	}
 
 	if c.Web.ListenAddr == "" {
@@ -315,6 +294,7 @@ func (c *Config) IsSuperAdmin(userID int64) bool {
 // If the chat is not in the map, it returns true (topic restriction not configured for this chat).
 // If the chat is configured with an empty list, it returns true (all topics allowed for this chat).
 // If the chat is configured with specific IDs, it returns true only if the topicID is in the list.
+// If the chat has specific topics configured and the message is in the main chat (topicID=0), it returns false.
 func (c *Config) IsAllowedTopic(chatID int64, topicID int) bool {
 	if c.Telegram.AllowedTopicIDs == nil {
 		return true
@@ -325,6 +305,10 @@ func (c *Config) IsAllowedTopic(chatID int64, topicID int) bool {
 	}
 	if len(allowedTopics) == 0 {
 		return true // Empty list means all topics allowed for this chat
+	}
+	// If specific topics are configured and message is in main chat (not a thread), block it
+	if topicID == 0 {
+		return false
 	}
 	return slices.Contains(allowedTopics, int64(topicID))
 }

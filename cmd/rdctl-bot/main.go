@@ -202,7 +202,7 @@ func runBot(cmd *cobra.Command, args []string) {
 		// Create bot instance
 		log.Println("Initializing bot...")
 		var err error
-		b, err = bot.NewBot(cfg, database, cfg.RealDebrid.Proxy, cfg.RealDebrid.IpTestURL, cfg.RealDebrid.IpVerifyURL)
+		b, err = bot.NewBot(cfg, database, cfg.RealDebrid.Proxy, cfg.RealDebrid.IPTestURL, cfg.RealDebrid.IPVerifyURL)
 		if err != nil {
 			log.Fatalf("Failed to create bot: %v", err)
 		}

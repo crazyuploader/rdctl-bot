@@ -47,7 +47,14 @@ func (m *Middleware) CheckAuthorization(chatID, userID int64) (bool, bool) {
 
 // WaitForRateLimit waits if rate limit is exceeded
 func (m *Middleware) WaitForRateLimit() error {
-	ctx := context.Background()
+	if err := m.limiter.Wait(context.Background()); err != nil {
+		return fmt.Errorf("rate limit error: %w", err)
+	}
+	return nil
+}
+
+// WaitForRateLimitWithContext waits if rate limit is exceeded with context cancellation support
+func (m *Middleware) WaitForRateLimitWithContext(ctx context.Context) error {
 	if err := m.limiter.Wait(ctx); err != nil {
 		return fmt.Errorf("rate limit error: %w", err)
 	}
