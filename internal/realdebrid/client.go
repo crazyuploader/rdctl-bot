@@ -268,8 +268,9 @@ func (c *Client) GetSupportedRegex() ([]string, error) {
 func (c *Client) GetSupportedDomains() ([]string, error) {
 	c.domainsCache.mu.RLock()
 	if len(c.domainsCache.domains) > 0 && time.Since(c.domainsCache.age) < 5*time.Minute {
-		defer c.domainsCache.mu.RUnlock()
-		return c.domainsCache.domains, nil
+		newSlice := append([]string(nil), c.domainsCache.domains...)
+		c.domainsCache.mu.RUnlock()
+		return newSlice, nil
 	}
 	c.domainsCache.mu.RUnlock()
 
@@ -277,7 +278,8 @@ func (c *Client) GetSupportedDomains() ([]string, error) {
 	defer c.domainsCache.mu.Unlock()
 
 	if len(c.domainsCache.domains) > 0 && time.Since(c.domainsCache.age) < 5*time.Minute {
-		return c.domainsCache.domains, nil
+		newSlice := append([]string(nil), c.domainsCache.domains...)
+		return newSlice, nil
 	}
 
 	respBody, err := c.GET("/hosts/domains", nil)
@@ -316,7 +318,7 @@ func (c *Client) IsDomainSupported(domain string) (bool, string, error) {
 	// If no TLD, search for domains that start with the input
 	if !strings.Contains(domain, ".") {
 		for _, d := range domains {
-			if strings.HasPrefix(d, domain+".") {
+			if strings.HasPrefix(strings.ToLower(d), strings.ToLower(domain)+".") {
 				return true, d, nil
 			}
 		}

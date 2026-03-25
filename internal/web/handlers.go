@@ -135,7 +135,7 @@ func (d *Dependencies) GetDownloads(c fiber.Ctx) error {
 
 // CheckDomain checks if a domain is supported
 func (d *Dependencies) CheckDomain(c fiber.Ctx) error {
-	domain := strings.ToLower(c.Query("domain"))
+	domain := strings.ToLower(strings.TrimSpace(c.Query("domain")))
 	if domain == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "Domain is required")
 	}
