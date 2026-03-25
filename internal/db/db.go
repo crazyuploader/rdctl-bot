@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
@@ -42,60 +41,31 @@ func Init(dsn string) (*gorm.DB, error) {
 	var db *gorm.DB
 	var err error
 
-	// Check if we should use SQLite or PostgreSQL
-	if cfg != nil && cfg.Database.IsSQLite() {
-		// Use SQLite
-		db, err = gorm.Open(sqlite.Open(dsn), &gorm.Config{
-			Logger:                                   newLogger,
-			NowFunc:                                  func() time.Time { return time.Now().UTC() },
-			DisableForeignKeyConstraintWhenMigrating: true,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to connect to SQLite database: %w", err)
-		}
-
-		// SQLite specific connection settings
-		sqlDB, err := db.DB()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get SQLite database instance: %w", err)
-		}
-
-		// Verify connection is working
-		if err := sqlDB.Ping(); err != nil {
-			return nil, fmt.Errorf("failed to ping SQLite database: %w", err)
-		}
-
-		// SQLite connection pool settings (simpler than PostgreSQL)
-		sqlDB.SetMaxIdleConns(1)
-		sqlDB.SetMaxOpenConns(1)
-		sqlDB.SetConnMaxLifetime(time.Hour)
-	} else {
-		// Use PostgreSQL
-		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
-			Logger:                                   newLogger,
-			NowFunc:                                  func() time.Time { return time.Now().UTC() },
-			DisableForeignKeyConstraintWhenMigrating: true,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to connect to PostgreSQL database: %w", err)
-		}
-
-		// Get underlying SQL DB to configure connection pool
-		sqlDB, err := db.DB()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get PostgreSQL database instance: %w", err)
-		}
-
-		// Verify connection is working
-		if err := sqlDB.Ping(); err != nil {
-			return nil, fmt.Errorf("failed to ping PostgreSQL database: %w", err)
-		}
-
-		// Set connection pool settings
-		sqlDB.SetMaxIdleConns(10)
-		sqlDB.SetMaxOpenConns(100)
-		sqlDB.SetConnMaxLifetime(time.Hour)
+	// Use PostgreSQL
+	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger:                                   newLogger,
+		NowFunc:                                  func() time.Time { return time.Now().UTC() },
+		DisableForeignKeyConstraintWhenMigrating: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to PostgreSQL database: %w", err)
 	}
+
+	// Get underlying SQL DB to configure connection pool
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get PostgreSQL database instance: %w", err)
+	}
+
+	// Verify connection is working
+	if err := sqlDB.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping PostgreSQL database: %w", err)
+	}
+
+	// Set connection pool settings
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	// Run migrations with proper ordering
 	if err := runMigrations(db); err != nil {

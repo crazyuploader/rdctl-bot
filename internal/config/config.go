@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"slices"
 	"strings"
@@ -89,28 +88,14 @@ type DatabaseConfig struct {
 	Password string `mapstructure:"password"`
 	DBName   string `mapstructure:"dbname"`
 	SSLMode  string `mapstructure:"sslmode"`
-
-	// SQLite configuration
-	SQLitePath string `mapstructure:"sqlite_path"`
 }
 
 var cfg *Config
 
 // GetDSN returns the PostgreSQL connection DSN
 func (d *DatabaseConfig) GetDSN() string {
-	// If SQLitePath is provided, return it instead
-	if d.SQLitePath != "" {
-		return d.SQLitePath
-	}
-
-	// Return PostgreSQL DSN
 	return fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=%s TimeZone=UTC",
 		d.Host, d.User, d.Password, d.DBName, d.Port, d.SSLMode)
-}
-
-// IsSQLite returns true if SQLite should be used instead of PostgreSQL
-func (d *DatabaseConfig) IsSQLite() bool {
-	return d.SQLitePath != ""
 }
 
 // Load reads configuration into a Config from the specified file or from standard locations,
@@ -222,31 +207,25 @@ func (c *Config) Validate(webOnly bool) error {
 		c.App.RateLimit.Burst = 5
 	}
 
-	// Database validation
-	if c.Database.SQLitePath != "" {
-		// Using SQLite, no PostgreSQL validation needed
-		log.Println("Using SQLite database:", c.Database.SQLitePath)
-	} else {
-		// Using PostgreSQL, validate PostgreSQL settings
-		if c.Database.Host == "" {
-			c.Database.Host = "localhost"
-		}
+	// Database validation - PostgreSQL settings
+	if c.Database.Host == "" {
+		c.Database.Host = "localhost"
+	}
 
-		if c.Database.Port == 0 {
-			c.Database.Port = 5432
-		}
+	if c.Database.Port == 0 {
+		c.Database.Port = 5432
+	}
 
-		if c.Database.User == "" {
-			c.Database.User = "postgres"
-		}
+	if c.Database.User == "" {
+		c.Database.User = "postgres"
+	}
 
-		if c.Database.DBName == "" {
-			return fmt.Errorf("database name is required")
-		}
+	if c.Database.DBName == "" {
+		return fmt.Errorf("database name is required")
+	}
 
-		if c.Database.SSLMode == "" {
-			c.Database.SSLMode = "disable"
-		}
+	if c.Database.SSLMode == "" {
+		c.Database.SSLMode = "disable"
 	}
 
 	if c.Web.ListenAddr == "" {

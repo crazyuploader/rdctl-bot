@@ -1,4 +1,21 @@
 services:
+  # PostgreSQL Database (uncomment to use)
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: rdctl-bot-db
+  #   environment:
+  #     POSTGRES_USER: rdctl_bot
+  #     POSTGRES_PASSWORD: your_password_here
+  #     POSTGRES_DB: rd_bot
+  #   volumes:
+  #     - ./data/postgres:/var/lib/postgresql/data
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U rdctl_bot -d rd_bot"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
   rdctl-bot:
     image: ghcr.io/crazyuploader/rdctl-bot:latest
     container_name: rdctl-bot
@@ -10,3 +27,9 @@ services:
     logging:
       options:
         max-size: "128m"
+    # Uncomment depends_on and environment when using PostgreSQL container
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+    # environment:
+    #   - DATABASE_HOST=postgres
