@@ -18,6 +18,9 @@ RUN go mod download
 # Copy source code
 COPY . .
 
+# Download dependencies and build the binary
+RUN go build -ldflags="-s -w" -o rdctl-bot ./cmd/rdctl-bot
+
 # Stage 2: Minimal runtime image
 FROM alpine:3.23
 
