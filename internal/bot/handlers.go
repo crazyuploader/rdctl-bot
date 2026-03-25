@@ -809,7 +809,7 @@ func (b *Bot) sendHTMLMessageWithErr(ctx context.Context, chatID int64, messageT
 			MessageID: replyToMessageID,
 		}
 	}
-	if err := b.middleware.WaitForRateLimit(); err != nil {
+	if err := b.middleware.WaitForRateLimitWithContext(ctx); err != nil {
 		return fmt.Errorf("rate limit error: %w", err)
 	}
 	if _, err := b.api.SendMessage(ctx, params); err != nil {
