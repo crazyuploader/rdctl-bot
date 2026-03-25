@@ -24,6 +24,9 @@ const (
 
 	// maxAutoDeleteDays is the maximum allowed value for auto-delete days
 	maxAutoDeleteDays = 3650
+
+	// warningCheckInterval defines how often to check for torrents needing warning
+	warningCheckInterval = 1 * time.Hour
 )
 
 // handleAutoDeleteCommand handles the /autodelete command (superadmin only)
@@ -288,4 +291,140 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 	if totalSkipped > 0 {
 		log.Printf("Auto-delete: skipped %d kept torrent(s)", totalSkipped)
 	}
+}
+
+// startAutoDeleteWarningWorker runs a background goroutine that periodically sends warnings
+// for torrents about to be auto-deleted. It stops when ctx is cancelled.
+func (b *Bot) startAutoDeleteWarningWorker(ctx context.Context) {
+	ticker := time.NewTicker(warningCheckInterval)
+	defer ticker.Stop()
+
+	log.Println("Auto-delete warning worker started (checking every hour)")
+
+	// Run first check after a short delay to let the bot initialize
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(30 * time.Second):
+		b.runAutoDeleteWarningCheck(ctx)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("Auto-delete warning worker stopped")
+			return
+		case <-ticker.C:
+			b.runAutoDeleteWarningCheck(ctx)
+		}
+	}
+}
+
+// runAutoDeleteWarningCheck performs a single warning check cycle
+func (b *Bot) runAutoDeleteWarningCheck(ctx context.Context) {
+	// Check if warning is configured
+	chatID := b.config.App.AutoDeleteWarning.ChatID
+	if chatID == 0 {
+		return
+	}
+
+	topicID := b.config.App.AutoDeleteWarning.TopicID
+	hoursBefore := b.config.App.AutoDeleteWarning.HoursBefore
+
+	// Get auto-delete days setting
+	daysStr, err := b.settingRepo.GetSetting(ctx, settingAutoDeleteDays)
+	if err != nil {
+		log.Printf("Auto-delete warning: failed to read setting: %v", err)
+		return
+	}
+
+	var days int
+	switch daysStr {
+	case "":
+		days = b.config.App.AutoDeleteDays
+		if days <= 0 {
+			return // Auto-delete is disabled
+		}
+	case "0":
+		return // Explicitly disabled
+	default:
+		var parseErr error
+		days, parseErr = strconv.Atoi(daysStr)
+		if parseErr != nil || days <= 0 {
+			return
+		}
+	}
+
+	// Get kept torrent IDs to skip them during warning
+	keptTorrentIDs, err := b.keptRepo.GetKeptTorrentIDs(ctx)
+	if err != nil {
+		log.Printf("Auto-delete warning: failed to get kept torrent IDs: %v", err)
+		keptTorrentIDs = make(map[string]bool)
+	}
+
+	// Calculate the cutoff time for deletion and the warning window
+	deleteCutoff := time.Now().UTC().AddDate(0, 0, -days)
+	warningCutoff := deleteCutoff.Add(time.Duration(hoursBefore) * time.Hour)
+
+	// Only send warning if the delete cutoff is in the future (torrent will be deleted soon)
+	if warningCutoff.Before(time.Now().UTC()) {
+		return
+	}
+
+	log.Printf("Auto-delete warning: checking for torrents to be deleted in %d hours (before %s)", hoursBefore, deleteCutoff.Format("2006-01-02 15:04"))
+
+	// Fetch torrents in batches
+	const batchSize = 100
+	offset := 0
+	var torrentsToWarn []realdebrid.Torrent
+
+	for {
+		torrents, err := b.rdClient.GetTorrents(batchSize, offset)
+		if err != nil {
+			log.Printf("Auto-delete warning: failed to fetch torrents (offset=%d): %v", offset, err)
+			break
+		}
+
+		if len(torrents) == 0 {
+			break
+		}
+
+		for _, t := range torrents {
+			if keptTorrentIDs[t.ID] {
+				continue
+			}
+
+			// Check if torrent will be deleted within the warning window
+			if t.Added.Before(warningCutoff) && !t.Added.Before(deleteCutoff) {
+				torrentsToWarn = append(torrentsToWarn, t)
+			}
+		}
+
+		if len(torrents) < batchSize {
+			break
+		}
+
+		offset += batchSize
+	}
+
+	if len(torrentsToWarn) == 0 {
+		return
+	}
+
+	// Build warning message
+	var text strings.Builder
+	text.WriteString("<b>⚠️ Torrents Scheduled for Auto-Deletion</b>\n\n")
+	fmt.Fprintf(&text, "The following torrents will be deleted in approximately <b>%d hours</b>.\n", hoursBefore)
+	text.WriteString("Use <code>/keep &lt;id&gt;</code> to keep any torrent from being deleted.\n\n")
+
+	for _, t := range torrentsToWarn {
+		filename := html.EscapeString(t.Filename)
+		addedDays := int(time.Since(t.Added).Hours() / 24)
+		fmt.Fprintf(&text, "• <code>/keep %s</code> — <i>%s</i> (<b>%d</b> days old)\n", t.ID, filename, addedDays)
+	}
+
+	fmt.Fprintf(&text, "\n<i>%d torrent(s) scheduled for deletion</i>", len(torrentsToWarn))
+
+	b.sendHTMLMessage(ctx, chatID, topicID, text.String(), 0)
+	log.Printf("Auto-delete warning: sent warning for %d torrent(s) to chat %d", len(torrentsToWarn), chatID)
 }
