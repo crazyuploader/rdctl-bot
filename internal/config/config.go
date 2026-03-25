@@ -294,6 +294,7 @@ func (c *Config) IsSuperAdmin(userID int64) bool {
 // If the chat is not in the map, it returns true (topic restriction not configured for this chat).
 // If the chat is configured with an empty list, it returns true (all topics allowed for this chat).
 // If the chat is configured with specific IDs, it returns true only if the topicID is in the list.
+// If the chat has specific topics configured and the message is in the main chat (topicID=0), it returns false.
 func (c *Config) IsAllowedTopic(chatID int64, topicID int) bool {
 	if c.Telegram.AllowedTopicIDs == nil {
 		return true
@@ -304,6 +305,10 @@ func (c *Config) IsAllowedTopic(chatID int64, topicID int) bool {
 	}
 	if len(allowedTopics) == 0 {
 		return true // Empty list means all topics allowed for this chat
+	}
+	// If specific topics are configured and message is in main chat (not a thread), block it
+	if topicID == 0 {
+		return false
 	}
 	return slices.Contains(allowedTopics, int64(topicID))
 }

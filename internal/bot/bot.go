@@ -328,8 +328,9 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 	}
 
 	// Check topic restrictions if configured
-	if messageThreadID != 0 && !b.config.IsAllowedTopic(chatID, messageThreadID) {
-		log.Printf("Topic %d not allowed for chat %d", messageThreadID, chatID)
+	if !b.config.IsAllowedTopic(chatID, messageThreadID) {
+		log.Printf("Topic %d not allowed for chat %d (config topics: %v)", messageThreadID, chatID, b.config.Telegram.AllowedTopicIDs[fmt.Sprintf("%d", chatID)])
+		b.middleware.LogUnauthorized(username, chatID, userID)
 		return
 	}
 
