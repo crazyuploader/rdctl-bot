@@ -13,7 +13,7 @@ import (
 	"github.com/crazyuploader/rdctl-bot/internal/config"
 )
 
-// Init initializes the database connection using either PostgreSQL or SQLite based on config.
+// Init initializes the database connection using PostgreSQL.
 // It configures logging, connection pool settings, runs migrations, and returns the *gorm.DB.
 func Init(dsn string) (*gorm.DB, error) {
 	cfg := config.Get()
