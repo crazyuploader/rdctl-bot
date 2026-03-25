@@ -67,10 +67,18 @@ type RealDebridConfig struct {
 
 // AppConfig holds application settings
 type AppConfig struct {
-	LogLevel        string          `mapstructure:"log_level"`
-	RateLimit       RateLimitConfig `mapstructure:"rate_limit"`
-	MaxKeptTorrents int             `mapstructure:"max_kept_torrents"` // Max kept torrents per non-admin user (0 = unlimited, admins always unlimited)
-	AutoDeleteDays  int             `mapstructure:"auto_delete_days"`  // Default auto-delete days fallback when not set in DB
+	LogLevel          string                  `mapstructure:"log_level"`
+	RateLimit         RateLimitConfig         `mapstructure:"rate_limit"`
+	MaxKeptTorrents   int                     `mapstructure:"max_kept_torrents"` // Max kept torrents per non-admin user (0 = unlimited, admins always unlimited)
+	AutoDeleteDays    int                     `mapstructure:"auto_delete_days"`  // Default auto-delete days fallback when not set in DB
+	AutoDeleteWarning AutoDeleteWarningConfig `mapstructure:"auto_delete_warning"`
+}
+
+// AutoDeleteWarningConfig holds settings for auto-delete warning notifications
+type AutoDeleteWarningConfig struct {
+	ChatID      int64 `mapstructure:"chat_id"`      // Chat ID to send warnings to (0 = disabled)
+	TopicID     int   `mapstructure:"topic_id"`     // Topic/thread ID (0 = main chat)
+	HoursBefore int   `mapstructure:"hours_before"` // Hours before deletion to send warning (default: 6)
 }
 
 // RateLimitConfig holds rate limiting settings
@@ -205,6 +213,11 @@ func (c *Config) Validate(webOnly bool) error {
 
 	if c.App.RateLimit.Burst == 0 {
 		c.App.RateLimit.Burst = 5
+	}
+
+	// Auto-delete warning defaults
+	if c.App.AutoDeleteWarning.HoursBefore == 0 {
+		c.App.AutoDeleteWarning.HoursBefore = 6
 	}
 
 	// Database validation - PostgreSQL settings

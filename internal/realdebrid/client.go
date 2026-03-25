@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -18,6 +20,12 @@ type Client struct {
 	baseURL    string
 	apiToken   string
 	httpClient *http.Client
+
+	domainsCache struct {
+		mu      sync.RWMutex
+		domains []string
+		age     time.Time
+	}
 }
 
 // APIError represents an error from the Real-Debrid API
@@ -254,4 +262,67 @@ func (c *Client) GetSupportedRegex() ([]string, error) {
 	}
 
 	return regexList, nil
+}
+
+// GetSupportedDomains retrieves the list of supported domains (cached)
+func (c *Client) GetSupportedDomains() ([]string, error) {
+	c.domainsCache.mu.RLock()
+	if len(c.domainsCache.domains) > 0 && time.Since(c.domainsCache.age) < 5*time.Minute {
+		newSlice := append([]string(nil), c.domainsCache.domains...)
+		c.domainsCache.mu.RUnlock()
+		return newSlice, nil
+	}
+	c.domainsCache.mu.RUnlock()
+
+	c.domainsCache.mu.Lock()
+	defer c.domainsCache.mu.Unlock()
+
+	if len(c.domainsCache.domains) > 0 && time.Since(c.domainsCache.age) < 5*time.Minute {
+		newSlice := append([]string(nil), c.domainsCache.domains...)
+		return newSlice, nil
+	}
+
+	respBody, err := c.GET("/hosts/domains", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get supported domains: %w", err)
+	}
+
+	var domains []string
+	if err := json.Unmarshal(respBody, &domains); err != nil {
+		return nil, fmt.Errorf("failed to decode supported domains: %w", err)
+	}
+
+	c.domainsCache.domains = domains
+	c.domainsCache.age = time.Now()
+
+	return domains, nil
+}
+
+// IsDomainSupported checks if a given domain is supported
+// If the input doesn't contain a TLD, it searches for matching domains in the list
+func (c *Client) IsDomainSupported(domain string) (bool, string, error) {
+	domains, err := c.GetSupportedDomains()
+	if err != nil {
+		return false, "", err
+	}
+
+	domain = strings.ToLower(domain)
+
+	// Direct match
+	for _, d := range domains {
+		if strings.EqualFold(d, domain) {
+			return true, domain, nil
+		}
+	}
+
+	// If no TLD, search for domains that start with the input
+	if !strings.Contains(domain, ".") {
+		for _, d := range domains {
+			if strings.HasPrefix(strings.ToLower(d), strings.ToLower(domain)+".") {
+				return true, d, nil
+			}
+		}
+	}
+
+	return false, domain, nil
 }

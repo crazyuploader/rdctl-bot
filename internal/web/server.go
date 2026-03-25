@@ -185,6 +185,7 @@ func NewServer(deps Dependencies) *Server {
 	api.Post("/torrents", deps.AddTorrent)
 	api.Get("/downloads", deps.GetDownloads)
 	api.Post("/unrestrict", deps.UnrestrictLink)
+	api.Get("/check-domain", deps.CheckDomain)
 	api.Get("/stats/user/:id", deps.GetUserStats)
 	api.Get("/kept-torrents", deps.GetKeptTorrents)
 
@@ -203,6 +204,10 @@ func NewServer(deps Dependencies) *Server {
 	// Embed static files - Place this last to ensure API routes are matched first
 	// or properly fall through if not found.
 	staticFS, _ := fs.Sub(staticFiles, "static")
+	app.Use("/*", func(c fiber.Ctx) error {
+		c.Set("Cache-Control", "no-store, max-age=0")
+		return c.Next()
+	})
 	app.Use("/*", static.New("", static.Config{
 		FS:     staticFS,
 		Browse: false,

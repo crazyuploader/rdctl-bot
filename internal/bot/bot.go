@@ -174,6 +174,13 @@ func (b *Bot) Start(ctx context.Context) error {
 		b.startAutoDeleteWorker(botCtx)
 	}()
 
+	// Start auto-delete warning worker
+	b.wg.Add(1)
+	go func() {
+		defer b.wg.Done()
+		b.startAutoDeleteWarningWorker(botCtx)
+	}()
+
 	log.Println("Bot started. Waiting for messages...")
 	b.api.Start(botCtx)
 	return nil

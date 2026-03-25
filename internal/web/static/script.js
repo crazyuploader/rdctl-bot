@@ -475,12 +475,9 @@ function renderDownloads(filterStr) {
         <div class="flex items-start justify-between gap-4">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1">
-              <a
-                href="${d.download}"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="truncate text-sm font-medium hover:text-blue-400 transition-colors focus-visible:outline-none focus-visible:text-blue-400"
-              >${escapeHtml(d.filename)}</a>
+              <span
+                class="truncate text-sm font-medium"
+              >${escapeHtml(d.filename)}</span>
               <span class="badge badge-muted">${escapeHtml(d.host)}</span>
             </div>
             <div class="flex items-center gap-3 text-xs text-[#71717a]" style="font-variant-numeric: tabular-nums">
@@ -489,15 +486,6 @@ function renderDownloads(filterStr) {
             </div>
           </div>
           <div class="flex items-center gap-1">
-            <a
-              href="${d.download}"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn btn-ghost p-2"
-              aria-label="Download ${escapeHtml(d.filename)}"
-            >
-              <i data-lucide="download" class="w-4 h-4" aria-hidden="true"></i>
-            </a>
             ${
               isAdmin
                 ? `
@@ -915,6 +903,37 @@ function setupEventListeners() {
           error.message || "Failed to unrestrict link — check the URL",
           "error",
         );
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+  // Check domain
+  document
+    .getElementById("check-domain-form")
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = document.getElementById("domain-input");
+      const btn = document.getElementById("check-domain-btn");
+      const resultDiv = document.getElementById("domain-result");
+      const domain = input.value.trim().toLowerCase();
+      if (!domain) return;
+
+      btn.disabled = true;
+      resultDiv.classList.add("hidden");
+      try {
+        const res = await apiFetch(
+          `${API_BASE_URL}/check-domain?domain=${encodeURIComponent(domain)}`,
+        );
+        resultDiv.classList.remove("hidden");
+        const displayDomain = res.checked_domain || domain;
+        if (res.supported) {
+          resultDiv.innerHTML = `<span class="text-green-400">✓ ${escapeHtml(displayDomain)} is supported</span>`;
+        } else {
+          resultDiv.innerHTML = `<span class="text-red-400">✗ ${escapeHtml(domain)} is not supported</span>`;
+        }
+      } catch (error) {
+        showToast(error.message || "Failed to check domain", "error");
       } finally {
         btn.disabled = false;
       }

@@ -133,6 +133,21 @@ func (d *Dependencies) GetDownloads(c fiber.Ctx) error {
 	})
 }
 
+// CheckDomain checks if a domain is supported
+func (d *Dependencies) CheckDomain(c fiber.Ctx) error {
+	domain := strings.ToLower(strings.TrimSpace(c.Query("domain")))
+	if domain == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "Domain is required")
+	}
+
+	supported, checkedDomain, err := d.RDClient.IsDomainSupported(domain)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{"success": true, "supported": supported, "domain": domain, "checked_domain": checkedDomain})
+}
+
 // UnrestrictLink unrestricts a hoster link
 func (d *Dependencies) UnrestrictLink(c fiber.Ctx) error {
 	var body struct {
