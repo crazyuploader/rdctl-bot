@@ -49,6 +49,10 @@ A visual interface for managing downloads. Access it by sending `/dashboard` to 
 1. `cp example-config.yaml config.yaml` and edit credentials.
 2. Run `docker compose up -d`.
 
+## Backup & Restore Instructions
+
+Follow [PostgreSQL backup and restore](postgres-backup-restore.md) guide for more information.
+
 ## License
 
 [MIT](LICENSE)
