@@ -362,16 +362,20 @@ func (b *Bot) runAutoDeleteWarningCheck(ctx context.Context) {
 		keptTorrentIDs = make(map[string]bool)
 	}
 
+	// Validate configuration: warning hours must be less than retention window
+	if hoursBefore >= days*24 {
+		log.Printf("Auto-delete warning: invalid configuration - warning window (%d hours) must be less than retention window (%d hours). Skipping warning check.", hoursBefore, days*24)
+		return
+	}
+
 	// Calculate the cutoff time for deletion and the warning window
 	deleteCutoff := time.Now().UTC().AddDate(0, 0, -days)
 	warningCutoff := deleteCutoff.Add(time.Duration(hoursBefore) * time.Hour)
 
-	// Only send warning if the delete cutoff is in the future (torrent will be deleted soon)
-	if warningCutoff.Before(time.Now().UTC()) {
-		return
-	}
-
 	log.Printf("Auto-delete warning: checking for torrents to be deleted in %d hours (before %s)", hoursBefore, deleteCutoff.Format("2006-01-02 15:04"))
+
+	// Calculate previous warning cutoff to only warn about newly-entered torrents
+	previousWarningCutoff := warningCutoff.Add(-warningCheckInterval)
 
 	// Fetch torrents in batches
 	const batchSize = 100
@@ -394,8 +398,8 @@ func (b *Bot) runAutoDeleteWarningCheck(ctx context.Context) {
 				continue
 			}
 
-			// Check if torrent will be deleted within the warning window
-			if t.Added.Before(warningCutoff) && !t.Added.Before(deleteCutoff) {
+			// Check if torrent entered the warning window since the last run
+			if t.Added.Before(warningCutoff) && !t.Added.Before(previousWarningCutoff) && !t.Added.Before(deleteCutoff) {
 				torrentsToWarn = append(torrentsToWarn, t)
 			}
 		}
@@ -411,20 +415,61 @@ func (b *Bot) runAutoDeleteWarningCheck(ctx context.Context) {
 		return
 	}
 
-	// Build warning message
-	var text strings.Builder
-	text.WriteString("<b>⚠️ Torrents Scheduled for Auto-Deletion</b>\n\n")
-	fmt.Fprintf(&text, "The following torrents will be deleted in approximately <b>%d hours</b>.\n", hoursBefore)
-	text.WriteString("Use <code>/keep &lt;id&gt;</code> to keep any torrent from being deleted.\n\n")
+	// Build warning messages in batches to stay under Telegram's 4096 character limit
+	const maxMessageLength = 4000 // Leave some margin for safety
+	var messages []string
+	var currentBatch strings.Builder
+
+	header := fmt.Sprintf("<b>⚠️ Torrents Scheduled for Auto-Deletion</b>\n\n"+
+		"The following torrents will be deleted in approximately <b>%d hours</b>.\n"+
+		"Use <code>/keep &lt;id&gt;</code> to keep any torrent from being deleted.\n\n", hoursBefore)
+
+	currentBatch.WriteString(header)
+	batchCount := 0
 
 	for _, t := range torrentsToWarn {
 		filename := html.EscapeString(t.Filename)
 		addedDays := int(time.Since(t.Added).Hours() / 24)
-		fmt.Fprintf(&text, "• <code>/keep %s</code> — <i>%s</i> (<b>%d</b> days old)\n", t.ID, filename, addedDays)
+		line := fmt.Sprintf("• <code>/keep %s</code> — <i>%s</i> (<b>%d</b> days old)\n", t.ID, filename, addedDays)
+
+		// Check if adding this line would exceed the limit
+		if currentBatch.Len()+len(line)+100 > maxMessageLength { // +100 for footer
+			// Finalize current batch
+			footer := fmt.Sprintf("\n<i>Batch %d of torrents scheduled for deletion</i>", len(messages)+1)
+			currentBatch.WriteString(footer)
+			messages = append(messages, currentBatch.String())
+
+			// Start new batch
+			currentBatch.Reset()
+			currentBatch.WriteString(header)
+			batchCount = 0
+		}
+
+		currentBatch.WriteString(line)
+		batchCount++
 	}
 
-	fmt.Fprintf(&text, "\n<i>%d torrent(s) scheduled for deletion</i>", len(torrentsToWarn))
+	// Add final batch if it has content
+	if batchCount > 0 {
+		footer := fmt.Sprintf("\n<i>%d torrent(s) scheduled for deletion</i>", len(torrentsToWarn))
+		currentBatch.WriteString(footer)
+		messages = append(messages, currentBatch.String())
+	}
 
-	b.sendHTMLMessage(ctx, chatID, topicID, text.String(), 0)
-	log.Printf("Auto-delete warning: sent warning for %d torrent(s) to chat %d", len(torrentsToWarn), chatID)
+	// Send each batch individually and check for errors
+	successCount := 0
+	for i, msg := range messages {
+		if err := b.sendHTMLMessageWithErr(ctx, chatID, topicID, msg, 0); err != nil {
+			log.Printf("Auto-delete warning: failed to send batch %d/%d to chat %d: %v", i+1, len(messages), chatID, err)
+		} else {
+			successCount++
+			log.Printf("Auto-delete warning: successfully sent batch %d/%d for %d torrent(s) to chat %d", i+1, len(messages), len(torrentsToWarn), chatID)
+		}
+	}
+
+	if successCount == len(messages) {
+		log.Printf("Auto-delete warning: successfully sent all %d batch(es) for %d torrent(s) to chat %d", len(messages), len(torrentsToWarn), chatID)
+	} else {
+		log.Printf("Auto-delete warning: sent %d/%d batches successfully for %d torrent(s) to chat %d", successCount, len(messages), len(torrentsToWarn), chatID)
+	}
 }

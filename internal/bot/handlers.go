@@ -794,6 +794,30 @@ func (b *Bot) sendHTMLMessage(ctx context.Context, chatID int64, messageThreadID
 	}
 }
 
+// sendHTMLMessageWithErr sends an HTML message and returns any error
+func (b *Bot) sendHTMLMessageWithErr(ctx context.Context, chatID int64, messageThreadID int, text string, replyToMessageID int) error {
+	params := &bot.SendMessageParams{
+		ChatID:    chatID,
+		Text:      text,
+		ParseMode: models.ParseModeHTML,
+	}
+	if messageThreadID != 0 {
+		params.MessageThreadID = messageThreadID
+	}
+	if replyToMessageID != 0 {
+		params.ReplyParameters = &models.ReplyParameters{
+			MessageID: replyToMessageID,
+		}
+	}
+	if err := b.middleware.WaitForRateLimit(); err != nil {
+		return fmt.Errorf("rate limit error: %w", err)
+	}
+	if _, err := b.api.SendMessage(ctx, params); err != nil {
+		return fmt.Errorf("error sending HTML message: %w", err)
+	}
+	return nil
+}
+
 // logCommandHelper logs a command to the command repo
 func (b *Bot) logCommandHelper(ctx context.Context, user *db.User, chatID int64, messageThreadID int, command, fullCommand string, startTime time.Time, success bool, errorMsg string, responseLength int) {
 	if user == nil {
