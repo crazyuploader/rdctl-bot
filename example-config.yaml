@@ -7,6 +7,14 @@ telegram:
     - 123456789
     - 987654321
 
+  # Optional: Restrict bot to specific topics in group chats
+  # Map of chat_id to list of allowed topic IDs. If not set or empty for a chat, all topics are allowed.
+  # Example (bot will only respond in topic 5 and 10 of chat -1001706698345):
+  # allowed_topic_ids:
+  #   -1001706698345:
+  #     - 5
+  #     - 10
+
   # Super admin chat IDs (full access)
   super_admin_ids:
     - 123456789

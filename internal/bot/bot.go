@@ -327,6 +327,12 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 		return
 	}
 
+	// Check topic restrictions if configured
+	if messageThreadID != 0 && !b.config.IsAllowedTopic(chatID, messageThreadID) {
+		log.Printf("Topic %d not allowed for chat %d", messageThreadID, chatID)
+		return
+	}
+
 	handler(ctx, chatID, messageThreadID, isSuperAdmin, user)
 }
 
