@@ -3,24 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0d0d0f" />
+    <meta name="theme-color" content="#0c0c11" />
     <title>Downloads — rdctl</title>
     <link
       rel="icon"
       type="image/svg+xml"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f98a3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 10V3L4 14h7v7l9-11h-7z'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235aabb8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 10V3L4 14h7v7l9-11h-7z'/%3E%3C/svg%3E"
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="styles.css" />
     <script src="https://unpkg.com/lucide@0.577.0/dist/umd/lucide.min.js"></script>
   </head>
   <body>
-    <!-- ── Top Bar ────────────────────────────────────────── -->
+    <!-- Topbar -->
     <header class="topbar">
       <a href="/dashboard" class="topbar-logo">rd<span>ctl</span></a>
       <nav class="topbar-nav" aria-label="Main">
@@ -39,7 +35,6 @@
       </div>
     </header>
 
-    <!-- ── Main ───────────────────────────────────────────── -->
     <main class="main">
       <div class="card">
         <!-- Toolbar -->
@@ -82,21 +77,21 @@
             id="downloads-loading"
             style="
               display: none;
-              padding: var(--space-3);
+              padding: 12px;
               flex-direction: column;
-              gap: var(--space-2);
+              gap: 8px;
             "
             aria-label="Loading…"
             role="status"
           >
-            <div class="skeleton" style="height: 60px"></div>
-            <div class="skeleton" style="height: 60px; opacity: 0.7"></div>
+            <div class="skeleton" style="height: 54px"></div>
+            <div class="skeleton" style="height: 54px; opacity: 0.7"></div>
           </div>
         </div>
       </div>
     </main>
 
-    <!-- ── Confirm Modal ──────────────────────────────────── -->
+    <!-- Confirm modal -->
     <div
       id="confirm-modal"
       class="modal-overlay"

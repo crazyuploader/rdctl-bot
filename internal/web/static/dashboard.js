@@ -99,18 +99,12 @@
 
       html += '<div class="status-item">';
       html += '<div class="status-key">Downloading</div>';
-      html +=
-        '<div class="status-val teal">' +
-        (d.torrents_downloading || 0) +
-        "</div>";
+      html += '<div class="status-val teal">' + (d.torrents_downloading || 0) + "</div>";
       html += "</div>";
 
       html += '<div class="status-item">';
       html += '<div class="status-key">Downloaded</div>';
-      html +=
-        '<div class="status-val green">' +
-        (d.torrents_downloaded || 0) +
-        "</div>";
+      html += '<div class="status-val green">' + (d.torrents_downloaded || 0) + "</div>";
       html += "</div>";
 
       if (d.torrents_kept !== undefined) {
@@ -123,7 +117,8 @@
       if (d.torrents_bytes) {
         html += '<div class="status-item">';
         html += '<div class="status-key">Size</div>';
-        var sizeNote = d.torrents_sample < d.torrents_total ? "~" : "";
+        var sizeNote =
+          d.torrents_sample < d.torrents_total ? "~" : "";
         html +=
           '<div class="status-val" title="' +
           (d.torrents_sample < d.torrents_total

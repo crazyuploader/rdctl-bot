@@ -3,25 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0d0d0f" />
+    <meta name="theme-color" content="#0c0c11" />
     <title>rdctl</title>
     <link
       rel="icon"
       type="image/svg+xml"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f98a3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 10V3L4 14h7v7l9-11h-7z'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235aabb8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 10V3L4 14h7v7l9-11h-7z'/%3E%3C/svg%3E"
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="styles.css" />
     <style>
       .login-theme {
         position: fixed;
-        top: var(--space-3);
-        right: var(--space-3);
+        top: 14px;
+        right: 14px;
       }
     </style>
   </head>
@@ -65,6 +61,7 @@
       (function () {
         App.initTheme();
 
+        /* Already authenticated → go to dashboard */
         if (
           localStorage.getItem("authToken") ||
           localStorage.getItem("apiKey")
@@ -73,6 +70,7 @@
           return;
         }
 
+        /* Telegram exchange code in URL */
         var params = new URLSearchParams(window.location.search);
         var code = params.get("code");
         if (code) {
@@ -89,8 +87,10 @@
           var btn = document.getElementById("login-btn");
           var key = input.value.trim();
           if (!key) return;
+
           btn.disabled = true;
           btn.textContent = "Signing in…";
+
           try {
             var res = await fetch("/api/auth/me", {
               headers: { "X-API-Key": key },
