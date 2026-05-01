@@ -15,7 +15,7 @@ let torrentPage = {
   limit: 50,
   hasMore: true,
   isLoading: false,
-  filter: ""
+  filter: "",
 };
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -220,7 +220,7 @@ async function fetchTorrents(reset = false) {
       limit: 50,
       hasMore: true,
       isLoading: false,
-      filter: ""
+      filter: "",
     };
   }
 
@@ -230,7 +230,9 @@ async function fetchTorrents(reset = false) {
   if (torrentPage.offset === 0) showLoading("torrents", true);
 
   try {
-    const result = await apiFetch(`${API_BASE_URL}/torrents?limit=${torrentPage.limit}&offset=${torrentPage.offset}`);
+    const result = await apiFetch(
+      `${API_BASE_URL}/torrents?limit=${torrentPage.limit}&offset=${torrentPage.offset}`,
+    );
     const newTorrents = result.data || [];
     const totalCount = result.total_count || 0;
 
@@ -262,10 +264,12 @@ function updateLoadMoreVisibility() {
     loadMoreEl.classList.remove("hidden");
   } else if (torrentPage.isLoading) {
     loadMoreEl.classList.remove("hidden");
-    loadMoreEl.innerHTML = '<span class="text-sm text-gray-500">Loading more...</span>';
+    loadMoreEl.innerHTML =
+      '<span class="text-sm text-gray-500">Loading more...</span>';
   } else if (!torrentPage.hasMore && torrentPage.items.length > 0) {
     loadMoreEl.classList.remove("hidden");
-    loadMoreEl.innerHTML = '<span class="text-sm text-gray-500">No more torrents</span>';
+    loadMoreEl.innerHTML =
+      '<span class="text-sm text-gray-500">No more torrents</span>';
   } else {
     loadMoreEl.classList.add("hidden");
   }
