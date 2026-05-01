@@ -205,9 +205,24 @@ func NewServer(deps Dependencies) *Server {
 	api.Get("/settings/autodelete", AdminOnly(deps.TokenStore, ipManager), deps.GetAutoDeleteSetting)
 	api.Put("/settings/autodelete", AdminOnly(deps.TokenStore, ipManager), deps.SetAutoDeleteSetting)
 
-	// Embed static files - Place this last to ensure API routes are matched first
-	// or properly fall through if not found.
+	// Page routes — serve HTML files for each app page (clean URLs without .html)
 	staticFS, _ := fs.Sub(staticFiles, "static")
+	serveHTML := func(filename string) fiber.Handler {
+		return func(c fiber.Ctx) error {
+			c.Set("Cache-Control", "no-store, max-age=0")
+			c.Set("Content-Type", "text/html; charset=utf-8")
+			data, err := staticFiles.ReadFile("static/" + filename)
+			if err != nil {
+				return fiber.NewError(fiber.StatusNotFound)
+			}
+			return c.Send(data)
+		}
+	}
+	app.Get("/dashboard", serveHTML("dashboard.html"))
+	app.Get("/torrents", serveHTML("torrents.html"))
+	app.Get("/downloads", serveHTML("downloads.html"))
+
+	// Static assets (CSS, JS, icons, etc.) — Place last
 	app.Use("/*", func(c fiber.Ctx) error {
 		c.Set("Cache-Control", "no-store, max-age=0")
 		return c.Next()

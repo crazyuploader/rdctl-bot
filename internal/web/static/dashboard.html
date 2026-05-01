@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0c0c11" />
+    <title>Dashboard — rdctl</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235aabb8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 10V3L4 14h7v7l9-11h-7z'/%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://unpkg.com/lucide@0.577.0/dist/umd/lucide.min.js"></script>
+  </head>
+  <body>
+    <!-- Topbar -->
+    <header class="topbar">
+      <a href="/dashboard" class="topbar-logo">rd<span>ctl</span></a>
+      <nav class="topbar-nav" aria-label="Main">
+        <a href="/torrents">Torrents</a>
+        <a href="/downloads">Downloads</a>
+      </nav>
+      <div class="topbar-actions">
+        <button
+          id="theme-btn"
+          class="icon-btn"
+          aria-label="Toggle theme"
+        ></button>
+        <button id="logout-btn" class="icon-btn" aria-label="Sign out">
+          <i data-lucide="log-out" style="width: 15px; height: 15px"></i>
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- Account status -->
+      <div style="margin-bottom: 20px">
+        <div class="section-label">Account</div>
+        <div class="card">
+          <div class="card-body" id="status-section">
+            <div class="status-grid" id="status-grid">
+              <div
+                class="skeleton"
+                style="height: 42px; width: 110px; border-radius: 6px"
+              ></div>
+              <div
+                class="skeleton"
+                style="height: 42px; width: 90px; border-radius: 6px"
+              ></div>
+              <div
+                class="skeleton"
+                style="height: 42px; width: 100px; border-radius: 6px"
+              ></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick actions -->
+      <div style="margin-bottom: 20px">
+        <div class="section-label">Actions</div>
+        <div class="grid-actions">
+          <!-- Add Torrent -->
+          <div class="action-card">
+            <div class="action-label">
+              <i data-lucide="download" style="width: 13px; height: 13px"></i>
+              Add Torrent
+            </div>
+            <form id="add-torrent-form" class="action-row" novalidate>
+              <label for="magnet-link" style="display: none">Magnet link</label>
+              <input
+                type="url"
+                id="magnet-link"
+                class="input"
+                placeholder="magnet:?xt=…"
+                autocomplete="off"
+                spellcheck="false"
+                inputmode="url"
+              />
+              <button type="submit" class="btn btn-teal" id="add-torrent-btn">
+                Add
+              </button>
+            </form>
+          </div>
+
+          <!-- Unrestrict Link -->
+          <div class="action-card">
+            <div class="action-label">
+              <i data-lucide="unlock" style="width: 13px; height: 13px"></i>
+              Unrestrict Link
+            </div>
+            <form id="unrestrict-form" class="action-row" novalidate>
+              <label for="hoster-link" style="display: none">Hoster link</label>
+              <input
+                type="url"
+                id="hoster-link"
+                class="input"
+                placeholder="https://…"
+                autocomplete="off"
+                spellcheck="false"
+                inputmode="url"
+              />
+              <button type="submit" class="btn btn-teal" id="unrestrict-btn">
+                Unlock
+              </button>
+            </form>
+          </div>
+
+          <!-- Check Domain -->
+          <div class="action-card">
+            <div class="action-label">
+              <i data-lucide="globe" style="width: 13px; height: 13px"></i>
+              Check Domain
+            </div>
+            <form id="check-domain-form" class="action-row" novalidate>
+              <label for="domain-input" style="display: none">Domain</label>
+              <input
+                type="text"
+                id="domain-input"
+                class="input"
+                placeholder="e.g. dropbox"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button type="submit" class="btn btn-teal" id="check-domain-btn">
+                Check
+              </button>
+            </form>
+            <div
+              id="domain-result"
+              style="
+                display: none;
+                margin-top: 8px;
+                font-size: 12px;
+                font-family: var(--font-mono);
+              "
+            ></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auto-Delete (admin only) -->
+      <div id="autodelete-section" style="display: none">
+        <div class="section-label">Admin</div>
+        <div class="action-card">
+          <div class="action-label">
+            <i data-lucide="clock" style="width: 13px; height: 13px"></i>
+            Auto-Delete
+            <span
+              id="autodelete-value"
+              style="
+                margin-left: auto;
+                font-family: var(--font-mono);
+                font-size: 11px;
+                color: var(--fg-muted);
+                font-weight: 400;
+                text-transform: none;
+                letter-spacing: 0;
+              "
+              >—</span
+            >
+          </div>
+          <div class="action-row">
+            <label for="autodelete-input" style="display: none">Days</label>
+            <input
+              type="number"
+              id="autodelete-input"
+              class="input"
+              min="0"
+              max="365"
+              placeholder="Days"
+              style="max-width: 100px"
+            />
+            <button id="autodelete-save" class="btn">Save</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="app.js"></script>
+    <script src="dashboard.js"></script>
+  </body>
+</html>

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0c0c11" />
+    <title>Torrents — rdctl</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235aabb8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 10V3L4 14h7v7l9-11h-7z'/%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://unpkg.com/lucide@0.577.0/dist/umd/lucide.min.js"></script>
+  </head>
+  <body>
+    <!-- Topbar -->
+    <header class="topbar">
+      <a href="/dashboard" class="topbar-logo">rd<span>ctl</span></a>
+      <nav class="topbar-nav" aria-label="Main">
+        <a href="/torrents">Torrents</a>
+        <a href="/downloads">Downloads</a>
+      </nav>
+      <div class="topbar-actions">
+        <button
+          id="theme-btn"
+          class="icon-btn"
+          aria-label="Toggle theme"
+        ></button>
+        <button id="logout-btn" class="icon-btn" aria-label="Sign out">
+          <i data-lucide="log-out" style="width: 15px; height: 15px"></i>
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="card" id="torrents-card">
+        <!-- Toolbar -->
+        <div class="toolbar">
+          <label for="torrents-search" style="display: none"
+            >Search torrents</label
+          >
+          <input
+            type="search"
+            id="torrents-search"
+            class="input"
+            placeholder="Search torrents…"
+            autocomplete="off"
+            spellcheck="false"
+            style="max-width: 260px"
+          />
+          <div class="toolbar-end">
+            <label class="check-label">
+              <input type="checkbox" id="auto-refresh" checked />
+              Auto-refresh
+            </label>
+            <button id="refresh-btn" class="icon-btn" aria-label="Refresh">
+              <i data-lucide="refresh-cw" style="width: 14px; height: 14px"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- List -->
+        <div
+          id="torrents-list"
+          style="
+            max-height: 600px;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+          "
+        >
+          <!-- Empty state -->
+          <div id="torrents-empty" class="empty-state">
+            <div class="empty-icon">
+              <i data-lucide="inbox" style="width: 18px; height: 18px"></i>
+            </div>
+            <p class="empty-text">No torrents yet</p>
+          </div>
+
+          <!-- Loading skeletons -->
+          <div
+            id="torrents-loading"
+            style="
+              display: none;
+              padding: 12px;
+              flex-direction: column;
+              gap: 8px;
+            "
+            aria-label="Loading…"
+            role="status"
+          >
+            <div class="skeleton" style="height: 62px"></div>
+            <div class="skeleton" style="height: 62px; opacity: 0.7"></div>
+            <div class="skeleton" style="height: 62px; opacity: 0.45"></div>
+          </div>
+        </div>
+
+        <!-- Load more -->
+        <div id="load-more" class="load-more" style="display: none">
+          <button id="load-more-btn">Load more</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Confirm modal -->
+    <div
+      id="confirm-modal"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-title"
+    >
+      <div class="modal">
+        <div class="modal-icon">
+          <i data-lucide="trash-2" style="width: 16px; height: 16px"></i>
+        </div>
+        <div class="modal-title" id="confirm-title">Delete torrent?</div>
+        <div class="modal-body" id="confirm-message"></div>
+        <div class="modal-actions">
+          <button id="confirm-cancel" class="btn">Cancel</button>
+          <button id="confirm-ok" class="btn btn-red">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="app.js"></script>
+    <script src="torrents.js"></script>
+  </body>
+</html>
