@@ -8,6 +8,16 @@ let refreshIntervals = { torrents: null, downloads: null };
 let confirmCallback = null;
 let lastFocusedElement = null;
 
+// Pagination state for torrents
+let torrentPage = {
+  items: [],
+  offset: 0,
+  limit: 50,
+  hasMore: true,
+  isLoading: false,
+  filter: ""
+};
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 const API_BASE_URL = "/api";
 const REFRESH_INTERVAL_MS = 5000;
@@ -156,7 +166,7 @@ async function fetchAllData() {
   // Fetch kept torrent IDs first so renderTorrents() already has them when it runs
   await fetchKeptTorrents();
   // Stagger remaining requests to avoid exceeding rate limiter
-  await Promise.all([fetchStatus(), fetchTorrents()]);
+  await Promise.all([fetchStatus(), fetchTorrents(true)]); // Reset pagination for initial load
   await Promise.all([fetchDownloads(), fetchAutoDeleteSetting()]);
 }
 
@@ -202,26 +212,62 @@ async function fetchStatus() {
 }
 
 // ─── Torrents ─────────────────────────────────────────────────────────────────
-async function fetchTorrents() {
-  if (cachedTorrents.length === 0) showLoading("torrents", true);
-  try {
-    const result = await apiFetch(`${API_BASE_URL}/torrents?limit=100`);
-    const newTorrents = result.data || [];
+async function fetchTorrents(reset = false) {
+  if (reset) {
+    torrentPage = {
+      items: [],
+      offset: 0,
+      limit: 50,
+      hasMore: true,
+      isLoading: false,
+      filter: ""
+    };
+  }
 
-    if (cachedTorrents.length > 0) {
-      const needsFullRender = smartUpdateTorrents(newTorrents);
-      cachedTorrents = newTorrents;
-      if (needsFullRender) renderTorrents();
-      // Always sync keep icons even if we didn't do a full render
-      updateKeepStatus();
-    } else {
-      cachedTorrents = newTorrents;
-      renderTorrents();
-    }
+  if (torrentPage.isLoading) return;
+  torrentPage.isLoading = true;
+
+  if (torrentPage.offset === 0) showLoading("torrents", true);
+
+  try {
+    const result = await apiFetch(`${API_BASE_URL}/torrents?limit=${torrentPage.limit}&offset=${torrentPage.offset}`);
+    const newTorrents = result.data || [];
+    const totalCount = result.total_count || 0;
+
+    torrentPage.hasMore = torrentPage.offset + newTorrents.length < totalCount;
+    torrentPage.items = [...torrentPage.items, ...newTorrents];
+    torrentPage.offset += newTorrents.length;
+    cachedTorrents = torrentPage.items;
+
+    renderTorrents();
   } catch (error) {
     showToast("Failed to load torrents — check your connection", "error");
   } finally {
     showLoading("torrents", false);
+    torrentPage.isLoading = false;
+    updateLoadMoreVisibility();
+  }
+}
+
+async function loadMoreTorrents() {
+  if (!torrentPage.hasMore || torrentPage.isLoading) return;
+  await fetchTorrents(false);
+}
+
+function updateLoadMoreVisibility() {
+  const loadMoreEl = document.getElementById("torrents-load-more");
+  if (!loadMoreEl) return;
+
+  if (torrentPage.hasMore && !torrentPage.isLoading) {
+    loadMoreEl.classList.remove("hidden");
+  } else if (torrentPage.isLoading) {
+    loadMoreEl.classList.remove("hidden");
+    loadMoreEl.innerHTML = '<span class="text-sm text-gray-500">Loading more...</span>';
+  } else if (!torrentPage.hasMore && torrentPage.items.length > 0) {
+    loadMoreEl.classList.remove("hidden");
+    loadMoreEl.innerHTML = '<span class="text-sm text-gray-500">No more torrents</span>';
+  } else {
+    loadMoreEl.classList.add("hidden");
   }
 }
 
@@ -837,7 +883,7 @@ function toggleAutoRefresh(type, enabled) {
     refreshIntervals[type] = setInterval(() => {
       if (type === "torrents") {
         fetchKeptTorrents();
-        fetchTorrents();
+        fetchTorrents(true); // Reset to get fresh data
       } else {
         fetchDownloads();
       }
@@ -868,7 +914,7 @@ function setupEventListeners() {
         });
         input.value = "";
         showToast("Torrent added", "success");
-        fetchTorrents();
+        fetchTorrents(true); // Reset to get fresh data including new torrent
       } catch (error) {
         showToast(
           error.message || "Failed to add torrent — check the magnet link",
@@ -947,7 +993,7 @@ function setupEventListeners() {
   // Refresh buttons
   document
     .getElementById("refresh-torrents")
-    .addEventListener("click", () => fetchTorrents());
+    .addEventListener("click", () => fetchTorrents(true));
   document
     .getElementById("refresh-downloads")
     .addEventListener("click", () => fetchDownloads());
@@ -981,6 +1027,17 @@ function setupEventListeners() {
   document.getElementById("confirm-modal").addEventListener("click", (e) => {
     if (e.target === e.currentTarget) hideConfirmModal();
   });
+
+  // Infinite scroll for torrents
+  const torrentsList = document.getElementById("torrents-list");
+  if (torrentsList) {
+    torrentsList.addEventListener("scroll", () => {
+      const { scrollTop, scrollHeight, clientHeight } = torrentsList;
+      if (scrollHeight - scrollTop - clientHeight < 100) {
+        loadMoreTorrents();
+      }
+    });
+  }
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────

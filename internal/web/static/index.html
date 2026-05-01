@@ -1101,42 +1101,49 @@
             </div>
           </div>
           <div
-            id="torrents-list"
-            class="max-h-[520px] overflow-y-auto overscroll-contain"
-          >
-            <div id="torrents-empty" class="py-16 text-center">
-              <div
-                style="
-                  width: 52px;
-                  height: 52px;
-                  border-radius: 16px;
-                  background: rgba(255, 255, 255, 0.04);
-                  border: 1px solid rgba(255, 255, 255, 0.06);
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  margin: 0 auto 12px;
-                "
-              >
-                <i
-                  data-lucide="inbox"
-                  class="w-6 h-6 text-[#2e2e3a]"
-                  aria-hidden="true"
-                ></i>
+              id="torrents-list"
+              class="max-h-[520px] overflow-y-auto overscroll-contain"
+            >
+              <div id="torrents-empty" class="py-16 text-center">
+                <div
+                  style="
+                    width: 52px;
+                    height: 52px;
+                    border-radius: 16px;
+                    background: rgba(255, 255, 255, 0.04);
+                    border: 1px solid rgba(255, 255, 255, 0.06);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 0 auto 12px;
+                  "
+                >
+                  <i
+                    data-lucide="inbox"
+                    class="w-6 h-6 text-[#2e2e3a]"
+                    aria-hidden="true"
+                  ></i>
+                </div>
+                <p class="text-[#3f3f46] text-sm font-medium">No torrents yet</p>
               </div>
-              <p class="text-[#3f3f46] text-sm font-medium">No torrents yet</p>
+              <div
+                id="torrents-loading"
+                class="hidden p-4 space-y-3"
+                aria-label="Loading torrents…"
+                role="status"
+              >
+                <div class="skeleton h-16"></div>
+                <div class="skeleton h-16" style="opacity: 0.7"></div>
+                <div class="skeleton h-16" style="opacity: 0.45"></div>
+              </div>
             </div>
             <div
-              id="torrents-loading"
-              class="hidden p-4 space-y-3"
-              aria-label="Loading torrents…"
-              role="status"
+              id="torrents-load-more"
+              class="hidden p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors"
+              onclick="loadMoreTorrents()"
             >
-              <div class="skeleton h-16"></div>
-              <div class="skeleton h-16" style="opacity: 0.7"></div>
-              <div class="skeleton h-16" style="opacity: 0.45"></div>
+              <span class="text-sm text-gray-500">Load more torrents</span>
             </div>
-          </div>
         </div>
 
         <!-- Downloads Panel -->
