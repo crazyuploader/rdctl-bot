@@ -311,7 +311,7 @@ func (b *Bot) sendAutoDeleteLogMessage(ctx context.Context, deletedTorrents []re
 	header := fmt.Sprintf("<b>🗑️ Auto-Delete Completed</b>\n\n"+
 		"The following <b>%d torrent(s)</b> have been automatically deleted.\n\n", totalDeleted)
 
-	footer := fmt.Sprintf("\n<i>These torrents can no longer be kept.</i>")
+	const footer = "\n<i>These torrents can no longer be kept.</i>"
 
 	const maxMessageLength = 4000
 	var messages []string
@@ -323,7 +323,12 @@ func (b *Bot) sendAutoDeleteLogMessage(ctx context.Context, deletedTorrents []re
 	for _, t := range deletedTorrents {
 		filename := html.EscapeString(t.Filename)
 		addedDays := int(time.Since(t.Added).Hours() / 24)
-		line := fmt.Sprintf("• <code>%s</code> — <i>%s</i> (<b>%d</b> days old)\n", t.ID, filename, addedDays)
+		line := fmt.Sprintf(
+			"• <code>%s</code> — <i>%s</i> (<b>%d</b> days old)\n",
+			t.ID,
+			filename,
+			addedDays,
+		)
 
 		if currentBatch.Len()+len(line)+len(footer)+100 > maxMessageLength {
 			currentBatch.WriteString(footer)
@@ -489,7 +494,12 @@ func (b *Bot) runAutoDeleteWarningCheck(ctx context.Context) {
 	for _, t := range torrentsToWarn {
 		filename := html.EscapeString(t.Filename)
 		addedDays := int(time.Since(t.Added).Hours() / 24)
-		line := fmt.Sprintf("• <code>/keep %s</code> — <i>%s</i> (<b>%d</b> days old)\n", t.ID, filename, addedDays)
+		line := fmt.Sprintf(
+			"• <code>/keep %s</code> — <i>%s</i> (<b>%d</b> days old)\n",
+			t.ID,
+			filename,
+			addedDays,
+		)
 
 		// Check if adding this line would exceed the limit
 		if currentBatch.Len()+len(line)+100 > maxMessageLength { // +100 for footer
