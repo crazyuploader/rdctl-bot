@@ -63,6 +63,7 @@ func (b *Bot) handleHelpCommand(ctx context.Context, _ *bot.Bot, update *models.
 			"• <code>/unkeep &lt;id&gt;</code> — Remove keep mark from a torrent\n\n" +
 			"<b>⚙️ General Commands:</b>\n" +
 			"• <code>/status</code> — Show your Real-Debrid account status\n" +
+			"• <code>/stats</code> — Show torrent/download counts and combined size\n" +
 			"• <code>/dashboard</code> — Get a temporary link to the web dashboard\n" +
 			"• <code>/autodelete &lt;days&gt;</code> — Auto-delete torrents older than X days <i>(superadmin only)</i>\n" +
 			"• <code>/help</code> — Display this help message"
@@ -577,6 +578,85 @@ func (b *Bot) handleStatusCommand(ctx context.Context, _ *bot.Bot, update *model
 			b.logCommandHelper(ctx, user, chatID, messageThreadID, "status", update.Message.Text, startTime, true, "", len(text.String()))
 			b.logActivityHelper(ctx, user, chatID, messageThreadID, db.ActivityTypeCommandStatus, "status", true, "", nil)
 		}
+	})
+}
+
+// handleStatsCommand handles the /stats command
+func (b *Bot) handleStatsCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
+	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
+		startTime := time.Now()
+		b.middleware.LogCommand(update, "stats")
+
+		// Fetch torrent total count
+		torrentsResult, err := b.rdClient.GetTorrentsWithCount(1, 0)
+		if err != nil {
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Failed to retrieve torrent stats: %s", html.EscapeString(err.Error())), update.Message.ID)
+			b.logCommandHelper(ctx, user, chatID, messageThreadID, "stats", update.Message.Text, startTime, false, err.Error(), 0)
+			return
+		}
+
+		// Fetch active torrent count
+		activeCount, err := b.rdClient.GetActiveCount()
+		if err != nil {
+			log.Printf("Stats: failed to get active count: %v", err)
+		}
+
+		// Fetch downloads total count
+		downloadsResult, err := b.rdClient.GetDownloadsWithCount(1, 0)
+		if err != nil {
+			log.Printf("Stats: failed to get downloads count: %v", err)
+		}
+
+		// Fetch kept torrents count
+		keptTorrents, err := b.keptRepo.ListKeptTorrents(ctx)
+		keptCount := 0
+		if err != nil {
+			log.Printf("Stats: failed to get kept torrents: %v", err)
+		} else {
+			keptCount = len(keptTorrents)
+		}
+
+		// Fetch a sample of torrents to compute size stats (up to 100)
+		sampleTorrents, _ := b.rdClient.GetTorrents(100, 0)
+		var totalBytes int64
+		downloadingCount := 0
+		downloadedCount := 0
+		for _, t := range sampleTorrents {
+			totalBytes += t.Bytes
+			switch t.Status {
+			case "downloading":
+				downloadingCount++
+			case "downloaded":
+				downloadedCount++
+			}
+		}
+
+		totalCount := torrentsResult.TotalCount
+		sampleNote := ""
+		if len(sampleTorrents) < totalCount {
+			sampleNote = fmt.Sprintf(" <i>(size estimated from first %d)</i>", len(sampleTorrents))
+		}
+
+		var text strings.Builder
+		text.WriteString("<b>📊 Real-Debrid Stats</b>\n\n")
+
+		text.WriteString("<b>Torrents</b>\n")
+		fmt.Fprintf(&text, "• Total: <b>%d</b>\n", totalCount)
+		if activeCount != nil {
+			fmt.Fprintf(&text, "• Active / limit: <b>%d</b> / %d\n", activeCount.Nb, activeCount.Limit)
+		}
+		fmt.Fprintf(&text, "• Downloading: <b>%d</b>\n", downloadingCount)
+		fmt.Fprintf(&text, "• Downloaded: <b>%d</b>\n", downloadedCount)
+		fmt.Fprintf(&text, "• Kept (protected): <b>%d</b>\n", keptCount)
+		fmt.Fprintf(&text, "• Combined size: <b>%s</b>%s\n\n", realdebrid.FormatSize(totalBytes), sampleNote)
+
+		if downloadsResult != nil {
+			text.WriteString("<b>Downloads</b>\n")
+			fmt.Fprintf(&text, "• Total unrestricted links: <b>%d</b>\n", downloadsResult.TotalCount)
+		}
+
+		b.sendHTMLMessage(ctx, chatID, messageThreadID, text.String(), update.Message.ID)
+		b.logCommandHelper(ctx, user, chatID, messageThreadID, "stats", update.Message.Text, startTime, true, "", len(text.String()))
 	})
 }
 

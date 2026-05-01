@@ -181,6 +181,68 @@ func (d *Dependencies) DeleteDownload(c fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"success": true, "message": "Download link removed successfully"})
 }
 
+// GetStats returns aggregate torrent and download statistics
+func (d *Dependencies) GetStats(c fiber.Ctx) error {
+	ctx := c.Context()
+
+	// Total torrent count
+	torrentsResult, err := d.RDClient.GetTorrentsWithCount(1, 0)
+	if err != nil {
+		return err
+	}
+
+	// Active torrent count
+	activeCount, _ := d.RDClient.GetActiveCount()
+
+	// Sample torrents for status breakdown + size estimate (up to 100)
+	sampleTorrents, _ := d.RDClient.GetTorrents(100, 0)
+	var totalBytes int64
+	downloadingCount := 0
+	downloadedCount := 0
+	for _, t := range sampleTorrents {
+		totalBytes += t.Bytes
+		switch t.Status {
+		case "downloading":
+			downloadingCount++
+		case "downloaded":
+			downloadedCount++
+		}
+	}
+
+	// Total downloads count
+	downloadsResult, _ := d.RDClient.GetDownloadsWithCount(1, 0)
+
+	// Kept torrents count
+	keptTorrents, _ := d.KeptRepo.ListKeptTorrents(ctx)
+
+	totalDownloads := 0
+	if downloadsResult != nil {
+		totalDownloads = downloadsResult.TotalCount
+	}
+
+	activeNb := 0
+	activeLimit := 0
+	if activeCount != nil {
+		activeNb = activeCount.Nb
+		activeLimit = activeCount.Limit
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data": fiber.Map{
+			"torrents_total":     torrentsResult.TotalCount,
+			"torrents_active":    activeNb,
+			"torrents_limit":     activeLimit,
+			"torrents_downloading": downloadingCount,
+			"torrents_downloaded": downloadedCount,
+			"torrents_kept":      len(keptTorrents),
+			"torrents_bytes":     totalBytes,
+			"torrents_sample":    len(sampleTorrents),
+			"downloads_total":    totalDownloads,
+		},
+	})
+}
+
 // GetUserStats retrieves statistics for a user
 func (d *Dependencies) GetUserStats(c fiber.Ctx) error {
 	userID, err := strconv.ParseUint(c.Params("id"), 10, 64)

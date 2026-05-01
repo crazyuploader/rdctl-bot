@@ -190,6 +190,7 @@ func NewServer(deps Dependencies) *Server {
 	api.Get("/downloads", deps.GetDownloads)
 	api.Post("/unrestrict", deps.UnrestrictLink)
 	api.Get("/check-domain", deps.CheckDomain)
+	api.Get("/stats", deps.GetStats)
 	api.Get("/stats/user/:id", deps.GetUserStats)
 	api.Get("/kept-torrents", deps.GetKeptTorrents)
 

@@ -27,6 +27,7 @@ import (
 type RealDebridClient interface {
 	GetTorrents(limit, offset int) ([]realdebrid.Torrent, error)
 	GetTorrentsWithCount(limit, offset int) (*realdebrid.TorrentsResult, error)
+	GetActiveCount() (*realdebrid.ActiveCount, error)
 	GetTorrentInfo(torrentID string) (*realdebrid.Torrent, error)
 	AddMagnet(magnetURL string) (*realdebrid.AddMagnetResponse, error)
 	SelectFiles(torrentID string, fileIDs []int) error
@@ -200,6 +201,7 @@ func (b *Bot) registerHandlers() {
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/downloads", bot.MatchTypeExact, b.handleDownloadsCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/removelink", bot.MatchTypePrefix, b.handleRemoveLinkCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/status", bot.MatchTypeExact, b.handleStatusCommand)
+	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/stats", bot.MatchTypeExact, b.handleStatsCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/dashboard", bot.MatchTypeExact, b.handleDashboardCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/autodelete", bot.MatchTypePrefix, b.handleAutoDeleteCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/keep", bot.MatchTypePrefix, b.handleKeepCommand)

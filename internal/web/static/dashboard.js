@@ -7,7 +7,7 @@
   lucide.createIcons();
 
   /* ── Init ── */
-  Promise.all([fetchStatus(), fetchAuthInfo()]);
+  Promise.all([fetchStatus(), fetchAuthInfo(), fetchStats()]);
 
   /* ── Account status ── */
   async function fetchStatus() {
@@ -69,6 +69,79 @@
     } catch (e) {
       document.getElementById("status-grid").innerHTML =
         '<span style="font-size:13px;color:var(--fg-muted)">Failed to load status</span>';
+    }
+  }
+
+  /* ── Stats ── */
+  async function fetchStats() {
+    try {
+      var r = await App.apiFetch("/stats");
+      var d = r.data || {};
+      var grid = document.getElementById("stats-grid");
+
+      var html = "";
+
+      html += '<div class="status-item">';
+      html += '<div class="status-key">Torrents</div>';
+      html += '<div class="status-val">' + (d.torrents_total || 0) + "</div>";
+      html += "</div>";
+
+      if (d.torrents_active !== undefined) {
+        html += '<div class="status-item">';
+        html += '<div class="status-key">Active</div>';
+        html +=
+          '<div class="status-val">' +
+          d.torrents_active +
+          (d.torrents_limit ? " / " + d.torrents_limit : "") +
+          "</div>";
+        html += "</div>";
+      }
+
+      html += '<div class="status-item">';
+      html += '<div class="status-key">Downloading</div>';
+      html += '<div class="status-val teal">' + (d.torrents_downloading || 0) + "</div>";
+      html += "</div>";
+
+      html += '<div class="status-item">';
+      html += '<div class="status-key">Downloaded</div>';
+      html += '<div class="status-val green">' + (d.torrents_downloaded || 0) + "</div>";
+      html += "</div>";
+
+      if (d.torrents_kept !== undefined) {
+        html += '<div class="status-item">';
+        html += '<div class="status-key">Kept</div>';
+        html += '<div class="status-val amber">' + d.torrents_kept + "</div>";
+        html += "</div>";
+      }
+
+      if (d.torrents_bytes) {
+        html += '<div class="status-item">';
+        html += '<div class="status-key">Size</div>';
+        var sizeNote =
+          d.torrents_sample < d.torrents_total ? "~" : "";
+        html +=
+          '<div class="status-val" title="' +
+          (d.torrents_sample < d.torrents_total
+            ? "Estimated from first " + d.torrents_sample + " torrents"
+            : "Total size of all torrents") +
+          '">' +
+          sizeNote +
+          App.formatBytes(d.torrents_bytes) +
+          "</div>";
+        html += "</div>";
+      }
+
+      if (d.downloads_total !== undefined) {
+        html += '<div class="status-item">';
+        html += '<div class="status-key">Downloads</div>';
+        html += '<div class="status-val">' + d.downloads_total + "</div>";
+        html += "</div>";
+      }
+
+      grid.innerHTML = html;
+    } catch (_) {
+      document.getElementById("stats-grid").innerHTML =
+        '<span style="font-size:13px;color:var(--fg-muted)">Failed to load stats</span>';
     }
   }
 
