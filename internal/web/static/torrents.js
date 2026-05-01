@@ -10,7 +10,7 @@
   /* ── State ── */
   var cached = [];
   var keptIds = new Set();
-  var keptTorrents = []; // full kept-torrent objects from /kept-torrents
+  var keptMap = new Map(); // id -> full kept object
   var isAdmin = false;
   var refreshTimer = null;
   var page = {
@@ -46,9 +46,10 @@
     try {
       var r = await App.apiFetch("/kept-torrents");
       keptIds.clear();
-      keptTorrents = r.data || [];
-      keptTorrents.forEach(function (t) {
+      keptMap.clear();
+      (r.data || []).forEach(function (t) {
         keptIds.add(t.TorrentID);
+        keptMap.set(t.TorrentID, t);
       });
     } catch (_) {}
   }
@@ -103,13 +104,13 @@
 
     if (af === "kept") {
       // Use the fully-fetched kept list directly so pagination doesn't hide kept items
-      pool = keptTorrents.map(function (kt) {
+      pool = Array.from(keptMap.values()).map(function (kt) {
         // Find matching cached item for live progress/speed, fall back to stub
         var live = null;
         for (var i = 0; i < cached.length; i++) {
           if (cached[i].id === kt.TorrentID) { live = cached[i]; break; }
         }
-        return live || { id: kt.TorrentID, filename: kt.Filename, bytes: 0, status: "", progress: 0, speed: 0, seeders: 0 };
+        return live || { id: kt.TorrentID, filename: kt.Filename, bytes: 0, status: "Archived", progress: 0, speed: 0, seeders: 0, isStub: true };
       });
     } else {
       pool = cached;
@@ -148,11 +149,14 @@
 
   function buildItem(t) {
     var isKept = keptIds.has(t.id);
+    var keptInfo = isKept ? keptMap.get(t.id) : null;
+    var keptUser = keptInfo && keptInfo.User ? keptInfo.User.Username : "";
+    
     var div = document.createElement("div");
     div.className = "list-item" + (isKept ? " kept" : "");
     div.dataset.id = t.id;
 
-    var statusClass = statusBadgeClass(t.status);
+    var statusClass = t.isStub ? "badge-slate" : statusBadgeClass(t.status);
     var seedText =
       t.seeders === 1 ? "1 seed" : t.seeders > 1 ? t.seeders + " seeds" : "";
 
@@ -164,13 +168,11 @@
       App.escHtml(t.filename) +
       "</span>" +
       (isKept
-        ? '<span class="badge badge-amber" title="Kept — protected from auto-delete" style="flex-shrink:0"><i data-lucide="shield" style="width:10px;height:10px"></i></span>'
+        ? '<span class="badge badge-amber" title="Kept by ' + App.escHtml(keptUser || 'Unknown') + ' — protected from auto-delete" style="flex-shrink:0"><i data-lucide="shield" style="width:10px;height:10px"></i></span>'
         : "") +
       "</div>" +
       '<div class="item-meta">' +
-      '<span class="meta">' +
-      App.formatBytes(t.bytes) +
-      "</span>" +
+      (t.isStub ? '' : '<span class="meta">' + App.formatBytes(t.bytes) + "</span>") +
       '<span class="badge ' +
       statusClass +
       ' item-status">' +
@@ -186,6 +188,7 @@
       (isAdmin ? buildDeleteBtn(t.id, t.filename, "torrent") : "") +
       "</div>" +
       "</div>" +
+      (t.isStub ? "" :
       '<div class="progress" role="progressbar" aria-valuenow="' +
       Math.round(t.progress) +
       '" aria-valuemin="0" aria-valuemax="100">' +
@@ -202,7 +205,7 @@
       '<span class="meta item-speed">' +
       (t.speed > 0 ? App.formatBytes(t.speed) + "/s" : "") +
       "</span>" +
-      "</div>";
+      "</div>");
 
     return div;
   }
