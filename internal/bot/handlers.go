@@ -616,26 +616,32 @@ func (b *Bot) handleStatsCommand(ctx context.Context, _ *bot.Bot, update *models
 			keptCount = len(keptTorrents)
 		}
 
-		// Fetch a sample of torrents to compute size stats (up to 100)
-		sampleTorrents, _ := b.rdClient.GetTorrents(100, 0)
+		// Paginate all torrents to get accurate size + status breakdown
 		var totalBytes int64
 		downloadingCount := 0
 		downloadedCount := 0
-		for _, t := range sampleTorrents {
-			totalBytes += t.Bytes
-			switch t.Status {
-			case "downloading":
-				downloadingCount++
-			case "downloaded":
-				downloadedCount++
+		const statsPageSize = 2500
+		for offset := 0; ; offset += statsPageSize {
+			page, err := b.rdClient.GetTorrents(statsPageSize, offset)
+			if err != nil {
+				log.Printf("Stats: error fetching torrents at offset %d: %v", offset, err)
+				break
+			}
+			for _, t := range page {
+				totalBytes += t.Bytes
+				switch realdebrid.FormatStatus(t.Status) {
+				case "Downloading":
+					downloadingCount++
+				case "Downloaded":
+					downloadedCount++
+				}
+			}
+			if len(page) < statsPageSize {
+				break
 			}
 		}
 
 		totalCount := torrentsResult.TotalCount
-		sampleNote := ""
-		if len(sampleTorrents) < totalCount {
-			sampleNote = fmt.Sprintf(" <i>(size estimated from first %d)</i>", len(sampleTorrents))
-		}
 
 		var text strings.Builder
 		text.WriteString("<b>📊 Real-Debrid Stats</b>\n\n")
@@ -648,7 +654,7 @@ func (b *Bot) handleStatsCommand(ctx context.Context, _ *bot.Bot, update *models
 		fmt.Fprintf(&text, "• Downloading: <b>%d</b>\n", downloadingCount)
 		fmt.Fprintf(&text, "• Downloaded: <b>%d</b>\n", downloadedCount)
 		fmt.Fprintf(&text, "• Kept (protected): <b>%d</b>\n", keptCount)
-		fmt.Fprintf(&text, "• Combined size: <b>%s</b>%s\n\n", realdebrid.FormatSize(totalBytes), sampleNote)
+		fmt.Fprintf(&text, "• Combined size: <b>%s</b>\n\n", realdebrid.FormatSize(totalBytes))
 
 		if downloadsResult != nil {
 			text.WriteString("<b>Downloads</b>\n")

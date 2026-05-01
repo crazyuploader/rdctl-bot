@@ -10,6 +10,7 @@
   /* ── State ── */
   var cached = [];
   var keptIds = new Set();
+  var keptTorrents = []; // full kept-torrent objects from /kept-torrents
   var isAdmin = false;
   var refreshTimer = null;
   var page = {
@@ -45,7 +46,8 @@
     try {
       var r = await App.apiFetch("/kept-torrents");
       keptIds.clear();
-      (r.data || []).forEach(function (t) {
+      keptTorrents = r.data || [];
+      keptTorrents.forEach(function (t) {
         keptIds.add(t.TorrentID);
       });
     } catch (_) {}
@@ -96,13 +98,26 @@
     var filter = filterOverride !== undefined ? filterOverride : page.filter;
     page.filter = filter;
 
-    var items = cached.filter(function (t) {
-      /* text search */
+    var af = page.activeFilter;
+    var pool;
+
+    if (af === "kept") {
+      // Use the fully-fetched kept list directly so pagination doesn't hide kept items
+      pool = keptTorrents.map(function (kt) {
+        // Find matching cached item for live progress/speed, fall back to stub
+        var live = null;
+        for (var i = 0; i < cached.length; i++) {
+          if (cached[i].id === kt.TorrentID) { live = cached[i]; break; }
+        }
+        return live || { id: kt.TorrentID, filename: kt.Filename, bytes: 0, status: "", progress: 0, speed: 0, seeders: 0 };
+      });
+    } else {
+      pool = cached;
+    }
+
+    var items = pool.filter(function (t) {
       if (filter && !t.filename.toLowerCase().includes(filter.toLowerCase()))
         return false;
-      /* tab filter */
-      var af = page.activeFilter;
-      if (af === "kept") return keptIds.has(t.id);
       if (af === "not-kept") return !keptIds.has(t.id);
       if (af === "Downloading" || af === "Downloaded" || af === "Error")
         return t.status === af;

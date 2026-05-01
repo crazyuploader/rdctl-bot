@@ -185,27 +185,37 @@ func (d *Dependencies) DeleteDownload(c fiber.Ctx) error {
 func (d *Dependencies) GetStats(c fiber.Ctx) error {
 	ctx := c.Context()
 
-	// Total torrent count
+	// Total torrent count + paginate ALL torrents for accurate size/status
 	torrentsResult, err := d.RDClient.GetTorrentsWithCount(1, 0)
 	if err != nil {
 		return err
 	}
+	totalCount := torrentsResult.TotalCount
 
 	// Active torrent count
 	activeCount, _ := d.RDClient.GetActiveCount()
 
-	// Sample torrents for status breakdown + size estimate (up to 100)
-	sampleTorrents, _ := d.RDClient.GetTorrents(100, 0)
+	// Paginate all torrents to get accurate size + status breakdown
 	var totalBytes int64
 	downloadingCount := 0
 	downloadedCount := 0
-	for _, t := range sampleTorrents {
-		totalBytes += t.Bytes
-		switch t.Status {
-		case "downloading":
-			downloadingCount++
-		case "downloaded":
-			downloadedCount++
+	const pageSize = 2500
+	for offset := 0; ; offset += pageSize {
+		page, err := d.RDClient.GetTorrents(pageSize, offset)
+		if err != nil {
+			break
+		}
+		for _, t := range page {
+			totalBytes += t.Bytes
+			switch realdebrid.FormatStatus(t.Status) {
+			case "Downloading":
+				downloadingCount++
+			case "Downloaded":
+				downloadedCount++
+			}
+		}
+		if len(page) < pageSize {
+			break
 		}
 	}
 
@@ -230,15 +240,15 @@ func (d *Dependencies) GetStats(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"success": true,
 		"data": fiber.Map{
-			"torrents_total":     torrentsResult.TotalCount,
-			"torrents_active":    activeNb,
-			"torrents_limit":     activeLimit,
+			"torrents_total":       totalCount,
+			"torrents_active":      activeNb,
+			"torrents_limit":       activeLimit,
 			"torrents_downloading": downloadingCount,
-			"torrents_downloaded": downloadedCount,
-			"torrents_kept":      len(keptTorrents),
-			"torrents_bytes":     totalBytes,
-			"torrents_sample":    len(sampleTorrents),
-			"downloads_total":    totalDownloads,
+			"torrents_downloaded":  downloadedCount,
+			"torrents_kept":        len(keptTorrents),
+			"torrents_bytes":       totalBytes,
+			"torrents_sample":      totalCount, // now a full count, no estimate
+			"downloads_total":      totalDownloads,
 		},
 	})
 }
