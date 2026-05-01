@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/crazyuploader/rdctl-bot/internal/db"
 	"github.com/crazyuploader/rdctl-bot/internal/realdebrid"
 	"github.com/gofiber/fiber/v3"
 )
@@ -304,9 +305,35 @@ func (d *Dependencies) GetKeptTorrents(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+
+	type keptTorrentResponse struct {
+		db.KeptTorrent
+		CurrentTorrent *realdebrid.Torrent `json:"CurrentTorrent,omitempty"`
+	}
+
+	response := make([]keptTorrentResponse, 0, len(keptTorrents))
+	for _, keptTorrent := range keptTorrents {
+		item := keptTorrentResponse{
+			KeptTorrent: keptTorrent,
+		}
+
+		// Best-effort enrichment so the kept tab can show the same live
+		// metadata as the main torrent list when the torrent still exists upstream.
+		torrent, err := d.RDClient.GetTorrentInfo(keptTorrent.TorrentID)
+		if err == nil {
+			torrent.Status = realdebrid.FormatStatus(torrent.Status)
+			if torrent.Filename == "" {
+				torrent.Filename = keptTorrent.Filename
+			}
+			item.CurrentTorrent = torrent
+		}
+
+		response = append(response, item)
+	}
+
 	return c.JSON(fiber.Map{
 		"success": true,
-		"data":    keptTorrents,
+		"data":    response,
 	})
 }
 
