@@ -287,9 +287,68 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 
 	if totalDeleted > 0 {
 		log.Printf("Auto-delete: completed, deleted %d torrent(s)", totalDeleted)
+		b.sendAutoDeleteLogMessage(ctx, oldTorrents, totalDeleted)
 	}
 	if totalSkipped > 0 {
 		log.Printf("Auto-delete: skipped %d kept torrent(s)", totalSkipped)
+	}
+}
+
+// sendAutoDeleteLogMessage sends a message to the configured auto-delete warning chat
+// showing the torrents that were deleted and providing options to keep them.
+func (b *Bot) sendAutoDeleteLogMessage(ctx context.Context, deletedTorrents []realdebrid.Torrent, totalDeleted int) {
+	chatID := b.config.App.AutoDeleteWarning.ChatID
+	if chatID == 0 {
+		return
+	}
+	topicID := b.config.App.AutoDeleteWarning.TopicID
+
+	if len(deletedTorrents) == 0 {
+		return
+	}
+
+	// Build the message
+	header := fmt.Sprintf("<b>🗑️ Auto-Delete Completed</b>\n\n"+
+		"The following <b>%d torrent(s)</b> have been automatically deleted.\n\n", totalDeleted)
+
+	footer := fmt.Sprintf("\n<i>These torrents can no longer be kept.</i>")
+
+	const maxMessageLength = 4000
+	var messages []string
+	var currentBatch strings.Builder
+
+	currentBatch.WriteString(header)
+	batchCount := 0
+
+	for _, t := range deletedTorrents {
+		filename := html.EscapeString(t.Filename)
+		addedDays := int(time.Since(t.Added).Hours() / 24)
+		line := fmt.Sprintf("• <code>%s</code> — <i>%s</i> (<b>%d</b> days old)\n", t.ID, filename, addedDays)
+
+		if currentBatch.Len()+len(line)+len(footer)+100 > maxMessageLength {
+			currentBatch.WriteString(footer)
+			messages = append(messages, currentBatch.String())
+			currentBatch.Reset()
+			currentBatch.WriteString(header)
+			batchCount = 0
+		}
+
+		currentBatch.WriteString(line)
+		batchCount++
+	}
+
+	if batchCount > 0 {
+		currentBatch.WriteString(footer)
+		messages = append(messages, currentBatch.String())
+	}
+
+	// Send each batch
+	for i, msg := range messages {
+		if err := b.sendHTMLMessageWithErr(ctx, chatID, topicID, msg, 0); err != nil {
+			log.Printf("Auto-delete log: failed to send batch %d/%d to chat %d: %v", i+1, len(messages), chatID, err)
+		} else {
+			log.Printf("Auto-delete log: successfully sent batch %d/%d for %d deleted torrent(s) to chat %d", i+1, len(messages), totalDeleted, chatID)
+		}
 	}
 }
 
