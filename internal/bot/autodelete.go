@@ -62,7 +62,7 @@ func (b *Bot) handleAutoDeleteCommand(ctx context.Context, _ *bot.Bot, update *m
 				if b.config.App.AutoDeleteDays > 0 {
 					text = fmt.Sprintf(
 						"<b>⏳ Auto-Delete</b>\n\n"+
-							"Torrents older than <b>%d days</b> are automatically deleted (using config.yaml default).\n\n"+
+							"Torrents and downloads older than <b>%d days</b> are automatically deleted (using config.yaml default).\n\n"+
 							"<b>Usage:</b> <code>/autodelete &lt;days&gt;</code>\n"+
 							"Set to <code>0</code> to disable.",
 						b.config.App.AutoDeleteDays,
@@ -81,7 +81,7 @@ func (b *Bot) handleAutoDeleteCommand(ctx context.Context, _ *bot.Bot, update *m
 			default:
 				text = fmt.Sprintf(
 					"<b>⏳ Auto-Delete</b>\n\n"+
-						"Torrents older than <b>%s days</b> are automatically deleted.\n\n"+
+						"Torrents and downloads older than <b>%s days</b> are automatically deleted.\n\n"+
 						"<b>Usage:</b> <code>/autodelete &lt;days&gt;</code>\n"+
 						"Set to <code>0</code> to disable.",
 					currentValue,
@@ -111,11 +111,11 @@ func (b *Bot) handleAutoDeleteCommand(ctx context.Context, _ *bot.Bot, update *m
 
 		var text string
 		if days == 0 {
-			text = "<b>⏳ Auto-Delete Disabled</b>\n\nTorrents will no longer be automatically deleted."
+			text = "<b>⏳ Auto-Delete Disabled</b>\n\nTorrents and downloads will no longer be automatically deleted."
 		} else {
 			text = fmt.Sprintf(
 				"<b>⏳ Auto-Delete Configured</b>\n\n"+
-					"Torrents older than <b>%d days</b> will be automatically deleted.\n"+
+					"Torrents and downloads older than <b>%d days</b> will be automatically deleted.\n"+
 					"The cleanup runs every hour.",
 				days,
 			)
@@ -244,15 +244,7 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 				break
 			}
 
-			// Check if error is retryable (rate limit or server error)
-			errStr := deleteErr.Error()
-			isRetryable := strings.Contains(errStr, "429") ||
-				strings.Contains(errStr, "500") ||
-				strings.Contains(errStr, "502") ||
-				strings.Contains(errStr, "503") ||
-				strings.Contains(errStr, "504")
-
-			if !isRetryable || attempt == maxRetries-1 {
+			if !isRetryableHTTPError(deleteErr) || attempt == maxRetries-1 {
 				// Not retryable or last attempt - break
 				break
 			}
@@ -292,6 +284,9 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 	if totalSkipped > 0 {
 		log.Printf("Auto-delete: skipped %d kept torrent(s)", totalSkipped)
 	}
+
+	// Auto-delete old downloads
+	b.runAutoDeleteDownloads(ctx, days)
 }
 
 // sendAutoDeleteLogMessage sends a message to the configured auto-delete warning chat
@@ -353,6 +348,155 @@ func (b *Bot) sendAutoDeleteLogMessage(ctx context.Context, deletedTorrents []re
 			log.Printf("Auto-delete log: failed to send batch %d/%d to chat %d: %v", i+1, len(messages), chatID, err)
 		} else {
 			log.Printf("Auto-delete log: successfully sent batch %d/%d for %d deleted torrent(s) to chat %d", i+1, len(messages), totalDeleted, chatID)
+		}
+	}
+}
+
+// isRetryableHTTPError reports whether err represents a transient HTTP error worth retrying.
+func isRetryableHTTPError(err error) bool {
+	s := err.Error()
+	return strings.Contains(s, "429") ||
+		strings.Contains(s, "500") ||
+		strings.Contains(s, "502") ||
+		strings.Contains(s, "503") ||
+		strings.Contains(s, "504")
+}
+
+// runAutoDeleteDownloads performs auto-delete for downloads
+func (b *Bot) runAutoDeleteDownloads(ctx context.Context, days int) {
+	cutoff := time.Now().UTC().AddDate(0, 0, -days)
+	log.Printf("Auto-delete: checking for downloads older than %d days (before %s)", days, cutoff.Format("2006-01-02 15:04"))
+
+	const batchSize = 100
+	offset := 0
+	var oldDownloads []realdebrid.Download
+
+	for {
+		downloads, err := b.rdClient.GetDownloads(batchSize, offset)
+		if err != nil {
+			log.Printf("Auto-delete: failed to fetch downloads (offset=%d): %v", offset, err)
+			break
+		}
+
+		if len(downloads) == 0 {
+			break
+		}
+
+		for _, d := range downloads {
+			if d.Generated.Before(cutoff) {
+				oldDownloads = append(oldDownloads, d)
+			}
+		}
+
+		if len(downloads) < batchSize {
+			break
+		}
+
+		offset += batchSize
+	}
+
+	var successfullyDeleted []realdebrid.Download
+
+	for i, d := range oldDownloads {
+		var deleteErr error
+		maxRetries := 3
+		baseDelay := 1 * time.Second
+
+		for attempt := 0; attempt < maxRetries; attempt++ {
+			deleteErr = b.rdClient.DeleteDownload(d.ID)
+			if deleteErr == nil {
+				break
+			}
+
+			if !isRetryableHTTPError(deleteErr) || attempt == maxRetries-1 {
+				break
+			}
+
+			backoffDelay := baseDelay * time.Duration(1<<uint(attempt))
+			log.Printf("Auto-delete: retry %d/%d for download %s after error: %v (waiting %v)",
+				attempt+1, maxRetries, d.ID, deleteErr, backoffDelay)
+			time.Sleep(backoffDelay)
+		}
+
+		if deleteErr != nil {
+			log.Printf("Auto-delete: failed to delete download %s (%s) after %d attempts: %v",
+				d.ID, d.Filename, maxRetries, deleteErr)
+			continue
+		}
+
+		log.Printf("Auto-delete: deleted download %s (%s), generated on %s", d.ID, d.Filename, d.Generated.Format("2006-01-02"))
+		successfullyDeleted = append(successfullyDeleted, d)
+
+		if err := b.downloadRepo.LogDownloadActivity(ctx, "", b.systemUserID, 0, d.ID, "", d.Filename, "", "delete", d.Filesize, true, "auto_deleted", nil, nil); err != nil {
+			log.Printf("Auto-delete: failed to log download deletion: %v", err)
+		}
+
+		if i != len(oldDownloads)-1 {
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+
+	if len(successfullyDeleted) > 0 {
+		log.Printf("Auto-delete: completed, deleted %d download(s)", len(successfullyDeleted))
+		b.sendAutoDeleteDownloadsLogMessage(ctx, successfullyDeleted)
+	}
+}
+
+// sendAutoDeleteDownloadsLogMessage sends a message about deleted downloads
+func (b *Bot) sendAutoDeleteDownloadsLogMessage(ctx context.Context, deletedDownloads []realdebrid.Download) {
+	chatID := b.config.App.AutoDeleteWarning.ChatID
+	if chatID == 0 {
+		return
+	}
+	topicID := b.config.App.AutoDeleteWarning.TopicID
+
+	if len(deletedDownloads) == 0 {
+		return
+	}
+
+	header := fmt.Sprintf("<b>🗑️ Auto-Delete Completed</b>\n\n"+
+		"The following <b>%d download link(s)</b> have been automatically cleared.\n\n", len(deletedDownloads))
+
+	const footer = "\n<i>These download links have been removed.</i>"
+
+	const maxMessageLength = 4000
+	var messages []string
+	var currentBatch strings.Builder
+	hasItems := false
+
+	currentBatch.WriteString(header)
+
+	for _, d := range deletedDownloads {
+		filename := html.EscapeString(d.Filename)
+		generatedDays := int(time.Since(d.Generated).Hours() / 24)
+		line := fmt.Sprintf(
+			"• <code>%s</code> — <i>%s</i> (<b>%d</b> days old)\n",
+			d.ID,
+			filename,
+			generatedDays,
+		)
+
+		if currentBatch.Len()+len(line)+len(footer)+100 > maxMessageLength {
+			currentBatch.WriteString(footer)
+			messages = append(messages, currentBatch.String())
+			currentBatch.Reset()
+			currentBatch.WriteString(header)
+		}
+
+		currentBatch.WriteString(line)
+		hasItems = true
+	}
+
+	if hasItems {
+		currentBatch.WriteString(footer)
+		messages = append(messages, currentBatch.String())
+	}
+
+	for i, msg := range messages {
+		if err := b.sendHTMLMessageWithErr(ctx, chatID, topicID, msg, 0); err != nil {
+			log.Printf("Auto-delete downloads log: failed to send batch %d/%d to chat %d: %v", i+1, len(messages), chatID, err)
+		} else {
+			log.Printf("Auto-delete downloads log: successfully sent batch %d/%d for %d deleted download(s) to chat %d", i+1, len(messages), len(deletedDownloads), chatID)
 		}
 	}
 }
@@ -540,5 +684,107 @@ func (b *Bot) runAutoDeleteWarningCheck(ctx context.Context) {
 		log.Printf("Auto-delete warning: successfully sent all %d batch(es) for %d torrent(s) to chat %d", len(messages), len(torrentsToWarn), chatID)
 	} else {
 		log.Printf("Auto-delete warning: sent %d/%d batches successfully for %d torrent(s) to chat %d", successCount, len(messages), len(torrentsToWarn), chatID)
+	}
+
+	// Also check for downloads to warn about
+	b.runAutoDeleteDownloadsWarning(ctx, chatID, topicID, days, hoursBefore)
+}
+
+// runAutoDeleteDownloadsWarning sends warnings for downloads about to be auto-deleted
+func (b *Bot) runAutoDeleteDownloadsWarning(ctx context.Context, chatID int64, topicID int, days int, hoursBefore int) {
+	if chatID == 0 {
+		return
+	}
+
+	deleteCutoff := time.Now().UTC().AddDate(0, 0, -days)
+	warningCutoff := deleteCutoff.Add(time.Duration(hoursBefore) * time.Hour)
+	previousWarningCutoff := warningCutoff.Add(-warningCheckInterval)
+
+	log.Printf("Auto-delete warning: checking for downloads to be cleared in %d hours (before %s)", hoursBefore, deleteCutoff.Format("2006-01-02 15:04"))
+
+	const batchSize = 100
+	offset := 0
+	var downloadsToWarn []realdebrid.Download
+
+	for {
+		downloads, err := b.rdClient.GetDownloads(batchSize, offset)
+		if err != nil {
+			log.Printf("Auto-delete warning: failed to fetch downloads (offset=%d): %v", offset, err)
+			break
+		}
+
+		if len(downloads) == 0 {
+			break
+		}
+
+		for _, d := range downloads {
+			if d.Generated.Before(warningCutoff) && !d.Generated.Before(previousWarningCutoff) && !d.Generated.Before(deleteCutoff) {
+				downloadsToWarn = append(downloadsToWarn, d)
+			}
+		}
+
+		if len(downloads) < batchSize {
+			break
+		}
+
+		offset += batchSize
+	}
+
+	if len(downloadsToWarn) == 0 {
+		return
+	}
+
+	const maxMessageLength = 4000
+	var messages []string
+	var currentBatch strings.Builder
+
+	header := fmt.Sprintf("<b>⚠️ Download Links Scheduled for Auto-Deletion</b>\n\n"+
+		"The following download links will be cleared in approximately <b>%d hours</b>.\n\n", hoursBefore)
+
+	currentBatch.WriteString(header)
+	hasItems := false
+
+	for _, d := range downloadsToWarn {
+		filename := html.EscapeString(d.Filename)
+		generatedDays := int(time.Since(d.Generated).Hours() / 24)
+		line := fmt.Sprintf(
+			"• <code>%s</code> — <i>%s</i> (<b>%d</b> days old)\n",
+			d.ID,
+			filename,
+			generatedDays,
+		)
+
+		if currentBatch.Len()+len(line)+100 > maxMessageLength {
+			footer := fmt.Sprintf("\n<i>Batch %d of download links scheduled for deletion</i>", len(messages)+1)
+			currentBatch.WriteString(footer)
+			messages = append(messages, currentBatch.String())
+			currentBatch.Reset()
+			currentBatch.WriteString(header)
+		}
+
+		currentBatch.WriteString(line)
+		hasItems = true
+	}
+
+	if hasItems {
+		footer := fmt.Sprintf("\n<i>%d download link(s) scheduled for deletion</i>", len(downloadsToWarn))
+		currentBatch.WriteString(footer)
+		messages = append(messages, currentBatch.String())
+	}
+
+	successCount := 0
+	for i, msg := range messages {
+		if err := b.sendHTMLMessageWithErr(ctx, chatID, topicID, msg, 0); err != nil {
+			log.Printf("Auto-delete downloads warning: failed to send batch %d/%d to chat %d: %v", i+1, len(messages), chatID, err)
+		} else {
+			successCount++
+			log.Printf("Auto-delete downloads warning: successfully sent batch %d/%d for %d download(s) to chat %d", i+1, len(messages), len(downloadsToWarn), chatID)
+		}
+	}
+
+	if successCount == len(messages) {
+		log.Printf("Auto-delete downloads warning: successfully sent all %d batch(es) for %d download(s) to chat %d", len(messages), len(downloadsToWarn), chatID)
+	} else {
+		log.Printf("Auto-delete downloads warning: sent %d/%d batches successfully for %d download(s) to chat %d", successCount, len(messages), len(downloadsToWarn), chatID)
 	}
 }
