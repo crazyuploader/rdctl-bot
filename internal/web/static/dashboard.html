@@ -3,20 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0c0c11" />
+    <meta name="theme-color" content="#0d0d0f" />
     <title>Dashboard — rdctl</title>
     <link
       rel="icon"
       type="image/svg+xml"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235aabb8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 10V3L4 14h7v7l9-11h-7z'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f98a3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 10V3L4 14h7v7l9-11h-7z'/%3E%3C/svg%3E"
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="styles.css" />
     <script src="https://unpkg.com/lucide@0.577.0/dist/umd/lucide.min.js"></script>
   </head>
   <body>
-    <!-- Topbar -->
+    <!-- ── Top Bar ────────────────────────────────────────── -->
     <header class="topbar">
       <a href="/dashboard" class="topbar-logo">rd<span>ctl</span></a>
       <nav class="topbar-nav" aria-label="Main">
@@ -35,24 +39,38 @@
       </div>
     </header>
 
+    <!-- ── Main ───────────────────────────────────────────── -->
     <main class="main">
       <!-- Account status -->
-      <div style="margin-bottom: 20px">
+      <div style="margin-bottom: var(--space-5)">
         <div class="section-label">Account</div>
         <div class="card">
           <div class="card-body" id="status-section">
             <div class="status-grid" id="status-grid">
               <div
                 class="skeleton"
-                style="height: 42px; width: 110px; border-radius: 6px"
+                style="
+                  height: 56px;
+                  width: 110px;
+                  border-radius: var(--radius-lg);
+                "
               ></div>
               <div
                 class="skeleton"
-                style="height: 42px; width: 90px; border-radius: 6px"
+                style="
+                  height: 56px;
+                  width: 90px;
+                  border-radius: var(--radius-lg);
+                "
               ></div>
               <div
                 class="skeleton"
-                style="height: 42px; width: 100px; border-radius: 6px"
+                style="
+                  height: 56px;
+                  width: 100px;
+                  border-radius: var(--radius-lg);
+                  opacity: 0.7;
+                "
               ></div>
             </div>
           </div>
@@ -60,21 +78,44 @@
       </div>
 
       <!-- Stats -->
-      <div style="margin-bottom: 20px">
+      <div style="margin-bottom: var(--space-5)">
         <div class="section-label">Stats</div>
         <div class="card">
           <div class="card-body">
             <div class="status-grid" id="stats-grid">
-              <div class="skeleton" style="height: 42px; width: 90px; border-radius: 6px"></div>
-              <div class="skeleton" style="height: 42px; width: 90px; border-radius: 6px; opacity: 0.7"></div>
-              <div class="skeleton" style="height: 42px; width: 90px; border-radius: 6px; opacity: 0.45"></div>
+              <div
+                class="skeleton"
+                style="
+                  height: 56px;
+                  width: 90px;
+                  border-radius: var(--radius-lg);
+                "
+              ></div>
+              <div
+                class="skeleton"
+                style="
+                  height: 56px;
+                  width: 90px;
+                  border-radius: var(--radius-lg);
+                  opacity: 0.7;
+                "
+              ></div>
+              <div
+                class="skeleton"
+                style="
+                  height: 56px;
+                  width: 90px;
+                  border-radius: var(--radius-lg);
+                  opacity: 0.45;
+                "
+              ></div>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Quick actions -->
-      <div style="margin-bottom: 20px">
+      <div style="margin-bottom: var(--space-5)">
         <div class="section-label">Actions</div>
         <div class="grid-actions">
           <!-- Add Torrent -->
@@ -147,8 +188,8 @@
               id="domain-result"
               style="
                 display: none;
-                margin-top: 8px;
-                font-size: 12px;
+                margin-top: var(--space-2);
+                font-size: var(--text-xs);
                 font-family: var(--font-mono);
               "
             ></div>
@@ -159,7 +200,7 @@
       <!-- Auto-Delete (admin only) -->
       <div id="autodelete-section" style="display: none">
         <div class="section-label">Admin</div>
-        <div class="action-card">
+        <div class="action-card" style="max-width: 340px">
           <div class="action-label">
             <i data-lucide="clock" style="width: 13px; height: 13px"></i>
             Auto-Delete
@@ -168,8 +209,8 @@
               style="
                 margin-left: auto;
                 font-family: var(--font-mono);
-                font-size: 11px;
-                color: var(--fg-muted);
+                font-size: var(--text-xs);
+                color: var(--text-faint);
                 font-weight: 400;
                 text-transform: none;
                 letter-spacing: 0;
