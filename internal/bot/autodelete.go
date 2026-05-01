@@ -182,8 +182,14 @@ func (b *Bot) runAutoDeleteCheck(ctx context.Context) {
 		keptTorrentIDs = make(map[string]bool)
 	}
 
+	// Offset delete cutoff by warning hours so every torrent passes through the
+	// warning window before it becomes eligible for deletion.
+	hoursBefore := b.config.App.AutoDeleteWarning.HoursBefore
 	cutoff := time.Now().UTC().AddDate(0, 0, -days)
-	log.Printf("Auto-delete: checking for torrents older than %d days (before %s)", days, cutoff.Format("2006-01-02 15:04"))
+	if hoursBefore > 0 {
+		cutoff = cutoff.Add(-time.Duration(hoursBefore) * time.Hour)
+	}
+	log.Printf("Auto-delete: checking for torrents older than %d days + %d hours (before %s)", days, hoursBefore, cutoff.Format("2006-01-02 15:04"))
 
 	// Fetch torrents in batches to handle large lists
 	const batchSize = 100
@@ -364,8 +370,12 @@ func isRetryableHTTPError(err error) bool {
 
 // runAutoDeleteDownloads performs auto-delete for downloads
 func (b *Bot) runAutoDeleteDownloads(ctx context.Context, days int) {
+	hoursBefore := b.config.App.AutoDeleteWarning.HoursBefore
 	cutoff := time.Now().UTC().AddDate(0, 0, -days)
-	log.Printf("Auto-delete: checking for downloads older than %d days (before %s)", days, cutoff.Format("2006-01-02 15:04"))
+	if hoursBefore > 0 {
+		cutoff = cutoff.Add(-time.Duration(hoursBefore) * time.Hour)
+	}
+	log.Printf("Auto-delete: checking for downloads older than %d days + %d hours (before %s)", days, hoursBefore, cutoff.Format("2006-01-02 15:04"))
 
 	const batchSize = 100
 	offset := 0
@@ -509,12 +519,13 @@ func (b *Bot) startAutoDeleteWarningWorker(ctx context.Context) {
 
 	log.Println("Auto-delete warning worker started (checking every hour)")
 
-	// Run first check after a short delay to let the bot initialize
+	// Run first check after a short delay; scan the full warning window so existing
+	// at-risk torrents are always notified, not just newly-entered ones.
 	select {
 	case <-ctx.Done():
 		return
 	case <-time.After(30 * time.Second):
-		b.runAutoDeleteWarningCheck(ctx)
+		b.runAutoDeleteWarningCheck(ctx, true)
 	}
 
 	for {
@@ -523,13 +534,15 @@ func (b *Bot) startAutoDeleteWarningWorker(ctx context.Context) {
 			log.Println("Auto-delete warning worker stopped")
 			return
 		case <-ticker.C:
-			b.runAutoDeleteWarningCheck(ctx)
+			b.runAutoDeleteWarningCheck(ctx, false)
 		}
 	}
 }
 
-// runAutoDeleteWarningCheck performs a single warning check cycle
-func (b *Bot) runAutoDeleteWarningCheck(ctx context.Context) {
+// runAutoDeleteWarningCheck performs a single warning check cycle.
+// fullScan=true warns about all torrents currently in the warning window (used on startup);
+// fullScan=false only warns about torrents that newly entered the window since the last run.
+func (b *Bot) runAutoDeleteWarningCheck(ctx context.Context, fullScan bool) {
 	// Check if warning is configured
 	chatID := b.config.App.AutoDeleteWarning.ChatID
 	if chatID == 0 {
@@ -582,8 +595,14 @@ func (b *Bot) runAutoDeleteWarningCheck(ctx context.Context) {
 
 	log.Printf("Auto-delete warning: checking for torrents to be deleted in %d hours (before %s)", hoursBefore, deleteCutoff.Format("2006-01-02 15:04"))
 
-	// Calculate previous warning cutoff to only warn about newly-entered torrents
-	previousWarningCutoff := warningCutoff.Add(-warningCheckInterval)
+	// On a full scan (startup), warn about everything in the window; otherwise
+	// only warn about torrents that newly entered the window since the last run.
+	var previousWarningCutoff time.Time
+	if fullScan {
+		previousWarningCutoff = deleteCutoff
+	} else {
+		previousWarningCutoff = warningCutoff.Add(-warningCheckInterval)
+	}
 
 	// Fetch torrents in batches
 	const batchSize = 100
@@ -687,18 +706,23 @@ func (b *Bot) runAutoDeleteWarningCheck(ctx context.Context) {
 	}
 
 	// Also check for downloads to warn about
-	b.runAutoDeleteDownloadsWarning(ctx, chatID, topicID, days, hoursBefore)
+	b.runAutoDeleteDownloadsWarning(ctx, chatID, topicID, days, hoursBefore, fullScan)
 }
 
 // runAutoDeleteDownloadsWarning sends warnings for downloads about to be auto-deleted
-func (b *Bot) runAutoDeleteDownloadsWarning(ctx context.Context, chatID int64, topicID int, days int, hoursBefore int) {
+func (b *Bot) runAutoDeleteDownloadsWarning(ctx context.Context, chatID int64, topicID int, days int, hoursBefore int, fullScan bool) {
 	if chatID == 0 {
 		return
 	}
 
 	deleteCutoff := time.Now().UTC().AddDate(0, 0, -days)
 	warningCutoff := deleteCutoff.Add(time.Duration(hoursBefore) * time.Hour)
-	previousWarningCutoff := warningCutoff.Add(-warningCheckInterval)
+	var previousWarningCutoff time.Time
+	if fullScan {
+		previousWarningCutoff = deleteCutoff
+	} else {
+		previousWarningCutoff = warningCutoff.Add(-warningCheckInterval)
+	}
 
 	log.Printf("Auto-delete warning: checking for downloads to be cleared in %d hours (before %s)", hoursBefore, deleteCutoff.Format("2006-01-02 15:04"))
 
