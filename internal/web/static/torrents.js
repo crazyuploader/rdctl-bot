@@ -19,6 +19,7 @@
     hasMore: true,
     loading: false,
     filter: "",
+    activeFilter: "all",
   };
 
   var REFRESH_MS = 5000;
@@ -60,6 +61,7 @@
         hasMore: true,
         loading: false,
         filter: page.filter,
+        activeFilter: page.activeFilter,
       };
     }
     if (page.loading) return;
@@ -94,11 +96,18 @@
     var filter = filterOverride !== undefined ? filterOverride : page.filter;
     page.filter = filter;
 
-    var items = filter
-      ? cached.filter(function (t) {
-          return t.filename.toLowerCase().includes(filter.toLowerCase());
-        })
-      : cached;
+    var items = cached.filter(function (t) {
+      /* text search */
+      if (filter && !t.filename.toLowerCase().includes(filter.toLowerCase()))
+        return false;
+      /* tab filter */
+      var af = page.activeFilter;
+      if (af === "kept") return keptIds.has(t.id);
+      if (af === "not-kept") return !keptIds.has(t.id);
+      if (af === "Downloading" || af === "Downloaded" || af === "Error")
+        return t.status === af;
+      return true;
+    });
 
     var list = document.getElementById("torrents-list");
     var empty = document.getElementById("torrents-empty");
@@ -452,6 +461,22 @@
     .getElementById("torrents-search")
     .addEventListener("input", function () {
       render(this.value);
+    });
+
+  /* ── Filter tabs ── */
+  document
+    .getElementById("torrent-filters")
+    .addEventListener("click", function (e) {
+      var tab = e.target.closest(".filter-tab");
+      if (!tab) return;
+      document.querySelectorAll(".filter-tab").forEach(function (t) {
+        t.classList.remove("active");
+        t.setAttribute("aria-selected", "false");
+      });
+      tab.classList.add("active");
+      tab.setAttribute("aria-selected", "true");
+      page.activeFilter = tab.dataset.filter;
+      render();
     });
 
   /* ── Event delegation for keep/delete buttons ── */

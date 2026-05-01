@@ -66,6 +66,63 @@
           </div>
         </div>
 
+        <!-- Filter tabs -->
+        <div
+          class="filter-tabs"
+          id="torrent-filters"
+          role="tablist"
+          aria-label="Filter torrents"
+        >
+          <button
+            class="filter-tab active"
+            data-filter="all"
+            role="tab"
+            aria-selected="true"
+          >
+            All
+          </button>
+          <button
+            class="filter-tab"
+            data-filter="kept"
+            role="tab"
+            aria-selected="false"
+          >
+            Kept
+          </button>
+          <button
+            class="filter-tab"
+            data-filter="not-kept"
+            role="tab"
+            aria-selected="false"
+          >
+            Not Kept
+          </button>
+          <button
+            class="filter-tab"
+            data-filter="Downloading"
+            role="tab"
+            aria-selected="false"
+          >
+            Downloading
+          </button>
+          <button
+            class="filter-tab"
+            data-filter="Downloaded"
+            role="tab"
+            aria-selected="false"
+          >
+            Downloaded
+          </button>
+          <button
+            class="filter-tab"
+            data-filter="Error"
+            role="tab"
+            aria-selected="false"
+          >
+            Error
+          </button>
+        </div>
+
         <!-- List -->
         <div
           id="torrents-list"
