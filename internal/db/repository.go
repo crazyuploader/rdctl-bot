@@ -487,15 +487,15 @@ func (r *CommandRepository) LogCommand(ctx context.Context, userID int64, chatID
 	})
 }
 
-// GetUserStats retrieves user statistics by internal user ID.
+// GetUserStats retrieves user statistics by Telegram user_id.
 // All four queries run inside a REPEATABLE READ transaction so the snapshot is
 // consistent even when concurrent writes are in flight.
-func (r *CommandRepository) GetUserStats(ctx context.Context, userID int64) (map[string]interface{}, error) {
+func (r *CommandRepository) GetUserStats(ctx context.Context, telegramUserID int64) (map[string]interface{}, error) {
 	var stats map[string]interface{}
 	err := withReadTx(ctx, r.pool, func(tx pgx.Tx) error {
 		q := New(tx)
 
-		u, err := q.GetUserByID(ctx, userID)
+		u, err := q.GetUserByUserID(ctx, telegramUserID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return errors.New("user not found")
@@ -503,15 +503,15 @@ func (r *CommandRepository) GetUserStats(ctx context.Context, userID int64) (map
 			return err
 		}
 
-		totalActivities, err := q.CountActivitiesByUser(ctx, userID)
+		totalActivities, err := q.CountActivitiesByUser(ctx, u.ID)
 		if err != nil {
 			return err
 		}
-		totalTorrents, err := q.CountTorrentAddsByUser(ctx, userID)
+		totalTorrents, err := q.CountTorrentAddsByUser(ctx, u.ID)
 		if err != nil {
 			return err
 		}
-		totalDownloads, err := q.CountDownloadsByUser(ctx, userID)
+		totalDownloads, err := q.CountDownloadsByUser(ctx, u.ID)
 		if err != nil {
 			return err
 		}
@@ -878,9 +878,9 @@ func (r *UserChatMembershipRepository) Touch(ctx context.Context, userPK int64, 
 	}
 	if incrementCommand {
 		return r.queries.IncrementMembershipCommandCount(ctx, IncrementMembershipCommandCountParams{
-			UserID:      userPK,
-			ChatID:      chatPK,
-			LastSeenAt:  now,
+			UserID:     userPK,
+			ChatID:     chatPK,
+			LastSeenAt: now,
 		})
 	}
 	return nil

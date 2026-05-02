@@ -1,6 +1,12 @@
 -- 000001_initial.down.sql
 -- Drop all tables in reverse FK dependency order
 
+SET search_path = public;
+
+DROP TABLE IF EXISTS user_daily_stats;
+DROP TABLE IF EXISTS daily_stats;
+DROP TABLE IF EXISTS user_chat_memberships;
+DROP TABLE IF EXISTS messages;
 DROP TABLE IF EXISTS setting_audits;
 DROP TABLE IF EXISTS kept_torrent_actions;
 DROP TABLE IF EXISTS kept_torrents;

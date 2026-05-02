@@ -1,6 +1,8 @@
 -- 000001_initial.up.sql
 -- Initial schema migration (v1)
 
+SET search_path = public;
+
 CREATE TABLE IF NOT EXISTS chats (
     id         bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     chat_id    bigint      NOT NULL,
@@ -51,7 +53,7 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     error_message     text,
     metadata          jsonb       NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(metadata) = 'object'),
     created_at        timestamptz NOT NULL DEFAULT now(),
-    created_date      date        GENERATED ALWAYS AS (created_at::date) STORED
+    created_date      date        GENERATED ALWAYS AS ((created_at AT TIME ZONE 'UTC')::date) STORED
 );
 
 CREATE TABLE IF NOT EXISTS torrent_activities (
@@ -71,7 +73,7 @@ CREATE TABLE IF NOT EXISTS torrent_activities (
     error_message  text,
     metadata       jsonb       NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(metadata) = 'object'),
     created_at     timestamptz NOT NULL DEFAULT now(),
-    created_date   date        GENERATED ALWAYS AS (created_at::date) STORED,
+    created_date   date        GENERATED ALWAYS AS ((created_at AT TIME ZONE 'UTC')::date) STORED,
     selected_files jsonb       NOT NULL DEFAULT '[]' CHECK (jsonb_typeof(selected_files) = 'array')
 );
 
@@ -90,7 +92,7 @@ CREATE TABLE IF NOT EXISTS download_activities (
     error_message       text,
     metadata            jsonb       NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(metadata) = 'object'),
     created_at          timestamptz NOT NULL DEFAULT now(),
-    created_date        date        GENERATED ALWAYS AS (created_at::date) STORED,
+    created_date        date        GENERATED ALWAYS AS ((created_at AT TIME ZONE 'UTC')::date) STORED,
     torrent_activity_id bigint      REFERENCES torrent_activities(id) ON DELETE SET NULL
 );
 
@@ -108,7 +110,7 @@ CREATE TABLE IF NOT EXISTS command_logs (
     error_message     text,
     response_length   bigint,
     created_at        timestamptz NOT NULL DEFAULT now(),
-    created_date      date        GENERATED ALWAYS AS (created_at::date) STORED
+    created_date      date        GENERATED ALWAYS AS ((created_at AT TIME ZONE 'UTC')::date) STORED
 );
 
 CREATE TABLE IF NOT EXISTS settings (
@@ -245,15 +247,6 @@ CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at_brin    ON activity_logs
 CREATE INDEX IF NOT EXISTS idx_torrent_activities_created_at_brin ON torrent_activities USING BRIN (created_at);
 CREATE INDEX IF NOT EXISTS idx_download_activities_created_at_brin ON download_activities USING BRIN (created_at);
 CREATE INDEX IF NOT EXISTS idx_command_logs_created_at_brin     ON command_logs     USING BRIN (created_at);
-
--- ── created_date indexes for date-bucket GROUP BY queries ──────────────────
-CREATE INDEX IF NOT EXISTS idx_activity_logs_created_date    ON activity_logs    (created_date);
-CREATE INDEX IF NOT EXISTS idx_torrent_activities_created_date ON torrent_activities (created_date);
-CREATE INDEX IF NOT EXISTS idx_download_activities_created_date ON download_activities (created_date);
-CREATE INDEX IF NOT EXISTS idx_command_logs_created_date     ON command_logs     (created_date);
-
--- ── command popularity ─────────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_command_logs_command_date ON command_logs (command, created_date);
 
 -- ──────────────────────────────────────────────────────────────────────────
 -- Stats / aggregation tables
