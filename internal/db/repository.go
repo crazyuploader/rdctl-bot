@@ -289,39 +289,44 @@ func (r *TorrentRepository) LogTorrentActivity(ctx context.Context, requestID st
 
 // GetTorrentActivities retrieves torrent activities.  If userID == 0, all activities are returned.
 func (r *TorrentRepository) GetTorrentActivities(ctx context.Context, userID int64, limit int) ([]TorrentActivity, error) {
-	var uid int64
-	if userID > 0 {
-		uid = userID
-	}
 	lim := int32(limit)
 	if lim <= 0 {
 		lim = 100
 	}
-	rows, err := r.queries.GetTorrentActivities(ctx, GetTorrentActivitiesParams{
-		Column1: uid,
-		Limit:   lim,
-	})
+
+	var rows []TorrentActivities
+	var err error
+
+	if userID > 0 {
+		rows, err = r.queries.GetTorrentActivities(ctx, GetTorrentActivitiesParams{
+			UserID: userID,
+			Limit:  lim,
+		})
+	} else {
+		rows, err = r.queries.GetAllTorrentActivities(ctx, lim)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 	result := make([]TorrentActivity, 0, len(rows))
 	for _, row := range rows {
 		ta := TorrentActivity{
-			ID:           row.ID,
-			RequestID:    derefStr(row.RequestID),
-			UserID:       row.UserID,
-			ChatID:       row.ChatID,
-			TorrentID:    row.TorrentID,
-			TorrentHash:  derefStr(row.TorrentHash),
-			TorrentName:  derefStr(row.TorrentName),
-			MagnetLink:   derefStr(row.MagnetLink),
-			Action:       row.Action,
-			Status:       derefStr(row.Status),
-			FileSize:     derefInt64(row.FileSize),
-			Progress:     toFloat64FromNumeric(row.Progress),
-			Success:      row.Success,
-			ErrorMessage: derefStr(row.ErrorMessage),
-			Metadata:     string(row.Metadata),
+			ID:            row.ID,
+			RequestID:     derefStr(row.RequestID),
+			UserID:        row.UserID,
+			ChatID:        row.ChatID,
+			TorrentID:     row.TorrentID,
+			TorrentHash:   derefStr(row.TorrentHash),
+			TorrentName:   derefStr(row.TorrentName),
+			MagnetLink:    derefStr(row.MagnetLink),
+			Action:        row.Action,
+			Status:        derefStr(row.Status),
+			FileSize:      derefInt64(row.FileSize),
+			Progress:      toFloat64FromNumeric(row.Progress),
+			Success:       row.Success,
+			ErrorMessage:  derefStr(row.ErrorMessage),
+			Metadata:      string(row.Metadata),
 			SelectedFiles: string(row.SelectedFiles),
 		}
 		if row.CreatedAt.Valid {
@@ -675,7 +680,7 @@ func (r *KeptTorrentRepository) UnkeepTorrent(ctx context.Context, torrentID str
 
 // IsKept checks if any user has marked the torrent as kept.
 func (r *KeptTorrentRepository) IsKept(ctx context.Context, torrentID string) (bool, error) {
-	_, err := r.queries.GetKeptTorrent(ctx, torrentID)
+	_, err := r.queries.CheckKeptTorrent(ctx, torrentID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil

@@ -256,12 +256,12 @@ func (d *Dependencies) GetStats(c fiber.Ctx) error {
 
 // GetUserStats retrieves statistics for a user
 func (d *Dependencies) GetUserStats(c fiber.Ctx) error {
-	userID, err := strconv.ParseUint(c.Params("id"), 10, 64)
+	userID, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid user ID")
 	}
 
-	stats, err := d.CommandRepo.GetUserStats(c.Context(), int64(userID))
+	stats, err := d.CommandRepo.GetUserStats(c.Context(), userID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return fiber.NewError(fiber.StatusNotFound, "User stats not found")

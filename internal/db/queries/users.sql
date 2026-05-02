@@ -22,7 +22,7 @@ SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL;
 SELECT * FROM users WHERE user_id = $1 AND deleted_at IS NULL;
 
 -- name: IncrementUserCommands :exec
-UPDATE users SET total_commands = total_commands + 1 WHERE id = $1;
+UPDATE users SET total_commands = total_commands + 1 WHERE user_id = $1;
 
 -- name: LockUserForUpdate :one
 SELECT * FROM users WHERE user_id = $1 AND deleted_at IS NULL FOR UPDATE;

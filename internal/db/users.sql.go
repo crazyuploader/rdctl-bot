@@ -62,11 +62,11 @@ func (q *Queries) GetUserByUserID(ctx context.Context, userID int64) (Users, err
 }
 
 const incrementUserCommands = `-- name: IncrementUserCommands :exec
-UPDATE users SET total_commands = total_commands + 1 WHERE id = $1
+UPDATE users SET total_commands = total_commands + 1 WHERE user_id = $1
 `
 
-func (q *Queries) IncrementUserCommands(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, incrementUserCommands, id)
+func (q *Queries) IncrementUserCommands(ctx context.Context, userID int64) error {
+	_, err := q.db.Exec(ctx, incrementUserCommands, userID)
 	return err
 }
 

@@ -11,6 +11,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const checkKeptTorrent = `-- name: CheckKeptTorrent :one
+SELECT 1 FROM kept_torrents WHERE torrent_id = $1 LIMIT 1
+`
+
+func (q *Queries) CheckKeptTorrent(ctx context.Context, torrentID string) (int32, error) {
+	row := q.db.QueryRow(ctx, checkKeptTorrent, torrentID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countKeptByUser = `-- name: CountKeptByUser :one
 SELECT COUNT(*) FROM kept_torrents WHERE kept_by_id = $1
 `
@@ -85,12 +96,17 @@ func (q *Queries) GetAllKeptTorrentIDs(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
-const getKeptTorrent = `-- name: GetKeptTorrent :one
-SELECT id, torrent_id, filename, kept_by_id, kept_at FROM kept_torrents WHERE torrent_id = $1 LIMIT 1
+const getKeptTorrentByOwner = `-- name: GetKeptTorrentByOwner :one
+SELECT id, torrent_id, filename, kept_by_id, kept_at FROM kept_torrents WHERE torrent_id = $1 AND kept_by_id = $2 LIMIT 1
 `
 
-func (q *Queries) GetKeptTorrent(ctx context.Context, torrentID string) (KeptTorrents, error) {
-	row := q.db.QueryRow(ctx, getKeptTorrent, torrentID)
+type GetKeptTorrentByOwnerParams struct {
+	TorrentID string `json:"torrent_id"`
+	KeptByID  int64  `json:"kept_by_id"`
+}
+
+func (q *Queries) GetKeptTorrentByOwner(ctx context.Context, arg GetKeptTorrentByOwnerParams) (KeptTorrents, error) {
+	row := q.db.QueryRow(ctx, getKeptTorrentByOwner, arg.TorrentID, arg.KeptByID)
 	var i KeptTorrents
 	err := row.Scan(
 		&i.ID,

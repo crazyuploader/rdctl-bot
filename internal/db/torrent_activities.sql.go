@@ -23,20 +23,64 @@ func (q *Queries) CountTorrentAddsByUser(ctx context.Context, userID int64) (int
 	return count, err
 }
 
+const getAllTorrentActivities = `-- name: GetAllTorrentActivities :many
+SELECT id, request_id, user_id, chat_id, torrent_id, torrent_hash, torrent_name, magnet_link, action, status, file_size, progress, success, error_message, metadata, created_at, selected_files FROM torrent_activities
+ORDER BY created_at DESC
+LIMIT $1
+`
+
+func (q *Queries) GetAllTorrentActivities(ctx context.Context, limit int32) ([]TorrentActivities, error) {
+	rows, err := q.db.Query(ctx, getAllTorrentActivities, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TorrentActivities
+	for rows.Next() {
+		var i TorrentActivities
+		if err := rows.Scan(
+			&i.ID,
+			&i.RequestID,
+			&i.UserID,
+			&i.ChatID,
+			&i.TorrentID,
+			&i.TorrentHash,
+			&i.TorrentName,
+			&i.MagnetLink,
+			&i.Action,
+			&i.Status,
+			&i.FileSize,
+			&i.Progress,
+			&i.Success,
+			&i.ErrorMessage,
+			&i.Metadata,
+			&i.CreatedAt,
+			&i.SelectedFiles,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTorrentActivities = `-- name: GetTorrentActivities :many
 SELECT id, request_id, user_id, chat_id, torrent_id, torrent_hash, torrent_name, magnet_link, action, status, file_size, progress, success, error_message, metadata, created_at, selected_files FROM torrent_activities
-WHERE ($1::bigint IS NULL OR user_id = $1)
+WHERE user_id = $1
 ORDER BY created_at DESC
 LIMIT $2
 `
 
 type GetTorrentActivitiesParams struct {
-	Column1 int64 `json:"column_1"`
-	Limit   int32 `json:"limit"`
+	UserID int64 `json:"user_id"`
+	Limit  int32 `json:"limit"`
 }
 
 func (q *Queries) GetTorrentActivities(ctx context.Context, arg GetTorrentActivitiesParams) ([]TorrentActivities, error) {
-	rows, err := q.db.Query(ctx, getTorrentActivities, arg.Column1, arg.Limit)
+	rows, err := q.db.Query(ctx, getTorrentActivities, arg.UserID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}

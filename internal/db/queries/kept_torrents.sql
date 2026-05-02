@@ -11,8 +11,11 @@ DELETE FROM kept_torrents WHERE torrent_id = $1 AND kept_by_id = $2;
 -- name: DeleteKeptTorrentAdmin :exec
 DELETE FROM kept_torrents WHERE torrent_id = $1;
 
--- name: GetKeptTorrent :one
-SELECT * FROM kept_torrents WHERE torrent_id = $1 LIMIT 1;
+-- name: GetKeptTorrentByOwner :one
+SELECT * FROM kept_torrents WHERE torrent_id = $1 AND kept_by_id = $2 LIMIT 1;
+
+-- name: CheckKeptTorrent :one
+SELECT 1 FROM kept_torrents WHERE torrent_id = $1 LIMIT 1;
 
 -- name: ListKeptTorrents :many
 SELECT

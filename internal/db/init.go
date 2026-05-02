@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"log"
+	"net/url"
 	"strings"
 	"time"
 
@@ -33,11 +34,14 @@ func Init(dsn string) (*pgxpool.Pool, error) {
 	cfg.MaxConnIdleTime = 30 * time.Minute
 	cfg.HealthCheckPeriod = time.Minute
 
-	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pool: %w", err)
 	}
-	if err := pool.Ping(context.Background()); err != nil {
+	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("failed to ping: %w", err)
 	}
@@ -80,7 +84,7 @@ func runMigrations(dsn string) error {
 // If the DSN is in key=value form (e.g. "host=... user=... ...") it is
 // toMigrateDSN converts a PostgreSQL DSN (URL or libpq key=value form) into a
 // pgx5:// URL suitable for use with the golang-migrate pgx/v5 driver.
-// 
+//
 // If the input already uses a URL scheme (postgresql://, postgres://, pgx://,
 // or pgx5://) the scheme is replaced with pgx5:// and the remainder is returned.
 // For key=value form, the string is parsed with parseKVDSN and the resulting
@@ -115,16 +119,23 @@ func toMigrateDSN(dsn string) string {
 		sslmode = "disable"
 	}
 
-	// golang-migrate DSN: pgx5://user:password@host:port/dbname?sslmode=...
-	authority := host + ":" + port
-	if user != "" || password != "" {
+	var userInfo *url.Userinfo
+	if user != "" {
 		if password != "" {
-			authority = user + ":" + password + "@" + authority
+			userInfo = url.UserPassword(user, password)
 		} else {
-			authority = user + "@" + authority
+			userInfo = url.User(user)
 		}
 	}
-	return fmt.Sprintf("pgx5://%s/%s?sslmode=%s", authority, dbname, sslmode)
+
+	u := url.URL{
+		Scheme:   "pgx5",
+		User:     userInfo,
+		Host:     host + ":" + port,
+		Path:     "/" + dbname,
+		RawQuery: url.Values{"sslmode": {sslmode}}.Encode(),
+	}
+	return u.String()
 }
 
 // parseKVDSN parses a libpq-style DSN string of space-separated `key=value` fields into a map.

@@ -11,9 +11,14 @@ INSERT INTO torrent_activities (
 
 -- name: GetTorrentActivities :many
 SELECT * FROM torrent_activities
-WHERE ($1::bigint IS NULL OR user_id = $1)
+WHERE user_id = $1
 ORDER BY created_at DESC
 LIMIT $2;
+
+-- name: GetAllTorrentActivities :many
+SELECT * FROM torrent_activities
+ORDER BY created_at DESC
+LIMIT $1;
 
 -- name: CountTorrentAddsByUser :one
 SELECT COUNT(*) FROM torrent_activities WHERE user_id = $1 AND action = 'add';
