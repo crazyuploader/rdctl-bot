@@ -89,7 +89,7 @@ type KeptTorrent struct {
 	User      KeptTorrentUser
 }
 
-// derefStr returns the string value of a *string, or "" if nil.
+// derefStr returns the string value pointed to by s, or the empty string if s is nil.
 func derefStr(s *string) string {
 	if s == nil {
 		return ""

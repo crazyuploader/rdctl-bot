@@ -130,7 +130,8 @@ func main() {
 }
 
 // runBot executes the main lifecycle: loads configuration, starts the bot and web server,
-// and manages graceful shutdown with a configurable timeout.
+// runBot loads and validates configuration, initializes and starts the database, web server, and (unless disabled) the Telegram bot, and manages graceful shutdown using the CLI-configurable timeout.
+// It reads flags from cmd: --web-only (disable Telegram bot), --validate-config (validate configuration and exit), and --shutdown-timeout (graceful shutdown timeout). The args parameter is unused.
 func runBot(cmd *cobra.Command, args []string) {
 	// Load configuration
 	cfg, err := config.Load(cfgFile)

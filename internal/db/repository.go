@@ -12,12 +12,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// toPgtypeTimestamptz converts a time.Time to pgtype.Timestamptz.
+// toPgtypeTimestamptz converts t to a pgtype.Timestamptz with the time normalized to UTC and Valid set to true.
 func toPgtypeTimestamptz(t time.Time) pgtype.Timestamptz {
 	return pgtype.Timestamptz{Time: t.UTC(), Valid: true}
 }
 
-// strPtr returns nil if s == "", else &s.
+// strPtr returns a pointer to s or nil when s is an empty string.
 func strPtr(s string) *string {
 	if s == "" {
 		return nil
@@ -25,7 +25,7 @@ func strPtr(s string) *string {
 	return &s
 }
 
-// int64Ptr returns nil if n == 0, else &n.
+// int64Ptr returns a pointer to n, or nil when n is zero.
 func int64Ptr(n int64) *int64 {
 	if n == 0 {
 		return nil
@@ -33,7 +33,8 @@ func int64Ptr(n int64) *int64 {
 	return &n
 }
 
-// toUserPublic converts a sqlc Users to the public User type.
+// toUserPublic maps a sqlc Users row to a public User value.
+// It converts nullable string fields using derefStr and copies nullable timestamp fields into the corresponding time.Time fields only when they are valid, returning a pointer to the constructed User.
 func toUserPublic(u Users) *User {
 	pub := &User{
 		ID:            u.ID,
@@ -60,7 +61,8 @@ func toUserPublic(u Users) *User {
 	return pub
 }
 
-// toChatPublic converts a sqlc Chats to the public Chat type.
+// toChatPublic converts a sqlc Chats row to a public *Chat, mapping nullable string and timestamp fields to their public representations.
+// Title and Type are dereferenced from nullable strings; CreatedAt and UpdatedAt are set only when the corresponding nullable timestamps are valid.
 func toChatPublic(c Chats) *Chat {
 	pub := &Chat{
 		ID:     c.ID,
@@ -77,7 +79,7 @@ func toChatPublic(c Chats) *Chat {
 	return pub
 }
 
-// toSettingAuditPublic converts sqlc SettingAudits to public SettingAudit.
+// toSettingAuditPublic converts a sqlc SettingAudits row into a public SettingAudit, mapping nullable string and timestamp fields to their concrete equivalents.
 func toSettingAuditPublic(a SettingAudits) SettingAudit {
 	pub := SettingAudit{
 		ID:        a.ID,
@@ -93,7 +95,7 @@ func toSettingAuditPublic(a SettingAudits) SettingAudit {
 	return pub
 }
 
-// toKeptTorrentPublic converts a ListKeptTorrentsRow to the public KeptTorrent type.
+// toKeptTorrentPublic converts a ListKeptTorrentsRow into a KeptTorrent, mapping nested user fields and setting KeptAt when the source timestamp is valid.
 func toKeptTorrentPublic(row ListKeptTorrentsRow) KeptTorrent {
 	kt := KeptTorrent{
 		ID:        row.ID,
@@ -114,7 +116,7 @@ func toKeptTorrentPublic(row ListKeptTorrentsRow) KeptTorrent {
 	return kt
 }
 
-// toFloat64FromNumeric converts a pgtype.Numeric to float64.
+// toFloat64FromNumeric converts a pgtype.Numeric to a float64 and returns 0 when the numeric is not valid.
 func toFloat64FromNumeric(n pgtype.Numeric) float64 {
 	if !n.Valid {
 		return 0
@@ -123,7 +125,8 @@ func toFloat64FromNumeric(n pgtype.Numeric) float64 {
 	return f.Float64
 }
 
-// toNumericFromFloat64 converts float64 to pgtype.Numeric.
+// toNumericFromFloat64 converts a float64 to a pgtype.Numeric.
+// On scan failure it returns an invalid (zero) pgtype.Numeric.
 func toNumericFromFloat64(f float64) pgtype.Numeric {
 	var n pgtype.Numeric
 	if err := n.Scan(fmt.Sprintf("%g", f)); err != nil {
@@ -142,7 +145,7 @@ type UserRepository struct {
 	queries *Queries
 }
 
-// NewUserRepository creates a UserRepository.
+// NewUserRepository returns a UserRepository backed by the provided pgxpool.Pool and initialized SQLC queries.
 func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 	return &UserRepository{pool: pool, queries: New(pool)}
 }
@@ -177,7 +180,7 @@ type ChatRepository struct {
 	queries *Queries
 }
 
-// NewChatRepository creates a ChatRepository.
+// NewChatRepository creates a ChatRepository using the provided pgxpool.Pool and initializes the SQLC queries.
 func NewChatRepository(pool *pgxpool.Pool) *ChatRepository {
 	return &ChatRepository{pool: pool, queries: New(pool)}
 }
@@ -208,7 +211,7 @@ type ActivityRepository struct {
 	queries *Queries
 }
 
-// NewActivityRepository creates an ActivityRepository.
+// NewActivityRepository returns an ActivityRepository that uses the provided pgxpool.Pool for database access.
 func NewActivityRepository(pool *pgxpool.Pool) *ActivityRepository {
 	return &ActivityRepository{pool: pool, queries: New(pool)}
 }
@@ -250,7 +253,7 @@ type TorrentRepository struct {
 	queries *Queries
 }
 
-// NewTorrentRepository creates a TorrentRepository.
+// NewTorrentRepository creates a TorrentRepository backed by the given pgxpool.Pool.
 func NewTorrentRepository(pool *pgxpool.Pool) *TorrentRepository {
 	return &TorrentRepository{pool: pool, queries: New(pool)}
 }
@@ -329,7 +332,7 @@ func (r *TorrentRepository) GetTorrentActivities(ctx context.Context, userID int
 	return result, nil
 }
 
-// derefInt64 returns 0 if n is nil, else *n.
+// derefInt64 returns 0 when n is nil and otherwise the value pointed to by n.
 func derefInt64(n *int64) int64 {
 	if n == nil {
 		return 0
@@ -347,7 +350,7 @@ type DownloadRepository struct {
 	queries *Queries
 }
 
-// NewDownloadRepository creates a DownloadRepository.
+// NewDownloadRepository constructs a DownloadRepository backed by the provided pgxpool.Pool and initialized SQLC Queries.
 func NewDownloadRepository(pool *pgxpool.Pool) *DownloadRepository {
 	return &DownloadRepository{pool: pool, queries: New(pool)}
 }
@@ -390,7 +393,7 @@ type CommandRepository struct {
 	queries *Queries
 }
 
-// NewCommandRepository creates a CommandRepository.
+// NewCommandRepository creates a CommandRepository that uses the provided pgxpool.Pool for database operations.
 func NewCommandRepository(pool *pgxpool.Pool) *CommandRepository {
 	return &CommandRepository{pool: pool, queries: New(pool)}
 }
@@ -476,7 +479,7 @@ type SettingRepository struct {
 	queries *Queries
 }
 
-// NewSettingRepository creates a SettingRepository.
+// NewSettingRepository creates a SettingRepository bound to the provided pgxpool.Pool.
 func NewSettingRepository(pool *pgxpool.Pool) *SettingRepository {
 	return &SettingRepository{pool: pool, queries: New(pool)}
 }
@@ -568,7 +571,7 @@ type KeptTorrentRepository struct {
 	queries *Queries
 }
 
-// NewKeptTorrentRepository creates a KeptTorrentRepository.
+// NewKeptTorrentRepository creates a KeptTorrentRepository backed by the provided pgxpool.Pool.
 func NewKeptTorrentRepository(pool *pgxpool.Pool) *KeptTorrentRepository {
 	return &KeptTorrentRepository{pool: pool, queries: New(pool)}
 }
@@ -722,7 +725,8 @@ func (r *KeptTorrentRepository) CountKeptByUser(ctx context.Context, userID int6
 
 // ─────────────────────────────────────────────────────────────
 // transaction helper
-// ─────────────────────────────────────────────────────────────
+// withTx begins a transaction on the provided pool, executes fn with the started transaction, rolls back if fn returns an error, and commits on success.
+// It returns the error returned by fn or any error encountered while committing the transaction.
 
 func withTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) error {
 	tx, err := pool.Begin(ctx)
