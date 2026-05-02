@@ -106,6 +106,26 @@ func (d *DatabaseConfig) GetDSN() string {
 		d.Host, d.User, d.Password, d.DBName, d.Port, d.SSLMode)
 }
 
+// Validate applies default values and validates the database configuration
+func (d *DatabaseConfig) Validate() error {
+	if d.Host == "" {
+		d.Host = "localhost"
+	}
+	if d.Port == 0 {
+		d.Port = 5432
+	}
+	if d.User == "" {
+		d.User = "postgres"
+	}
+	if d.DBName == "" {
+		return fmt.Errorf("database name is required")
+	}
+	if d.SSLMode == "" {
+		d.SSLMode = "disable"
+	}
+	return nil
+}
+
 // Load reads configuration into a Config from the specified file or from standard locations,
 // supports overriding via environment variables prefixed with TGRD (dots replaced by underscores),
 // unmarshals the resulting configuration, and validates it before returning it or an error.
@@ -220,25 +240,9 @@ func (c *Config) Validate(webOnly bool) error {
 		c.App.AutoDeleteWarning.HoursBefore = 6
 	}
 
-	// Database validation - PostgreSQL settings
-	if c.Database.Host == "" {
-		c.Database.Host = "localhost"
-	}
-
-	if c.Database.Port == 0 {
-		c.Database.Port = 5432
-	}
-
-	if c.Database.User == "" {
-		c.Database.User = "postgres"
-	}
-
-	if c.Database.DBName == "" {
-		return fmt.Errorf("database name is required")
-	}
-
-	if c.Database.SSLMode == "" {
-		c.Database.SSLMode = "disable"
+	// Database validation
+	if err := c.Database.Validate(); err != nil {
+		return err
 	}
 
 	if c.Web.ListenAddr == "" {

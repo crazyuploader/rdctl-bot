@@ -20,7 +20,7 @@ var migrationsFS embed.FS
 
 // It returns an error if migrations fail, if the DSN cannot be parsed, if the pool cannot be created, or if the initial ping fails (the pool is closed on ping failure).
 func Init(dsn string) (*pgxpool.Pool, error) {
-	if err := runMigrations(dsn); err != nil {
+	if err := RunMigrations(dsn); err != nil {
 		return nil, fmt.Errorf("migrations failed: %w", err)
 	}
 
@@ -56,9 +56,9 @@ func Close(pool *pgxpool.Pool) {
 	}
 }
 
-// runMigrations applies the embedded SQL migrations to the database identified by dsn.
+// RunMigrations applies the embedded SQL migrations to the database identified by dsn.
 // It returns an error if creating the migration source or migrate instance fails, or if applying migrations fails (a "no change" result is treated as success).
-func runMigrations(dsn string) error {
+func RunMigrations(dsn string) error {
 	src, err := iofs.New(migrationsFS, "migrations")
 	if err != nil {
 		return fmt.Errorf("failed to create migration source: %w", err)
