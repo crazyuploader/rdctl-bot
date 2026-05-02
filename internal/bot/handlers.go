@@ -237,21 +237,30 @@ func (b *Bot) handleInfoCommand(ctx context.Context, _ *bot.Bot, update *models.
 			return
 		}
 		torrentID := parts[1]
-		b.sendTorrentInfo(ctx, chatID, messageThreadID, torrentID, user, update.Message.ID, chatPK)
+		err := b.sendTorrentInfo(ctx, chatID, messageThreadID, torrentID, user, update.Message.ID, chatPK)
 
 		if user != nil {
-			if err := b.activityRepo.LogActivity(ctx, "", user.ID, chatPK, user.Username, db.ActivityTypeTorrentInfo, "info", int64(update.Message.ID), messageThreadID, true, "", map[string]any{"torrent_id": torrentID}); err != nil {
-				log.Printf("Warning: failed to log torrent info activity: %v", err)
+			if err != nil {
+				if err2 := b.activityRepo.LogActivity(ctx, "", user.ID, chatPK, user.Username, db.ActivityTypeTorrentInfo, "info", int64(update.Message.ID), messageThreadID, false, err.Error(), map[string]any{"torrent_id": torrentID}); err2 != nil {
+					log.Printf("Warning: failed to log torrent info activity error: %v", err2)
+				}
+				if err2 := b.commandRepo.LogCommand(ctx, user.ID, chatPK, user.Username, "info", update.Message.Text, int64(update.Message.ID), messageThreadID, time.Since(startTime).Milliseconds(), false, err.Error(), 0); err2 != nil {
+					log.Printf("Warning: failed to log info command error: %v", err2)
+				}
+			} else {
+				if err2 := b.activityRepo.LogActivity(ctx, "", user.ID, chatPK, user.Username, db.ActivityTypeTorrentInfo, "info", int64(update.Message.ID), messageThreadID, true, "", map[string]any{"torrent_id": torrentID}); err2 != nil {
+					log.Printf("Warning: failed to log torrent info activity: %v", err2)
+				}
+				if err2 := b.commandRepo.LogCommand(ctx, user.ID, chatPK, user.Username, "info", update.Message.Text, int64(update.Message.ID), messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0); err2 != nil {
+					log.Printf("Warning: failed to log info command success: %v", err2)
+				} // Response length logged in sendTorrentInfo
 			}
-			if err := b.commandRepo.LogCommand(ctx, user.ID, chatPK, user.Username, "info", update.Message.Text, int64(update.Message.ID), messageThreadID, time.Since(startTime).Milliseconds(), true, "", 0); err != nil {
-				log.Printf("Warning: failed to log info command success: %v", err)
-			} // Response length logged in sendTorrentInfo
 		}
 	})
 }
 
 // sendTorrentInfo sends detailed torrent information
-func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID int, torrentID string, user *db.User, messageID int, chatPK int64) {
+func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID int, torrentID string, user *db.User, messageID int, chatPK int64) error {
 	torrent, err := b.rdClient.GetTorrentInfo(torrentID)
 	if err != nil {
 		text := fmt.Sprintf("<b>[ERROR]</b> Could not retrieve torrent info: %s", html.EscapeString(err.Error()))
@@ -261,7 +270,7 @@ func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID
 				log.Printf("Warning: failed to log torrent info error: %v", err)
 			}
 		}
-		return
+		return err
 	}
 
 	status := realdebrid.FormatStatus(torrent.Status)
@@ -293,6 +302,7 @@ func (b *Bot) sendTorrentInfo(ctx context.Context, chatID int64, messageThreadID
 			log.Printf("Warning: failed to log torrent info success: %v", err)
 		}
 	}
+	return nil
 }
 
 // handleDeleteCommand handles the /delete command

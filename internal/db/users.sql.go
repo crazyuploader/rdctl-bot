@@ -13,7 +13,7 @@ import (
 
 const banUser = `-- name: BanUser :exec
 UPDATE users SET is_allowed = false, ban_reason = $2, banned_at = $3, updated_at = $4
-WHERE user_id = $1
+WHERE user_id = $1 AND deleted_at IS NULL
 `
 
 type BanUserParams struct {
@@ -98,7 +98,7 @@ func (q *Queries) GetUserByUserID(ctx context.Context, userID int64) (Users, err
 }
 
 const incrementUserCommands = `-- name: IncrementUserCommands :exec
-UPDATE users SET total_commands = total_commands + 1 WHERE user_id = $1
+UPDATE users SET total_commands = total_commands + 1 WHERE user_id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) IncrementUserCommands(ctx context.Context, userID int64) error {
@@ -107,7 +107,7 @@ func (q *Queries) IncrementUserCommands(ctx context.Context, userID int64) error
 }
 
 const incrementUserDownloads = `-- name: IncrementUserDownloads :exec
-UPDATE users SET total_downloads = total_downloads + 1 WHERE user_id = $1
+UPDATE users SET total_downloads = total_downloads + 1 WHERE user_id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) IncrementUserDownloads(ctx context.Context, userID int64) error {
@@ -116,7 +116,7 @@ func (q *Queries) IncrementUserDownloads(ctx context.Context, userID int64) erro
 }
 
 const incrementUserTorrents = `-- name: IncrementUserTorrents :exec
-UPDATE users SET total_torrents_added = total_torrents_added + 1 WHERE user_id = $1
+UPDATE users SET total_torrents_added = total_torrents_added + 1 WHERE user_id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) IncrementUserTorrents(ctx context.Context, userID int64) error {
@@ -158,7 +158,7 @@ func (q *Queries) LockUserForUpdate(ctx context.Context, userID int64) (Users, e
 
 const unbanUser = `-- name: UnbanUser :exec
 UPDATE users SET is_allowed = true, ban_reason = NULL, banned_at = NULL, updated_at = $2
-WHERE user_id = $1
+WHERE user_id = $1 AND deleted_at IS NULL
 `
 
 type UnbanUserParams struct {

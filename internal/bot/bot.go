@@ -313,20 +313,25 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 		chatPK = chat.ID
 	}
 
-	user, err := b.userRepo.GetOrCreateUser(ctx, userID, username, firstName, lastName, languageCode, isBot, isPremium, isSuperAdmin)
-	if err != nil {
-		log.Printf("Error getting/creating user: %v", err)
-		if chatID != 0 {
-			if err2 := b.middleware.WaitForRateLimit(); err2 != nil {
-				log.Printf("Rate limit error: %v", err2)
+	var user *db.User
+	if userID != 0 {
+		user, err = b.userRepo.GetOrCreateUser(ctx, userID, username, firstName, lastName, languageCode, isBot, isPremium, isSuperAdmin)
+		if err != nil {
+			log.Printf("Error getting/creating user: %v", err)
+			if chatID != 0 {
+				if err2 := b.middleware.WaitForRateLimit(); err2 != nil {
+					log.Printf("Rate limit error: %v", err2)
+				}
+				_, _ = b.api.SendMessage(ctx, &bot.SendMessageParams{
+					ChatID:          chatID,
+					Text:            "[ERROR] An internal error occurred. Please try again later.",
+					MessageThreadID: messageThreadID,
+				})
 			}
-			_, _ = b.api.SendMessage(ctx, &bot.SendMessageParams{
-				ChatID:          chatID,
-				Text:            "[ERROR] An internal error occurred. Please try again later.",
-				MessageThreadID: messageThreadID,
-			})
+			return
 		}
-		return
+	} else {
+		log.Printf("Warning: missing user ID in update, skipping user tracking")
 	}
 
 	if !isAllowed {

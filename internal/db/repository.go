@@ -229,6 +229,9 @@ func NewActivityRepository(pool *pgxpool.Pool) *ActivityRepository {
 
 // LogActivity logs a general activity.
 func (r *ActivityRepository) LogActivity(ctx context.Context, requestID string, userID int64, chatID int64, username string, activityType ActivityType, command string, messageID int64, messageThreadID int, success bool, errorMsg string, metadata map[string]interface{}) error {
+	if metadata == nil {
+		metadata = make(map[string]interface{})
+	}
 	metaJSON, err := json.Marshal(metadata)
 	if err != nil {
 		metaJSON = []byte("{}")
