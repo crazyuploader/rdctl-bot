@@ -83,6 +83,14 @@ The bot also supports direct message handling:
 			fmt.Printf("Git commit: %s\n", GitCommit)
 		},
 	}
+
+	// Migrate command
+	migrateCmd = &cobra.Command{
+		Use:   "migrate",
+		Short: "Run database migrations and exit",
+		Long:  "Connects to the configured PostgreSQL database, runs all pending migrations, and exits",
+		Run:   runMigrate,
+	}
 )
 
 // init configures CLI flags, binds them to viper configuration keys, and registers subcommands.
@@ -111,6 +119,7 @@ func init() {
 
 	// Add subcommands
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(migrateCmd)
 }
 
 // initConfig sets Viper's configuration file to the path provided in the
@@ -130,7 +139,8 @@ func main() {
 }
 
 // runBot executes the main lifecycle: loads configuration, starts the bot and web server,
-// and manages graceful shutdown with a configurable timeout.
+// runBot loads and validates configuration, initializes and starts the database, web server, and (unless disabled) the Telegram bot, and manages graceful shutdown using the CLI-configurable timeout.
+// It reads flags from cmd: --web-only (disable Telegram bot), --validate-config (validate configuration and exit), and --shutdown-timeout (graceful shutdown timeout). The args parameter is unused.
 func runBot(cmd *cobra.Command, args []string) {
 	// Load configuration
 	cfg, err := config.Load(cfgFile)
@@ -299,13 +309,8 @@ func runBot(cmd *cobra.Command, args []string) {
 			// Stop token store cleanup even in web-only mode
 			tokenStore.Stop()
 			// Close database explicitly when bot is not running
-			if sqlDB, err := database.DB(); err == nil {
-				if err := sqlDB.Close(); err != nil {
-					log.Printf("Error closing database: %v", err)
-				} else {
-					log.Println("Database connection closed")
-				}
-			}
+			db.Close(database)
+			log.Println("Database connection closed")
 		}
 
 		log.Println("Cleanup completed")
@@ -320,4 +325,30 @@ func runBot(cmd *cobra.Command, args []string) {
 	}
 
 	log.Println("Exited successfully")
+}
+
+// runMigrate connects to the database and applies all pending migrations, then exits.
+func runMigrate(cmd *cobra.Command, args []string) {
+	// Load configuration
+	cfg, err := config.Load(cfgFile)
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
+	// Setup logging
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.SetOutput(os.Stdout)
+	log.Println("Configuration loaded successfully")
+
+	// Apply database defaults and validate (skipping full cfg.Validate() to avoid RD/Telegram checks)
+	if err := cfg.Database.Validate(); err != nil {
+		log.Fatalf("Invalid database configuration: %v", err)
+	}
+	log.Printf("Connecting to database: %s:%d/%s", cfg.Database.Host, cfg.Database.Port, cfg.Database.DBName)
+
+	if err := db.RunMigrations(cfg.Database.GetDSN()); err != nil {
+		log.Fatalf("Migrations failed: %v", err)
+	}
+
+	log.Println("Migrations applied successfully!")
 }

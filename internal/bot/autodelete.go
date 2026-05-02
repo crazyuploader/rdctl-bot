@@ -31,14 +31,14 @@ const (
 
 // handleAutoDeleteCommand handles the /autodelete command (superadmin only)
 func (b *Bot) handleAutoDeleteCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
-	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
+	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, chatPK int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
 		startTime := time.Now()
 		b.middleware.LogCommand(update, "autodelete")
 
 		if !isSuperAdmin {
 			b.sendHTMLMessage(ctx, chatID, messageThreadID, "<b>[ERROR]</b> Access Denied. This command is for superadmins only.", update.Message.ID)
 			if user != nil {
-				if err := b.commandRepo.LogCommand(ctx, user.ID, chatID, user.Username, "autodelete", update.Message.Text, messageThreadID, time.Since(startTime).Milliseconds(), false, "Unauthorized - not superadmin", 0); err != nil {
+				if err := b.commandRepo.LogCommand(ctx, user.ID, chatPK, user.Username, "autodelete", update.Message.Text, int64(update.Message.ID), messageThreadID, time.Since(startTime).Milliseconds(), false, "Unauthorized - not superadmin", 0); err != nil {
 					log.Printf("Warning: failed to log unauthorized autodelete command: %v", err)
 				}
 			}
@@ -88,7 +88,7 @@ func (b *Bot) handleAutoDeleteCommand(ctx context.Context, _ *bot.Bot, update *m
 				)
 			}
 			b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
-			b.logCommandHelper(ctx, user, chatID, messageThreadID, "autodelete", update.Message.Text, startTime, true, "", len(text))
+			b.logCommandHelper(ctx, user, chatPK, int64(update.Message.ID), messageThreadID, "autodelete", update.Message.Text, startTime, true, "", len(text))
 			return
 		}
 
@@ -97,15 +97,15 @@ func (b *Bot) handleAutoDeleteCommand(ctx context.Context, _ *bot.Bot, update *m
 		days, err := strconv.Atoi(daysStr)
 		if err != nil || days < 0 || days > maxAutoDeleteDays {
 			b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Please provide a valid number of days (0 to %d).", maxAutoDeleteDays), update.Message.ID)
-			b.logCommandHelper(ctx, user, chatID, messageThreadID, "autodelete", update.Message.Text, startTime, false, "Invalid days value", 0)
+			b.logCommandHelper(ctx, user, chatPK, int64(update.Message.ID), messageThreadID, "autodelete", update.Message.Text, startTime, false, "Invalid days value", 0)
 			return
 		}
 
 		// Save setting to DB
-		if err := b.settingRepo.SetSettingWithAudit(ctx, settingAutoDeleteDays, strconv.Itoa(days), user.UserID, chatID); err != nil {
+		if err := b.settingRepo.SetSettingWithAudit(ctx, settingAutoDeleteDays, strconv.Itoa(days), user.UserID, chatPK); err != nil {
 			text := fmt.Sprintf("<b>[ERROR]</b> Failed to save setting: %s", html.EscapeString(err.Error()))
 			b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
-			b.logCommandHelper(ctx, user, chatID, messageThreadID, "autodelete", update.Message.Text, startTime, false, err.Error(), 0)
+			b.logCommandHelper(ctx, user, chatPK, int64(update.Message.ID), messageThreadID, "autodelete", update.Message.Text, startTime, false, err.Error(), 0)
 			return
 		}
 
@@ -122,7 +122,7 @@ func (b *Bot) handleAutoDeleteCommand(ctx context.Context, _ *bot.Bot, update *m
 		}
 
 		b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
-		b.logCommandHelper(ctx, user, chatID, messageThreadID, "autodelete", update.Message.Text, startTime, true, "", len(text))
+		b.logCommandHelper(ctx, user, chatPK, int64(update.Message.ID), messageThreadID, "autodelete", update.Message.Text, startTime, true, "", len(text))
 	})
 }
 

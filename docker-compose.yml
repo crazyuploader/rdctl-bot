@@ -17,7 +17,7 @@ services:
   #     retries: 5
 
   rdctl-bot:
-    build: https://github.com/crazyuploader/rdctl-bot.git#main
+    image: ghcr.io/crazyuploader/rdctl-bot:main
     container_name: rdctl-bot
     volumes:
       - ./config.yaml:/app/config.yaml

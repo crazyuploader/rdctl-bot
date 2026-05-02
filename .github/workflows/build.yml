@@ -1,15 +1,21 @@
-name: Go Build
+name: Go Build & Test
 
 on:
   push:
   pull_request:
+  workflow_call:
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+
+    permissions:
+      contents: read
+
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+
     steps:
       - uses: actions/checkout@v6
 
@@ -19,11 +25,11 @@ jobs:
           go-version: "1.26.2"
           cache: true
 
-      - name: Download Go modules
-        run: go mod download
-
-      - name: Run Go vet
-        run: go vet -v ./...
+      - name: go vet
+        run: go vet ./...
 
       - name: Build
         run: go build -v ./cmd/rdctl-bot
+
+      - name: Test
+        run: go test ./...

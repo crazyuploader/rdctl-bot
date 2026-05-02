@@ -7,440 +7,682 @@ import (
 	"fmt"
 	"time"
 
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// UserRepository handles user operations
+// toPgtypeTimestamptz converts t to a pgtype.Timestamptz with the time normalized to UTC and Valid set to true.
+func toPgtypeTimestamptz(t time.Time) pgtype.Timestamptz {
+	return pgtype.Timestamptz{Time: t.UTC(), Valid: true}
+}
+
+// toPgtypeDate converts t to a pgtype.Date (calendar date only, no time).
+func toPgtypeDate(t time.Time) pgtype.Date {
+	y, m, d := t.UTC().Date()
+	return pgtype.Date{Time: time.Date(y, m, d, 0, 0, 0, 0, time.UTC), Valid: true}
+}
+
+// strPtr returns a pointer to s or nil when s is an empty string.
+func strPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// int64Ptr returns a pointer to n, or nil when n is zero.
+func int64Ptr(n int64) *int64 {
+	if n == 0 {
+		return nil
+	}
+	return &n
+}
+
+// toUserPublic maps a sqlc Users row to a public User value.
+// It converts nullable string fields using derefStr and copies nullable timestamp fields into the corresponding time.Time fields only when they are valid, returning a pointer to the constructed User.
+func toUserPublic(u Users) *User {
+	pub := &User{
+		ID:            u.ID,
+		UserID:        u.UserID,
+		Username:      derefStr(u.Username),
+		FirstName:     derefStr(u.FirstName),
+		LastName:      derefStr(u.LastName),
+		IsSuperAdmin:  u.IsSuperAdmin,
+		IsAllowed:     u.IsAllowed,
+		TotalCommands: u.TotalCommands,
+	}
+	if u.FirstSeenAt.Valid {
+		pub.FirstSeenAt = u.FirstSeenAt.Time
+	}
+	if u.LastSeenAt.Valid {
+		pub.LastSeenAt = u.LastSeenAt.Time
+	}
+	if u.CreatedAt.Valid {
+		pub.CreatedAt = u.CreatedAt.Time
+	}
+	if u.UpdatedAt.Valid {
+		pub.UpdatedAt = u.UpdatedAt.Time
+	}
+	return pub
+}
+
+// toChatPublic converts a sqlc Chats row to a public *Chat, mapping nullable string and timestamp fields to their public representations.
+// Title and Type are dereferenced from nullable strings; CreatedAt and UpdatedAt are set only when the corresponding nullable timestamps are valid.
+func toChatPublic(c Chats) *Chat {
+	pub := &Chat{
+		ID:     c.ID,
+		ChatID: c.ChatID,
+		Title:  derefStr(c.Title),
+		Type:   derefStr(c.Type),
+	}
+	if c.CreatedAt.Valid {
+		pub.CreatedAt = c.CreatedAt.Time
+	}
+	if c.UpdatedAt.Valid {
+		pub.UpdatedAt = c.UpdatedAt.Time
+	}
+	return pub
+}
+
+// toSettingAuditPublic converts a sqlc SettingAudits row into a public SettingAudit, mapping nullable string and timestamp fields to their concrete equivalents.
+func toSettingAuditPublic(a SettingAudits) SettingAudit {
+	pub := SettingAudit{
+		ID:        a.ID,
+		Key:       a.Key,
+		OldValue:  derefStr(a.OldValue),
+		NewValue:  derefStr(a.NewValue),
+		ChangedBy: a.ChangedBy,
+		ChatID:    a.ChatID,
+	}
+	if a.ChangedAt.Valid {
+		pub.ChangedAt = a.ChangedAt.Time
+	}
+	return pub
+}
+
+// toKeptTorrentPublic converts a ListKeptTorrentsRow into a KeptTorrent, mapping nested user fields and setting KeptAt when the source timestamp is valid.
+func toKeptTorrentPublic(row ListKeptTorrentsRow) KeptTorrent {
+	kt := KeptTorrent{
+		ID:        row.ID,
+		TorrentID: row.TorrentID,
+		Filename:  derefStr(row.Filename),
+		KeptByID:  row.KeptByID,
+		User: KeptTorrentUser{
+			ID:        row.UserIDPk,
+			UserID:    row.UserUserID,
+			Username:  derefStr(row.UserUsername),
+			FirstName: derefStr(row.UserFirstName),
+			LastName:  derefStr(row.UserLastName),
+		},
+	}
+	if row.KeptAt.Valid {
+		kt.KeptAt = row.KeptAt.Time
+	}
+	return kt
+}
+
+// toFloat64FromNumeric converts a pgtype.Numeric to a float64 and returns 0 when the numeric is not valid.
+func toFloat64FromNumeric(n pgtype.Numeric) float64 {
+	if !n.Valid {
+		return 0
+	}
+	f, _ := n.Float64Value()
+	return f.Float64
+}
+
+// toNumericFromFloat64 converts a float64 to a pgtype.Numeric.
+// On scan failure it returns an invalid (zero) pgtype.Numeric.
+func toNumericFromFloat64(f float64) pgtype.Numeric {
+	var n pgtype.Numeric
+	if err := n.Scan(fmt.Sprintf("%g", f)); err != nil {
+		return pgtype.Numeric{}
+	}
+	return n
+}
+
+// ─────────────────────────────────────────────────────────────
+// UserRepository
+// ─────────────────────────────────────────────────────────────
+
+// UserRepository handles user operations.
 type UserRepository struct {
-	db *gorm.DB
+	pool    *pgxpool.Pool
+	queries *Queries
 }
 
-// NewUserRepository creates a UserRepository using the provided gorm.DB.
-func NewUserRepository(db *gorm.DB) *UserRepository {
-	return &UserRepository{db: db}
+// NewUserRepository returns a UserRepository backed by the provided pgxpool.Pool and initialized SQLC queries.
+func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
+	return &UserRepository{pool: pool, queries: New(pool)}
 }
 
-// GetOrCreateUser gets or creates a user based on their Telegram user ID
-func (r *UserRepository) GetOrCreateUser(ctx context.Context, userID int64, username, firstName, lastName string, isSuperAdmin bool) (*User, error) {
+// GetOrCreateUser upserts a user and returns the current record.
+func (r *UserRepository) GetOrCreateUser(ctx context.Context, userID int64, username, firstName, lastName, languageCode string, isBot, isPremium, isSuperAdmin bool) (*User, error) {
 	now := time.Now().UTC()
-	user := User{
+	u, err := r.queries.UpsertUser(ctx, UpsertUserParams{
 		UserID:       userID,
-		Username:     username,
-		FirstName:    firstName,
-		LastName:     lastName,
+		Username:     strPtr(username),
+		FirstName:    strPtr(firstName),
+		LastName:     strPtr(lastName),
+		LanguageCode: strPtr(languageCode),
+		IsBot:        isBot,
+		IsPremium:    isPremium,
 		IsSuperAdmin: isSuperAdmin,
-		FirstSeenAt:  now,
-		LastSeenAt:   now,
-	}
-
-	// Use clause.OnConflict to perform an upsert based on user_id
-	result := r.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "user_id"}},
-		DoUpdates: clause.Assignments(map[string]any{
-			"username":       username,
-			"first_name":     firstName,
-			"last_name":      lastName,
-			"is_super_admin": isSuperAdmin,
-			"last_seen_at":   now,
-		}),
-	}).Create(&user)
-
-	if result.Error != nil {
-		return nil, result.Error
-	}
-
-	// Retrieve the user to ensure all fields are current
-	var updatedUser User
-	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&updatedUser).Error; err != nil {
+		FirstSeenAt:  toPgtypeTimestamptz(now),
+		LastSeenAt:   toPgtypeTimestamptz(now),
+		CreatedAt:    toPgtypeTimestamptz(now),
+		UpdatedAt:    toPgtypeTimestamptz(now),
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	return &updatedUser, nil
+	return toUserPublic(u), nil
 }
 
-// ChatRepository handles chat operations
+// ─────────────────────────────────────────────────────────────
+// ChatRepository
+// ─────────────────────────────────────────────────────────────
+
+// ChatRepository handles chat operations.
 type ChatRepository struct {
-	db *gorm.DB
+	pool    *pgxpool.Pool
+	queries *Queries
 }
 
-// NewChatRepository creates a ChatRepository using the provided gorm.DB.
-func NewChatRepository(db *gorm.DB) *ChatRepository {
-	return &ChatRepository{db: db}
+// NewChatRepository creates a ChatRepository using the provided pgxpool.Pool and initializes the SQLC queries.
+func NewChatRepository(pool *pgxpool.Pool) *ChatRepository {
+	return &ChatRepository{pool: pool, queries: New(pool)}
 }
 
-// GetOrCreateChat gets or creates a chat based on its Telegram chat ID
-func (r *ChatRepository) GetOrCreateChat(ctx context.Context, chatID int64, title, chatType string) (*Chat, error) {
+// GetOrCreateChat upserts a chat and returns the current record.
+func (r *ChatRepository) GetOrCreateChat(ctx context.Context, chatID int64, title, username, chatType string, isForum bool) (*Chat, error) {
 	now := time.Now().UTC()
-	chat := Chat{
+	c, err := r.queries.UpsertChat(ctx, UpsertChatParams{
 		ChatID:    chatID,
-		Title:     title,
-		Type:      chatType,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-
-	result := r.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "chat_id"}},
-		DoUpdates: clause.Assignments(map[string]any{
-			"title":      title,
-			"type":       chatType,
-			"updated_at": now,
-		}),
-	}).Create(&chat)
-
-	if result.Error != nil {
-		return nil, result.Error
-	}
-
-	var updatedChat Chat
-	if err := r.db.WithContext(ctx).Where("chat_id = ?", chatID).First(&updatedChat).Error; err != nil {
+		Title:     strPtr(title),
+		Username:  strPtr(username),
+		Type:      strPtr(chatType),
+		IsForum:   isForum,
+		CreatedAt: toPgtypeTimestamptz(now),
+		UpdatedAt: toPgtypeTimestamptz(now),
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	return &updatedChat, nil
+	return toChatPublic(c), nil
 }
 
-// ActivityRepository handles activity logging
+// ─────────────────────────────────────────────────────────────
+// ActivityRepository
+// ─────────────────────────────────────────────────────────────
+
+// ActivityRepository handles activity logging.
 type ActivityRepository struct {
-	db *gorm.DB
+	pool    *pgxpool.Pool
+	queries *Queries
 }
 
-// NewActivityRepository returns a new ActivityRepository using the provided GORM DB handle.
-func NewActivityRepository(db *gorm.DB) *ActivityRepository {
-	return &ActivityRepository{db: db}
+// NewActivityRepository returns an ActivityRepository that uses the provided pgxpool.Pool for database access.
+func NewActivityRepository(pool *pgxpool.Pool) *ActivityRepository {
+	return &ActivityRepository{pool: pool, queries: New(pool)}
 }
 
-// LogActivity logs a general activity
-func (r *ActivityRepository) LogActivity(ctx context.Context, requestID string, userID uint, chatID int64, username string, activityType ActivityType, command string, messageThreadID int, success bool, errorMsg string, metadata map[string]interface{}) error {
-	metadataJSON, err := json.Marshal(metadata)
-	if err != nil {
-		metadataJSON = []byte("{}")
+// LogActivity logs a general activity.
+func (r *ActivityRepository) LogActivity(ctx context.Context, requestID string, userID int64, chatID int64, username string, activityType ActivityType, command string, messageID int64, messageThreadID int, success bool, errorMsg string, metadata map[string]interface{}) error {
+	if metadata == nil {
+		metadata = make(map[string]interface{})
 	}
-
-	activity := ActivityLog{
-		RequestID:       requestID,
+	metaJSON, err := json.Marshal(metadata)
+	if err != nil {
+		metaJSON = []byte("{}")
+	}
+	raw := json.RawMessage(metaJSON)
+	var threadID *int64
+	if messageThreadID != 0 {
+		tid := int64(messageThreadID)
+		threadID = &tid
+	}
+	return r.queries.InsertActivityLog(ctx, InsertActivityLogParams{
+		RequestID:       strPtr(requestID),
 		UserID:          userID,
 		ChatID:          chatID,
-		Username:        username,
-		ActivityType:    activityType,
-		Command:         command,
-		MessageThreadID: messageThreadID,
+		Username:        strPtr(username),
+		ActivityType:    string(activityType),
+		Command:         strPtr(command),
+		MessageID:       int64Ptr(messageID),
+		MessageThreadID: threadID,
 		Success:         success,
-		ErrorMessage:    errorMsg,
-		Metadata:        string(metadataJSON),
-		CreatedAt:       time.Now().UTC(),
-	}
-
-	return r.db.WithContext(ctx).Create(&activity).Error
+		ErrorMessage:    strPtr(errorMsg),
+		Metadata:        raw,
+		CreatedAt:       toPgtypeTimestamptz(time.Now().UTC()),
+	})
 }
 
-// TorrentRepository handles torrent activity logging
+// ─────────────────────────────────────────────────────────────
+// TorrentRepository
+// ─────────────────────────────────────────────────────────────
+
+// TorrentRepository handles torrent activity logging.
 type TorrentRepository struct {
-	db *gorm.DB
+	pool    *pgxpool.Pool
+	queries *Queries
 }
 
-// NewTorrentRepository creates and returns a TorrentRepository backed by the provided gorm.DB.
-func NewTorrentRepository(db *gorm.DB) *TorrentRepository {
-	return &TorrentRepository{db: db}
+// NewTorrentRepository creates a TorrentRepository backed by the given pgxpool.Pool.
+func NewTorrentRepository(pool *pgxpool.Pool) *TorrentRepository {
+	return &TorrentRepository{pool: pool, queries: New(pool)}
 }
 
-// LogTorrentActivity logs torrent-specific activity
-func (r *TorrentRepository) LogTorrentActivity(ctx context.Context, requestID string, userID uint, chatID int64, torrentID, torrentHash, torrentName, magnetLink, action, status string, fileSize int64, progress float64, success bool, errorMsg string, metadata map[string]interface{}) error {
-	// Ensure metadata is never nil
+// LogTorrentActivity logs a torrent-specific activity.
+// When action=="add" and success==true, also increments daily and user torrent counters.
+func (r *TorrentRepository) LogTorrentActivity(ctx context.Context, requestID string, userID int64, chatID int64, torrentID, torrentHash, torrentName, magnetLink, action, status string, fileSize int64, progress float64, success bool, errorMsg string, metadata map[string]interface{}) error {
 	if metadata == nil {
 		metadata = make(map[string]interface{})
 	}
-	metadataJSON, err := json.Marshal(metadata)
+	metaJSON, err := json.Marshal(metadata)
 	if err != nil {
-		metadataJSON = []byte("{}")
+		metaJSON = []byte("{}")
 	}
-
-	// Ensure selected_files has valid default JSON array
-	selectedFiles := "[]"
-
-	activity := TorrentActivity{
-		RequestID:     requestID,
-		UserID:        userID,
-		ChatID:        chatID,
-		TorrentID:     torrentID,
-		TorrentHash:   torrentHash,
-		TorrentName:   torrentName,
-		MagnetLink:    magnetLink,
-		Action:        action,
-		Status:        status,
-		FileSize:      fileSize,
-		Progress:      progress,
-		Success:       success,
-		ErrorMessage:  errorMsg,
-		Metadata:      string(metadataJSON),
-		SelectedFiles: selectedFiles,
-		CreatedAt:     time.Now().UTC(),
-	}
-
-	return r.db.WithContext(ctx).Create(&activity).Error
-}
-
-// GetTorrentActivities retrieves torrent activities with filters
-func (r *TorrentRepository) GetTorrentActivities(ctx context.Context, userID uint, limit int) ([]TorrentActivity, error) {
-	var activities []TorrentActivity
-	query := r.db.WithContext(ctx).Order("created_at DESC")
-
-	if userID > 0 {
-		query = query.Where("user_id = ?", userID)
-	}
-
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
-
-	err := query.Find(&activities).Error
-	return activities, err
-}
-
-// DownloadRepository handles download activity logging
-type DownloadRepository struct {
-	db *gorm.DB
-}
-
-// NewDownloadRepository creates a DownloadRepository backed by the provided gorm.DB.
-func NewDownloadRepository(db *gorm.DB) *DownloadRepository {
-	return &DownloadRepository{db: db}
-}
-
-// LogDownloadActivity logs download/unrestrict activity with optional torrent association
-func (r *DownloadRepository) LogDownloadActivity(ctx context.Context, requestID string, userID uint, chatID int64, downloadID, originalLink, fileName, host, action string, fileSize int64, success bool, errorMsg string, metadata map[string]interface{}, torrentActivityID *uint) error {
-	// Ensure metadata is never nil
-	if metadata == nil {
-		metadata = make(map[string]interface{})
-	}
-	metadataJSON, err := json.Marshal(metadata)
-	if err != nil {
-		metadataJSON = []byte("{}")
-	}
-
-	activity := DownloadActivity{
-		RequestID:         requestID,
-		UserID:            userID,
-		ChatID:            chatID,
-		DownloadID:        downloadID,
-		OriginalLink:      originalLink,
-		FileName:          fileName,
-		FileSize:          fileSize,
-		Host:              host,
-		Action:            action,
-		Success:           success,
-		ErrorMessage:      errorMsg,
-		Metadata:          string(metadataJSON),
-		CreatedAt:         time.Now().UTC(),
-		TorrentActivityID: torrentActivityID,
-	}
-
-	return r.db.WithContext(ctx).Create(&activity).Error
-}
-
-// CommandRepository handles command logging
-type CommandRepository struct {
-	db *gorm.DB
-}
-
-// NewCommandRepository creates a new CommandRepository backed by the provided GORM DB handle.
-func NewCommandRepository(db *gorm.DB) *CommandRepository {
-	return &CommandRepository{db: db}
-}
-
-// LogCommand logs command execution and atomically increments the user's total_commands counter.
-func (r *CommandRepository) LogCommand(ctx context.Context, userID uint, chatID int64, username, command, fullCommand string, messageThreadID int, executionTime int64, success bool, errorMsg string, responseLength int) error {
-	cmdLog := CommandLog{
-		UserID:          userID,
-		ChatID:          chatID,
-		Username:        username,
-		Command:         command,
-		FullCommand:     fullCommand,
-		MessageThreadID: messageThreadID,
-		ExecutionTime:   executionTime,
-		Success:         success,
-		ErrorMessage:    errorMsg,
-		ResponseLength:  responseLength,
-		CreatedAt:       time.Now().UTC(),
-	}
-
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Create the command log within the transaction
-		if err := tx.Create(&cmdLog).Error; err != nil {
+	today := toPgtypeDate(time.Now())
+	return withTx(ctx, r.pool, func(tx pgx.Tx) error {
+		q := New(tx)
+		if err := q.InsertTorrentActivity(ctx, InsertTorrentActivityParams{
+			RequestID:     strPtr(requestID),
+			UserID:        userID,
+			ChatID:        chatID,
+			TorrentID:     torrentID,
+			TorrentHash:   strPtr(torrentHash),
+			TorrentName:   strPtr(torrentName),
+			MagnetLink:    strPtr(magnetLink),
+			Action:        action,
+			Status:        strPtr(status),
+			FileSize:      int64Ptr(fileSize),
+			Progress:      toNumericFromFloat64(progress),
+			Success:       success,
+			ErrorMessage:  strPtr(errorMsg),
+			Metadata:      json.RawMessage(metaJSON),
+			CreatedAt:     toPgtypeTimestamptz(time.Now().UTC()),
+			SelectedFiles: json.RawMessage("[]"),
+		}); err != nil {
 			return err
 		}
-
-		// Atomically increment total_commands for the user
-		if err := tx.Model(&User{}).Where("id = ?", userID).UpdateColumn("total_commands", gorm.Expr("total_commands + ?", 1)).Error; err != nil {
-			return err
+		if action == "add" && success {
+			if err := q.IncrementUserTorrents(ctx, userID); err != nil {
+				return err
+			}
+			if err := q.IncrementDailyTorrent(ctx, today); err != nil {
+				return err
+			}
+			return q.IncrementUserDailyTorrent(ctx, IncrementUserDailyTorrentParams{StatDate: today, UserID: userID})
 		}
-
 		return nil
 	})
 }
 
-// GetUserStats retrieves user statistics
-func (r *CommandRepository) GetUserStats(ctx context.Context, userID uint) (map[string]interface{}, error) {
-	var user User
-	err := r.db.WithContext(ctx).First(&user, userID).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, errors.New("user not found")
+// GetTorrentActivities retrieves torrent activities.  If userID == 0, all activities are returned.
+func (r *TorrentRepository) GetTorrentActivities(ctx context.Context, userID int64, limit int) ([]TorrentActivity, error) {
+	lim := int32(limit)
+	if lim <= 0 {
+		lim = 100
 	}
+
+	var rows []TorrentActivities
+	var err error
+
+	if userID > 0 {
+		rows, err = r.queries.GetTorrentActivities(ctx, GetTorrentActivitiesParams{
+			UserID: userID,
+			Limit:  lim,
+		})
+	} else {
+		rows, err = r.queries.GetAllTorrentActivities(ctx, lim)
+	}
+
 	if err != nil {
 		return nil, err
 	}
-
-	var totalActivities int64
-	if res := r.db.WithContext(ctx).Model(&ActivityLog{}).Where("user_id = ?", userID).Count(&totalActivities); res.Error != nil {
-		return nil, res.Error
+	result := make([]TorrentActivity, 0, len(rows))
+	for _, row := range rows {
+		ta := TorrentActivity{
+			ID:            row.ID,
+			RequestID:     derefStr(row.RequestID),
+			UserID:        row.UserID,
+			ChatID:        row.ChatID,
+			TorrentID:     row.TorrentID,
+			TorrentHash:   derefStr(row.TorrentHash),
+			TorrentName:   derefStr(row.TorrentName),
+			MagnetLink:    derefStr(row.MagnetLink),
+			Action:        row.Action,
+			Status:        derefStr(row.Status),
+			FileSize:      derefInt64(row.FileSize),
+			Progress:      toFloat64FromNumeric(row.Progress),
+			Success:       row.Success,
+			ErrorMessage:  derefStr(row.ErrorMessage),
+			Metadata:      string(row.Metadata),
+			SelectedFiles: string(row.SelectedFiles),
+		}
+		if row.CreatedAt.Valid {
+			ta.CreatedAt = row.CreatedAt.Time
+		}
+		result = append(result, ta)
 	}
-
-	var totalTorrents int64
-	if res := r.db.WithContext(ctx).Model(&TorrentActivity{}).Where("user_id = ? AND action = ?", userID, "add").Count(&totalTorrents); res.Error != nil {
-		return nil, res.Error
-	}
-
-	var totalDownloads int64
-	if res := r.db.WithContext(ctx).Model(&DownloadActivity{}).Where("user_id = ? AND action = ?", userID, "unrestrict").Count(&totalDownloads); res.Error != nil {
-		return nil, res.Error
-	}
-
-	stats := map[string]interface{}{
-		"total_commands":   user.TotalCommands,
-		"total_activities": totalActivities,
-		"total_torrents":   totalTorrents,
-		"total_downloads":  totalDownloads,
-		"first_seen_at":    user.FirstSeenAt,
-		"last_seen_at":     user.LastSeenAt,
-	}
-
-	return stats, nil
+	return result, nil
 }
 
-// SettingRepository handles runtime configuration settings
-type SettingRepository struct {
-	db *gorm.DB
-}
-
-// NewSettingRepository creates a new SettingRepository backed by the provided GORM DB handle.
-func NewSettingRepository(db *gorm.DB) *SettingRepository {
-	return &SettingRepository{db: db}
-}
-
-// GetSetting retrieves a setting value by key. Returns empty string if not found.
-func (r *SettingRepository) GetSetting(ctx context.Context, key string) (string, error) {
-	var setting Setting
-	err := r.db.WithContext(ctx).Where("key = ?", key).First(&setting).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return "", nil
+// derefInt64 returns 0 when n is nil and otherwise the value pointed to by n.
+func derefInt64(n *int64) int64 {
+	if n == nil {
+		return 0
 	}
+	return *n
+}
+
+// ─────────────────────────────────────────────────────────────
+// DownloadRepository
+// ─────────────────────────────────────────────────────────────
+
+// DownloadRepository handles download activity logging.
+type DownloadRepository struct {
+	pool    *pgxpool.Pool
+	queries *Queries
+}
+
+// NewDownloadRepository constructs a DownloadRepository backed by the provided pgxpool.Pool and initialized SQLC Queries.
+func NewDownloadRepository(pool *pgxpool.Pool) *DownloadRepository {
+	return &DownloadRepository{pool: pool, queries: New(pool)}
+}
+
+// LogDownloadActivity logs a download/unrestrict activity.
+// When success==true, also increments daily and user download counters.
+func (r *DownloadRepository) LogDownloadActivity(ctx context.Context, requestID string, userID int64, chatID int64, downloadID, originalLink, fileName, host, action string, fileSize int64, success bool, errorMsg string, metadata map[string]interface{}, torrentActivityID *int64) error {
+	if metadata == nil {
+		metadata = make(map[string]interface{})
+	}
+	metaJSON, err := json.Marshal(metadata)
 	if err != nil {
-		return "", err
+		metaJSON = []byte("{}")
 	}
-	return setting.Value, nil
-}
-
-// SetSetting creates or updates a setting value by key.
-func (r *SettingRepository) SetSetting(ctx context.Context, key, value string) error {
-	now := time.Now().UTC()
-	setting := Setting{
-		Key:       key,
-		Value:     value,
-		UpdatedAt: now,
-	}
-	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "key"}},
-		DoUpdates: clause.Assignments(map[string]interface{}{
-			"value":      value,
-			"updated_at": now,
-		}),
-	}).Create(&setting).Error
-}
-
-// SetSettingWithAudit creates or updates a setting and logs the change
-func (r *SettingRepository) SetSettingWithAudit(ctx context.Context, key, value string, changedBy int64, chatID int64) error {
-	now := time.Now().UTC()
-	setting := Setting{
-		Key:       key,
-		Value:     value,
-		UpdatedAt: now,
-	}
-
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Read existing setting inside transaction
-		var oldSetting Setting
-		oldValue := ""
-		err := tx.Where("key = ?", key).First(&oldSetting).Error
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	raw := json.RawMessage(metaJSON)
+	today := toPgtypeDate(time.Now())
+	return withTx(ctx, r.pool, func(tx pgx.Tx) error {
+		q := New(tx)
+		if err := q.InsertDownloadActivity(ctx, InsertDownloadActivityParams{
+			RequestID:         strPtr(requestID),
+			UserID:            userID,
+			ChatID:            chatID,
+			DownloadID:        strPtr(downloadID),
+			OriginalLink:      strPtr(originalLink),
+			FileName:          strPtr(fileName),
+			FileSize:          int64Ptr(fileSize),
+			Host:              strPtr(host),
+			Action:            action,
+			Success:           success,
+			ErrorMessage:      strPtr(errorMsg),
+			Metadata:          raw,
+			CreatedAt:         toPgtypeTimestamptz(time.Now().UTC()),
+			TorrentActivityID: torrentActivityID,
+		}); err != nil {
 			return err
 		}
-		if err == nil {
-			oldValue = oldSetting.Value
+		if success {
+			if err := q.IncrementUserDownloads(ctx, userID); err != nil {
+				return err
+			}
+			if err := q.IncrementDailyDownload(ctx, today); err != nil {
+				return err
+			}
+			return q.IncrementUserDailyDownload(ctx, IncrementUserDailyDownloadParams{StatDate: today, UserID: userID})
 		}
-
-		if err := tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "key"}},
-			DoUpdates: clause.Assignments(map[string]interface{}{
-				"value":      value,
-				"updated_at": now,
-			}),
-		}).Create(&setting).Error; err != nil {
-			return err
-		}
-
-		audit := SettingAudit{
-			Key:       key,
-			OldValue:  oldValue,
-			NewValue:  value,
-			ChangedBy: changedBy,
-			ChatID:    &chatID,
-			ChangedAt: now,
-		}
-		return tx.Create(&audit).Error
+		return nil
 	})
 }
 
-// GetSettingHistory retrieves the audit history for a setting key
-func (r *SettingRepository) GetSettingHistory(ctx context.Context, key string, limit int) ([]SettingAudit, error) {
-	var audits []SettingAudit
-	query := r.db.WithContext(ctx).Where("key = ?", key).Order("changed_at DESC")
-	if limit > 0 {
-		query = query.Limit(limit)
+// ─────────────────────────────────────────────────────────────
+// CommandRepository
+// ─────────────────────────────────────────────────────────────
+
+// CommandRepository handles command logging.
+type CommandRepository struct {
+	pool    *pgxpool.Pool
+	queries *Queries
+}
+
+// NewCommandRepository creates a CommandRepository that uses the provided pgxpool.Pool for database operations.
+func NewCommandRepository(pool *pgxpool.Pool) *CommandRepository {
+	return &CommandRepository{pool: pool, queries: New(pool)}
+}
+
+// LogCommand logs a command execution and atomically increments total_commands.
+func (r *CommandRepository) LogCommand(ctx context.Context, userID int64, chatID int64, username, command, fullCommand string, messageID int64, messageThreadID int, executionTime int64, success bool, errorMsg string, responseLength int) error {
+	var threadID *int64
+	if messageThreadID != 0 {
+		tid := int64(messageThreadID)
+		threadID = &tid
 	}
-	err := query.Find(&audits).Error
-	return audits, err
+	respLen := int64(responseLength)
+
+	today := toPgtypeDate(time.Now())
+	return withTx(ctx, r.pool, func(tx pgx.Tx) error {
+		q := New(tx)
+		if err := q.InsertCommandLog(ctx, InsertCommandLogParams{
+			UserID:          userID,
+			ChatID:          chatID,
+			Username:        strPtr(username),
+			Command:         command,
+			FullCommand:     strPtr(fullCommand),
+			MessageID:       int64Ptr(messageID),
+			MessageThreadID: threadID,
+			ExecutionTime:   &executionTime,
+			Success:         success,
+			ErrorMessage:    strPtr(errorMsg),
+			ResponseLength:  &respLen,
+			CreatedAt:       toPgtypeTimestamptz(time.Now().UTC()),
+		}); err != nil {
+			return err
+		}
+		if err := q.IncrementUserCommands(ctx, userID); err != nil {
+			return err
+		}
+		if err := q.IncrementDailyCommand(ctx, IncrementDailyCommandParams{StatDate: today, Column2: success}); err != nil {
+			return err
+		}
+		return q.IncrementUserDailyCommand(ctx, IncrementUserDailyCommandParams{StatDate: today, UserID: userID})
+	})
 }
 
-// KeptTorrentRepository handles kept torrent operations
+// GetUserStats retrieves user statistics by Telegram user_id.
+// All four queries run inside a REPEATABLE READ transaction so the snapshot is
+// consistent even when concurrent writes are in flight.
+func (r *CommandRepository) GetUserStats(ctx context.Context, telegramUserID int64) (map[string]interface{}, error) {
+	var stats map[string]interface{}
+	err := withReadTx(ctx, r.pool, func(tx pgx.Tx) error {
+		q := New(tx)
+
+		u, err := q.GetUserByUserID(ctx, telegramUserID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return errors.New("user not found")
+			}
+			return err
+		}
+
+		totalActivities, err := q.CountActivitiesByUser(ctx, u.ID)
+		if err != nil {
+			return err
+		}
+		totalTorrents, err := q.CountTorrentAddsByUser(ctx, u.ID)
+		if err != nil {
+			return err
+		}
+		totalDownloads, err := q.CountDownloadsByUser(ctx, u.ID)
+		if err != nil {
+			return err
+		}
+
+		var firstSeen, lastSeen time.Time
+		if u.FirstSeenAt.Valid {
+			firstSeen = u.FirstSeenAt.Time
+		}
+		if u.LastSeenAt.Valid {
+			lastSeen = u.LastSeenAt.Time
+		}
+
+		stats = map[string]interface{}{
+			"total_commands":   u.TotalCommands,
+			"total_activities": totalActivities,
+			"total_torrents":   totalTorrents,
+			"total_downloads":  totalDownloads,
+			"first_seen_at":    firstSeen,
+			"last_seen_at":     lastSeen,
+		}
+		return nil
+	})
+	return stats, err
+}
+
+// ─────────────────────────────────────────────────────────────
+// SettingRepository
+// ─────────────────────────────────────────────────────────────
+
+// SettingRepository handles runtime configuration settings.
+type SettingRepository struct {
+	pool    *pgxpool.Pool
+	queries *Queries
+}
+
+// NewSettingRepository creates a SettingRepository bound to the provided pgxpool.Pool.
+func NewSettingRepository(pool *pgxpool.Pool) *SettingRepository {
+	return &SettingRepository{pool: pool, queries: New(pool)}
+}
+
+// GetSetting retrieves a setting value by key.  Returns "" if not found.
+func (r *SettingRepository) GetSetting(ctx context.Context, key string) (string, error) {
+	s, err := r.queries.GetSetting(ctx, key)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+	return s.Value, nil
+}
+
+// SetSetting creates or updates a setting value.
+func (r *SettingRepository) SetSetting(ctx context.Context, key, value string) error {
+	return r.queries.UpsertSetting(ctx, UpsertSettingParams{
+		Key:       key,
+		Value:     value,
+		UpdatedAt: toPgtypeTimestamptz(time.Now().UTC()),
+	})
+}
+
+// SetSettingWithAudit creates/updates a setting and writes an audit record.
+// changedByUserID is the Telegram user_id of the actor; it is resolved to the
+// internal users.id inside the transaction so the FK is consistent with all
+// other tables. chatPK is the internal chats.id (FK to chats(id)).
+func (r *SettingRepository) SetSettingWithAudit(ctx context.Context, key, value string, changedByUserID int64, chatPK int64) error {
+	now := time.Now().UTC()
+	return withTx(ctx, r.pool, func(tx pgx.Tx) error {
+		q := New(tx)
+
+		// Resolve Telegram user_id → internal users.id (consistent with all other FK references).
+		actor, err := q.GetUserByUserID(ctx, changedByUserID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("actor user %d not found", changedByUserID)
+			}
+			return fmt.Errorf("failed to load actor user %d: %w", changedByUserID, err)
+		}
+
+		// Read old value inside the transaction.
+		oldValue := ""
+		existing, err := q.GetSetting(ctx, key)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		if err == nil {
+			oldValue = existing.Value
+		}
+
+		if err := q.UpsertSetting(ctx, UpsertSettingParams{
+			Key:       key,
+			Value:     value,
+			UpdatedAt: toPgtypeTimestamptz(now),
+		}); err != nil {
+			return err
+		}
+
+		var chatIDPtr *int64
+		if chatPK != 0 {
+			chatIDPtr = &chatPK
+		}
+		return q.InsertSettingAudit(ctx, InsertSettingAuditParams{
+			Key:       key,
+			OldValue:  strPtr(oldValue),
+			NewValue:  strPtr(value),
+			ChangedBy: actor.ID,
+			ChatID:    chatIDPtr,
+			ChangedAt: toPgtypeTimestamptz(now),
+		})
+	})
+}
+
+// GetSettingHistory returns audit records for a setting key.
+func (r *SettingRepository) GetSettingHistory(ctx context.Context, key string, limit int) ([]SettingAudit, error) {
+	lim := int32(limit)
+	if lim <= 0 {
+		lim = 100
+	}
+	rows, err := r.queries.GetSettingHistory(ctx, GetSettingHistoryParams{Key: key, Limit: lim})
+	if err != nil {
+		return nil, err
+	}
+	result := make([]SettingAudit, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, toSettingAuditPublic(row))
+	}
+	return result, nil
+}
+
+// ─────────────────────────────────────────────────────────────
+// KeptTorrentRepository
+// ─────────────────────────────────────────────────────────────
+
+// KeptTorrentRepository handles kept torrent operations.
 type KeptTorrentRepository struct {
-	db *gorm.DB
+	pool    *pgxpool.Pool
+	queries *Queries
 }
 
-// NewKeptTorrentRepository creates a new KeptTorrentRepository backed by the provided gorm.DB.
-func NewKeptTorrentRepository(db *gorm.DB) *KeptTorrentRepository {
-	return &KeptTorrentRepository{db: db}
+// NewKeptTorrentRepository creates a KeptTorrentRepository backed by the provided pgxpool.Pool.
+func NewKeptTorrentRepository(pool *pgxpool.Pool) *KeptTorrentRepository {
+	return &KeptTorrentRepository{pool: pool, queries: New(pool)}
 }
 
-// KeepTorrent marks a torrent as kept (excluded from auto-delete).
-// If maxKept > 0, the limit is enforced atomically inside the transaction
-// to prevent TOCTOU races from concurrent requests.
+// KeepTorrent marks a torrent as kept.  If maxKept > 0, the limit is enforced
+// atomically inside a transaction.
 func (r *KeptTorrentRepository) KeepTorrent(ctx context.Context, torrentID, filename string, keptByID int64, maxKept int) error {
 	now := time.Now().UTC()
 
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var user User
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ?", keptByID).First(&user).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
+	return withTx(ctx, r.pool, func(tx pgx.Tx) error {
+		q := New(tx)
+
+		// Lock the user row to prevent concurrent keep races.
+		user, err := q.LockUserForUpdate(ctx, keptByID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
 				return fmt.Errorf("cannot keep torrent: actor user %d not found", keptByID)
 			}
 			return fmt.Errorf("failed to load actor user %d: %w", keptByID, err)
 		}
 
-		// Atomic limit check inside the transaction
+		// Atomic limit check.
 		if maxKept > 0 {
-			var count int64
-			if err := tx.Model(&KeptTorrent{}).Where("kept_by_id = ? AND torrent_id != ?", user.ID, torrentID).Count(&count).Error; err != nil {
+			count, err := q.CountKeptExcluding(ctx, CountKeptExcludingParams{
+				KeptByID:  user.ID,
+				TorrentID: torrentID,
+			})
+			if err != nil {
 				return fmt.Errorf("failed to count kept torrents: %w", err)
 			}
 			if count >= int64(maxKept) {
@@ -448,119 +690,218 @@ func (r *KeptTorrentRepository) KeepTorrent(ctx context.Context, torrentID, file
 			}
 		}
 
-		keptTorrent := KeptTorrent{
+		if err := q.UpsertKeptTorrent(ctx, UpsertKeptTorrentParams{
 			TorrentID: torrentID,
-			Filename:  filename,
+			Filename:  strPtr(filename),
 			KeptByID:  user.ID,
-			KeptAt:    now,
-		}
-
-		if err := tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "torrent_id"}, {Name: "kept_by_id"}},
-			DoUpdates: clause.Assignments(map[string]interface{}{
-				"filename": filename,
-				"kept_at":  now,
-			}),
-		}).Create(&keptTorrent).Error; err != nil {
+			KeptAt:    toPgtypeTimestamptz(now),
+		}); err != nil {
 			return err
 		}
 
-		action := KeptTorrentAction{
+		return q.InsertKeptTorrentAction(ctx, InsertKeptTorrentActionParams{
 			TorrentID: torrentID,
 			Action:    "keep",
 			UserID:    user.ID,
 			Username:  user.Username,
-			CreatedAt: now,
-		}
-		return tx.Create(&action).Error
+			CreatedAt: toPgtypeTimestamptz(now),
+		})
 	})
 }
 
-// UnkeepTorrent removes the keep mark from a torrent
+// UnkeepTorrent removes the keep mark from a torrent.
 func (r *KeptTorrentRepository) UnkeepTorrent(ctx context.Context, torrentID string, unkeptByID int64, isAdmin bool) error {
 	now := time.Now().UTC()
 
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var user User
-		if err := tx.Where("user_id = ?", unkeptByID).First(&user).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
+	return withTx(ctx, r.pool, func(tx pgx.Tx) error {
+		q := New(tx)
+
+		user, err := q.GetUserByUserID(ctx, unkeptByID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
 				return fmt.Errorf("cannot unkeep torrent: actor user %d not found", unkeptByID)
 			}
 			return fmt.Errorf("failed to load actor user %d: %w", unkeptByID, err)
 		}
 
-		query := tx.Where("torrent_id = ?", torrentID)
-		if !isAdmin {
-			query = query.Where("kept_by_id = ?", user.ID)
+		if isAdmin {
+			tag, err := tx.Exec(ctx,
+				"DELETE FROM kept_torrents WHERE torrent_id = $1",
+				torrentID)
+			if err != nil {
+				return err
+			}
+			if tag.RowsAffected() == 0 {
+				return fmt.Errorf("torrent is not kept or you don't have permission to unkeep it")
+			}
+		} else {
+			tag, err := tx.Exec(ctx,
+				"DELETE FROM kept_torrents WHERE torrent_id = $1 AND kept_by_id = $2",
+				torrentID, user.ID)
+			if err != nil {
+				return err
+			}
+			if tag.RowsAffected() == 0 {
+				return fmt.Errorf("torrent is not kept or you don't have permission to unkeep it")
+			}
 		}
 
-		res := query.Delete(&KeptTorrent{})
-		if res.Error != nil {
-			return res.Error
-		}
-		if res.RowsAffected == 0 {
-			return fmt.Errorf("torrent is not kept or you don't have permission to unkeep it")
-		}
-
-		action := KeptTorrentAction{
+		return q.InsertKeptTorrentAction(ctx, InsertKeptTorrentActionParams{
 			TorrentID: torrentID,
 			Action:    "unkeep",
 			UserID:    user.ID,
 			Username:  user.Username,
-			CreatedAt: now,
-		}
-		return tx.Create(&action).Error
+			CreatedAt: toPgtypeTimestamptz(now),
+		})
 	})
 }
 
-// IsKept checks if a torrent is marked as kept
+// IsKept checks if any user has marked the torrent as kept.
 func (r *KeptTorrentRepository) IsKept(ctx context.Context, torrentID string) (bool, error) {
-	var keptTorrent KeptTorrent
-	err := r.db.WithContext(ctx).Where("torrent_id = ?", torrentID).First(&keptTorrent).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, nil
-	}
+	_, err := r.queries.CheckKeptTorrent(ctx, torrentID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
 		return false, err
 	}
 	return true, nil
 }
 
-// GetKeptTorrentIDs returns a map of all kept torrent IDs for quick lookup
+// GetKeptTorrentIDs returns a map of all kept torrent IDs for quick lookup.
 func (r *KeptTorrentRepository) GetKeptTorrentIDs(ctx context.Context) (map[string]bool, error) {
-	var keptTorrents []KeptTorrent
-	err := r.db.WithContext(ctx).Find(&keptTorrents).Error
+	ids, err := r.queries.GetAllKeptTorrentIDs(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	result := make(map[string]bool)
-	for _, kt := range keptTorrents {
-		result[kt.TorrentID] = true
+	result := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		result[id] = true
 	}
 	return result, nil
 }
 
-// ListKeptTorrents returns all kept torrents with user details
+// ListKeptTorrents returns all kept torrents with associated user details.
 func (r *KeptTorrentRepository) ListKeptTorrents(ctx context.Context) ([]KeptTorrent, error) {
-	var results []KeptTorrent
-	err := r.db.WithContext(ctx).
-		Preload("User").
-		Order("kept_at DESC").
-		Find(&results).Error
-	return results, err
+	rows, err := r.queries.ListKeptTorrents(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]KeptTorrent, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, toKeptTorrentPublic(row))
+	}
+	return result, nil
 }
 
-// CountKeptByUser returns the number of torrents kept by a specific user
+// CountKeptByUser returns the number of torrents kept by a user (by Telegram user_id).
 func (r *KeptTorrentRepository) CountKeptByUser(ctx context.Context, userID int64) (int64, error) {
-	var count int64
-	var user User
-	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+	u, err := r.queries.GetUserByUserID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return 0, nil
 		}
 		return 0, err
 	}
-	err := r.db.WithContext(ctx).Model(&KeptTorrent{}).Where("kept_by_id = ?", user.ID).Count(&count).Error
-	return count, err
+	return r.queries.CountKeptByUser(ctx, u.ID)
+}
+
+// ─────────────────────────────────────────────────────────────
+// transaction helper
+// withTx begins a transaction on the provided pool, executes fn with the started transaction, rolls back if fn returns an error, and commits on success.
+// It returns the error returned by fn or any error encountered while committing the transaction.
+
+func withTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) error {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	if err := fn(tx); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// ─────────────────────────────────────────────────────────────
+// MessageRepository
+// ─────────────────────────────────────────────────────────────
+
+// MessageRepository handles raw Telegram message archival.
+type MessageRepository struct {
+	pool    *pgxpool.Pool
+	queries *Queries
+}
+
+// NewMessageRepository creates a MessageRepository backed by the provided pgxpool.Pool.
+func NewMessageRepository(pool *pgxpool.Pool) *MessageRepository {
+	return &MessageRepository{pool: pool, queries: New(pool)}
+}
+
+// RecordMessage upserts a Telegram message into the archive.
+func (r *MessageRepository) RecordMessage(ctx context.Context, messageID int64, chatPK int64, userPK *int64, threadID int64, text, messageType string, replyToID int64, isForward bool, sentAt time.Time) error {
+	_, err := r.queries.UpsertMessage(ctx, UpsertMessageParams{
+		MessageID:   messageID,
+		ChatID:      chatPK,
+		UserID:      userPK,
+		ThreadID:    int64Ptr(threadID),
+		Text:        strPtr(text),
+		MessageType: messageType,
+		ReplyToID:   int64Ptr(replyToID),
+		IsForward:   isForward,
+		SentAt:      toPgtypeTimestamptz(sentAt),
+	})
+	return err
+}
+
+// ─────────────────────────────────────────────────────────────
+// UserChatMembershipRepository
+// ─────────────────────────────────────────────────────────────
+
+// UserChatMembershipRepository tracks per-user-per-chat activity.
+type UserChatMembershipRepository struct {
+	pool    *pgxpool.Pool
+	queries *Queries
+}
+
+// NewUserChatMembershipRepository creates a UserChatMembershipRepository backed by the provided pgxpool.Pool.
+func NewUserChatMembershipRepository(pool *pgxpool.Pool) *UserChatMembershipRepository {
+	return &UserChatMembershipRepository{pool: pool, queries: New(pool)}
+}
+
+// Touch upserts a membership record and optionally increments the command count.
+func (r *UserChatMembershipRepository) Touch(ctx context.Context, userPK int64, chatPK int64, incrementCommand bool) error {
+	now := toPgtypeTimestamptz(time.Now().UTC())
+	if err := r.queries.UpsertUserChatMembership(ctx, UpsertUserChatMembershipParams{
+		UserID:      userPK,
+		ChatID:      chatPK,
+		FirstSeenAt: now,
+	}); err != nil {
+		return err
+	}
+	if incrementCommand {
+		return r.queries.IncrementMembershipCommandCount(ctx, IncrementMembershipCommandCountParams{
+			UserID:     userPK,
+			ChatID:     chatPK,
+			LastSeenAt: now,
+		})
+	}
+	return nil
+}
+
+// withReadTx runs fn inside a REPEATABLE READ read-only transaction so that
+// multiple SELECT statements see a consistent snapshot.
+func withReadTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) error {
+	tx, err := pool.BeginTx(ctx, pgx.TxOptions{
+		IsoLevel:   pgx.RepeatableRead,
+		AccessMode: pgx.ReadOnly,
+	})
+	if err != nil {
+		return err
+	}
+	if err := fn(tx); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+	return tx.Commit(ctx)
 }
