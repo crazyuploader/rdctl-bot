@@ -522,8 +522,8 @@ func (r *SettingRepository) SetSetting(ctx context.Context, key, value string) e
 // SetSettingWithAudit creates/updates a setting and writes an audit record.
 // changedByUserID is the Telegram user_id of the actor; it is resolved to the
 // internal users.id inside the transaction so the FK is consistent with all
-// other tables.
-func (r *SettingRepository) SetSettingWithAudit(ctx context.Context, key, value string, changedByUserID int64, chatID int64) error {
+// other tables. chatPK is the internal chats.id (FK to chats(id)).
+func (r *SettingRepository) SetSettingWithAudit(ctx context.Context, key, value string, changedByUserID int64, chatPK int64) error {
 	now := time.Now().UTC()
 	return withTx(ctx, r.pool, func(tx pgx.Tx) error {
 		q := New(tx)
@@ -556,8 +556,8 @@ func (r *SettingRepository) SetSettingWithAudit(ctx context.Context, key, value 
 		}
 
 		var chatIDPtr *int64
-		if chatID != 0 {
-			chatIDPtr = &chatID
+		if chatPK != 0 {
+			chatIDPtr = &chatPK
 		}
 		return q.InsertSettingAudit(ctx, InsertSettingAuditParams{
 			Key:       key,

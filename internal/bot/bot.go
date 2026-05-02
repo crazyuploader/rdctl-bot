@@ -294,17 +294,19 @@ func (b *Bot) getChatFromUpdate(update *models.Update) (chatID int64, title, cha
 }
 
 // withAuth is a middleware to check authorization and execute the handler
-func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(ctx context.Context, chatID int64, messageThreadID int, isSuperAdmin bool, user *db.User)) {
+func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(ctx context.Context, chatID int64, chatPK int64, messageThreadID int, isSuperAdmin bool, user *db.User)) {
 	chatID, messageThreadID, username, firstName, lastName, userID := b.getUserFromUpdate(update)
 	_, title, chatType := b.getChatFromUpdate(update)
 
 	isAllowed, isSuperAdmin := b.middleware.CheckAuthorization(chatID, userID)
 
-	if chatID != 0 {
-		_, err := b.chatRepo.GetOrCreateChat(ctx, chatID, title, chatType)
-		if err != nil {
-			log.Printf("Warning: failed to automatically log chat ID: %v", err)
-		}
+	chatPK := int64(0)
+	chat, err := b.chatRepo.GetOrCreateChat(ctx, chatID, title, chatType)
+	if err != nil {
+		log.Printf("Warning: failed to automatically log chat ID: %v", err)
+	}
+	if chat != nil {
+		chatPK = chat.ID
 	}
 
 	user, err := b.userRepo.GetOrCreateUser(ctx, userID, username, firstName, lastName, isSuperAdmin)
@@ -327,7 +329,7 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 		b.middleware.LogUnauthorized(username, chatID, userID)
 		b.sendUnauthorizedMessage(ctx, chatID, messageThreadID, userID)
 		if user != nil {
-			if err := b.activityRepo.LogActivity(ctx, "", user.ID, chatID, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil); err != nil {
+			if err := b.activityRepo.LogActivity(ctx, "", user.ID, chatPK, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil); err != nil {
 				log.Printf("Warning: failed to log unauthorized activity: %v", err)
 			}
 		}
@@ -341,7 +343,7 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 		return
 	}
 
-	handler(ctx, chatID, messageThreadID, isSuperAdmin, user)
+	handler(ctx, chatID, chatPK, messageThreadID, isSuperAdmin, user)
 }
 
 // sendUnauthorizedMessage sends an unauthorized message

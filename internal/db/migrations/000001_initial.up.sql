@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     id                bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     request_id        text,
     user_id           bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    chat_id           bigint      NOT NULL REFERENCES chats(chat_id) ON DELETE CASCADE,
+    chat_id           bigint      NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
     username          text,
     activity_type     text        NOT NULL,
     command           text,
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS torrent_activities (
     id             bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     request_id     text,
     user_id        bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    chat_id        bigint      NOT NULL REFERENCES chats(chat_id) ON DELETE CASCADE,
+    chat_id        bigint      NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
     torrent_id     text        NOT NULL,
     torrent_hash   text,
     torrent_name   text,
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS download_activities (
     id                  bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     request_id          text,
     user_id             bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    chat_id             bigint      NOT NULL REFERENCES chats(chat_id) ON DELETE CASCADE,
+    chat_id             bigint      NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
     download_id         text,
     original_link       text,
     file_name           text,
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS download_activities (
 CREATE TABLE IF NOT EXISTS command_logs (
     id                bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id           bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    chat_id           bigint      NOT NULL REFERENCES chats(chat_id) ON DELETE CASCADE,
+    chat_id           bigint      NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
     username          text,
     command           text        NOT NULL,
     full_command      text,
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS setting_audits (
     old_value  text,
     new_value  text,
     changed_by bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    chat_id    bigint      REFERENCES chats(chat_id) ON DELETE SET NULL,
+    chat_id    bigint      REFERENCES chats(id) ON DELETE SET NULL,
     changed_at timestamptz NOT NULL DEFAULT now()
 );
 
