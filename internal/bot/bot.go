@@ -19,7 +19,7 @@ import (
 	"github.com/crazyuploader/rdctl-bot/internal/web"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
-	"gorm.io/gorm"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // RealDebridClient defines the required interface for Real-Debrid operations.
@@ -49,7 +49,7 @@ type Bot struct {
 	middleware     *Middleware
 	supportedRegex []*regexp.Regexp
 	config         *config.Config
-	db             *gorm.DB
+	db             *pgxpool.Pool
 	userRepo       *db.UserRepository
 	activityRepo   *db.ActivityRepository
 	torrentRepo    *db.TorrentRepository
@@ -61,11 +61,11 @@ type Bot struct {
 	tokenStore     *web.TokenStore
 	wg             sync.WaitGroup
 	cancel         context.CancelFunc
-	systemUserID   uint
+	systemUserID   int64
 }
 
 // NewBot creates and returns a fully configured Bot.
-func NewBot(cfg *config.Config, database *gorm.DB, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, error) {
+func NewBot(cfg *config.Config, database *pgxpool.Pool, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, error) {
 	// Perform IP tests first
 	if err := performIPTests(proxyURL, ipTestURL, ipVerifyURL); err != nil {
 		return nil, fmt.Errorf("IP test failed: %w", err)
@@ -225,9 +225,7 @@ func (b *Bot) Stop() {
 	// Wait for background workers to finish
 	b.wg.Wait()
 
-	if err := db.Close(b.db); err != nil {
-		log.Printf("Error closing database: %v", err)
-	}
+	db.Close(b.db)
 	log.Println("Bot stopped")
 }
 

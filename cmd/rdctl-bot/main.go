@@ -299,13 +299,8 @@ func runBot(cmd *cobra.Command, args []string) {
 			// Stop token store cleanup even in web-only mode
 			tokenStore.Stop()
 			// Close database explicitly when bot is not running
-			if sqlDB, err := database.DB(); err == nil {
-				if err := sqlDB.Close(); err != nil {
-					log.Printf("Error closing database: %v", err)
-				} else {
-					log.Println("Database connection closed")
-				}
-			}
+			db.Close(database)
+			log.Println("Database connection closed")
 		}
 
 		log.Println("Cleanup completed")

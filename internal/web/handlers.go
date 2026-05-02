@@ -261,7 +261,7 @@ func (d *Dependencies) GetUserStats(c fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid user ID")
 	}
 
-	stats, err := d.CommandRepo.GetUserStats(c.Context(), uint(userID))
+	stats, err := d.CommandRepo.GetUserStats(c.Context(), int64(userID))
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return fiber.NewError(fiber.StatusNotFound, "User stats not found")
