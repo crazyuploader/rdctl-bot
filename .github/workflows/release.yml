@@ -1,6 +1,8 @@
 name: rdctl-bot GoReleaser Release
 
 on:
+  schedule:
+    - cron: "0 0 1 * *"  # 1st of every month at midnight UTC
   workflow_dispatch:
     inputs:
       version_type:
@@ -20,22 +22,26 @@ permissions:
   contents: write
 
 jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
   goreleaser:
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Configure git identity
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Bump version tag
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'push'
         run: |
           OLD_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           OLD_VERSION_NUM=${OLD_VERSION#v}
@@ -45,7 +51,12 @@ jobs:
           MINOR=${MINOR:-0}
           PATCH=${PATCH:-0}
 
-          case "${{ github.event.inputs.version_type }}" in
+          VERSION_TYPE="${{ github.event.inputs.version_type }}"
+          if [ -z "$VERSION_TYPE" ]; then
+            VERSION_TYPE="minor"
+          fi
+
+          case "$VERSION_TYPE" in
             major)
               MAJOR=$((MAJOR + 1))
               MINOR=0
@@ -67,9 +78,9 @@ jobs:
           git push origin "$NEW_VERSION"
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v5
         with:
-          go-version: "1.26.2"
+          go-version: "1.25.3"
           cache: true
 
       - name: Install UPX
