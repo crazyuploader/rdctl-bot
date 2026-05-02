@@ -39,8 +39,8 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     message_thread_id bigint,
     success           bool        NOT NULL DEFAULT true,
     error_message     text,
-    metadata          jsonb,
-    created_at        timestamptz NOT NULL
+    metadata          jsonb       NOT NULL DEFAULT '{}',
+    created_at        timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS torrent_activities (
@@ -59,38 +59,38 @@ CREATE TABLE IF NOT EXISTS torrent_activities (
     success        bool        NOT NULL DEFAULT true,
     error_message  text,
     metadata       jsonb       NOT NULL DEFAULT '{}',
-    created_at     timestamptz NOT NULL,
+    created_at     timestamptz NOT NULL DEFAULT now(),
     selected_files jsonb       NOT NULL DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS download_activities (
-    id                  bigserial PRIMARY KEY,
+    id                  bigserial   PRIMARY KEY,
     request_id          text,
-    user_id             bigint    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    chat_id             bigint    NOT NULL REFERENCES chats(chat_id) ON DELETE CASCADE,
+    user_id             bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    chat_id             bigint      NOT NULL REFERENCES chats(chat_id) ON DELETE CASCADE,
     download_id         text,
     original_link       text,
     file_name           text,
     file_size           bigint,
     host                text,
-    action              text      NOT NULL,
-    success             bool      NOT NULL DEFAULT true,
+    action              text        NOT NULL,
+    success             bool        NOT NULL DEFAULT true,
     error_message       text,
-    metadata            jsonb,
-    created_at          timestamptz NOT NULL,
-    torrent_activity_id bigint    REFERENCES torrent_activities(id) ON DELETE SET NULL
+    metadata            jsonb       NOT NULL DEFAULT '{}',
+    created_at          timestamptz NOT NULL DEFAULT now(),
+    torrent_activity_id bigint      REFERENCES torrent_activities(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS command_logs (
-    id                bigserial PRIMARY KEY,
-    user_id           bigint    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    chat_id           bigint    NOT NULL REFERENCES chats(chat_id) ON DELETE CASCADE,
+    id                bigserial   PRIMARY KEY,
+    user_id           bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    chat_id           bigint      NOT NULL REFERENCES chats(chat_id) ON DELETE CASCADE,
     username          text,
-    command           text      NOT NULL,
+    command           text        NOT NULL,
     full_command      text,
     message_thread_id bigint,
     execution_time    bigint,
-    success           bool      NOT NULL DEFAULT true,
+    success           bool        NOT NULL DEFAULT true,
     error_message     text,
     response_length   bigint,
     created_at        timestamptz NOT NULL DEFAULT now()
@@ -107,8 +107,8 @@ CREATE TABLE IF NOT EXISTS kept_torrents (
     torrent_id text        NOT NULL,
     filename   text,
     kept_by_id bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    kept_at    timestamptz NOT NULL,
-    CONSTRAINT idx_torrent_user UNIQUE (torrent_id, kept_by_id)
+    kept_at    timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_kept_torrents_torrent_user UNIQUE (torrent_id, kept_by_id)
 );
 
 CREATE TABLE IF NOT EXISTS kept_torrent_actions (
@@ -117,17 +117,20 @@ CREATE TABLE IF NOT EXISTS kept_torrent_actions (
     action     text        NOT NULL,
     user_id    bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     username   text,
-    created_at timestamptz NOT NULL
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- setting_audits.changed_by references users(id) (internal PK), consistent with
+-- all other tables. The repository resolves the Telegram user_id to users.id
+-- before inserting.
 CREATE TABLE IF NOT EXISTS setting_audits (
     id         bigserial   PRIMARY KEY,
     key        text        NOT NULL,
     old_value  text,
     new_value  text,
-    changed_by bigint      NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    changed_by bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     chat_id    bigint      REFERENCES chats(chat_id) ON DELETE SET NULL,
-    changed_at timestamptz NOT NULL
+    changed_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- ── users ──────────────────────────────────────────────────────────────────

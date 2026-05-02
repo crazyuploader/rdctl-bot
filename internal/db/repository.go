@@ -434,44 +434,53 @@ func (r *CommandRepository) LogCommand(ctx context.Context, userID int64, chatID
 }
 
 // GetUserStats retrieves user statistics by internal user ID.
+// All four queries run inside a REPEATABLE READ transaction so the snapshot is
+// consistent even when concurrent writes are in flight.
 func (r *CommandRepository) GetUserStats(ctx context.Context, userID int64) (map[string]interface{}, error) {
-	u, err := r.queries.GetUserByID(ctx, userID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errors.New("user not found")
+	var stats map[string]interface{}
+	err := withReadTx(ctx, r.pool, func(tx pgx.Tx) error {
+		q := New(tx)
+
+		u, err := q.GetUserByID(ctx, userID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return errors.New("user not found")
+			}
+			return err
 		}
-		return nil, err
-	}
 
-	totalActivities, err := r.queries.CountActivitiesByUser(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	totalTorrents, err := r.queries.CountTorrentAddsByUser(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	totalDownloads, err := r.queries.CountDownloadsByUser(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
+		totalActivities, err := q.CountActivitiesByUser(ctx, userID)
+		if err != nil {
+			return err
+		}
+		totalTorrents, err := q.CountTorrentAddsByUser(ctx, userID)
+		if err != nil {
+			return err
+		}
+		totalDownloads, err := q.CountDownloadsByUser(ctx, userID)
+		if err != nil {
+			return err
+		}
 
-	var firstSeen, lastSeen time.Time
-	if u.FirstSeenAt.Valid {
-		firstSeen = u.FirstSeenAt.Time
-	}
-	if u.LastSeenAt.Valid {
-		lastSeen = u.LastSeenAt.Time
-	}
+		var firstSeen, lastSeen time.Time
+		if u.FirstSeenAt.Valid {
+			firstSeen = u.FirstSeenAt.Time
+		}
+		if u.LastSeenAt.Valid {
+			lastSeen = u.LastSeenAt.Time
+		}
 
-	return map[string]interface{}{
-		"total_commands":   u.TotalCommands,
-		"total_activities": totalActivities,
-		"total_torrents":   totalTorrents,
-		"total_downloads":  totalDownloads,
-		"first_seen_at":    firstSeen,
-		"last_seen_at":     lastSeen,
-	}, nil
+		stats = map[string]interface{}{
+			"total_commands":   u.TotalCommands,
+			"total_activities": totalActivities,
+			"total_torrents":   totalTorrents,
+			"total_downloads":  totalDownloads,
+			"first_seen_at":    firstSeen,
+			"last_seen_at":     lastSeen,
+		}
+		return nil
+	})
+	return stats, err
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -511,10 +520,22 @@ func (r *SettingRepository) SetSetting(ctx context.Context, key, value string) e
 }
 
 // SetSettingWithAudit creates/updates a setting and writes an audit record.
-func (r *SettingRepository) SetSettingWithAudit(ctx context.Context, key, value string, changedBy int64, chatID int64) error {
+// changedByUserID is the Telegram user_id of the actor; it is resolved to the
+// internal users.id inside the transaction so the FK is consistent with all
+// other tables.
+func (r *SettingRepository) SetSettingWithAudit(ctx context.Context, key, value string, changedByUserID int64, chatID int64) error {
 	now := time.Now().UTC()
 	return withTx(ctx, r.pool, func(tx pgx.Tx) error {
 		q := New(tx)
+
+		// Resolve Telegram user_id → internal users.id (consistent with all other FK references).
+		actor, err := q.GetUserByUserID(ctx, changedByUserID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("actor user %d not found", changedByUserID)
+			}
+			return fmt.Errorf("failed to load actor user %d: %w", changedByUserID, err)
+		}
 
 		// Read old value inside the transaction.
 		oldValue := ""
@@ -542,7 +563,7 @@ func (r *SettingRepository) SetSettingWithAudit(ctx context.Context, key, value 
 			Key:       key,
 			OldValue:  strPtr(oldValue),
 			NewValue:  strPtr(value),
-			ChangedBy: changedBy,
+			ChangedBy: actor.ID,
 			ChatID:    chatIDPtr,
 			ChangedAt: toPgtypeTimestamptz(now),
 		})
@@ -625,7 +646,7 @@ func (r *KeptTorrentRepository) KeepTorrent(ctx context.Context, torrentID, file
 			TorrentID: torrentID,
 			Action:    "keep",
 			UserID:    user.ID,
-			Username:  strPtr(derefStr(user.Username)),
+			Username:  user.Username,
 			CreatedAt: toPgtypeTimestamptz(now),
 		})
 	})
@@ -672,7 +693,7 @@ func (r *KeptTorrentRepository) UnkeepTorrent(ctx context.Context, torrentID str
 			TorrentID: torrentID,
 			Action:    "unkeep",
 			UserID:    user.ID,
-			Username:  strPtr(derefStr(user.Username)),
+			Username:  user.Username,
 			CreatedAt: toPgtypeTimestamptz(now),
 		})
 	})
@@ -735,6 +756,23 @@ func (r *KeptTorrentRepository) CountKeptByUser(ctx context.Context, userID int6
 
 func withTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) error {
 	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	if err := fn(tx); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// withReadTx runs fn inside a REPEATABLE READ read-only transaction so that
+// multiple SELECT statements see a consistent snapshot.
+func withReadTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) error {
+	tx, err := pool.BeginTx(ctx, pgx.TxOptions{
+		IsoLevel:   pgx.RepeatableRead,
+		AccessMode: pgx.ReadOnly,
+	})
 	if err != nil {
 		return err
 	}
