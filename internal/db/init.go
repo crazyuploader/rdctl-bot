@@ -17,7 +17,7 @@ import (
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
-// Init runs migrations and returns a connection pool.
+// It returns an error if migrations fail, if the DSN cannot be parsed, if the pool cannot be created, or if the initial ping fails (the pool is closed on ping failure).
 func Init(dsn string) (*pgxpool.Pool, error) {
 	if err := runMigrations(dsn); err != nil {
 		return nil, fmt.Errorf("migrations failed: %w", err)
@@ -45,13 +45,15 @@ func Init(dsn string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-// Close shuts down the connection pool.
+// Close closes the given connection pool. Calling Close with a nil pool is a no-op.
 func Close(pool *pgxpool.Pool) {
 	if pool != nil {
 		pool.Close()
 	}
 }
 
+// runMigrations applies the embedded SQL migrations to the database identified by dsn.
+// It returns an error if creating the migration source or migrate instance fails, or if applying migrations fails (a "no change" result is treated as success).
 func runMigrations(dsn string) error {
 	src, err := iofs.New(migrationsFS, "migrations")
 	if err != nil {
@@ -76,7 +78,16 @@ func runMigrations(dsn string) error {
 //
 // If the DSN already starts with a URL scheme, it is converted to pgx5://.
 // If the DSN is in key=value form (e.g. "host=... user=... ...") it is
-// converted to a URL first.
+// toMigrateDSN converts a PostgreSQL DSN (URL or libpq key=value form) into a
+// pgx5:// URL suitable for use with the golang-migrate pgx/v5 driver.
+// 
+// If the input already uses a URL scheme (postgresql://, postgres://, pgx://,
+// or pgx5://) the scheme is replaced with pgx5:// and the remainder is returned.
+// For key=value form, the string is parsed with parseKVDSN and the resulting
+// components are mapped into a URL: host defaults to "localhost", port to
+// "5432", and sslmode to "disable" when absent. The returned URL includes user
+// and password in the authority when provided and has the form
+// pgx5://[user[:password]@]host:port/dbname?sslmode=value.
 func toMigrateDSN(dsn string) string {
 	// Already a URL — just swap the scheme.
 	for _, prefix := range []string{"postgresql://", "postgres://", "pgx://", "pgx5://"} {
@@ -116,7 +127,8 @@ func toMigrateDSN(dsn string) string {
 	return fmt.Sprintf("pgx5://%s/%s?sslmode=%s", authority, dbname, sslmode)
 }
 
-// parseKVDSN parses a libpq-style "key=value" DSN into a map.
+// parseKVDSN parses a libpq-style DSN string of space-separated `key=value` fields into a map.
+// It splits on whitespace, ignores fields that do not contain an `=`, and removes surrounding single quotes from values.
 func parseKVDSN(dsn string) map[string]string {
 	result := make(map[string]string)
 	fields := strings.Fields(dsn)
