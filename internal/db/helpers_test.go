@@ -451,6 +451,7 @@ func TestStrPtr_DoesNotShareMemory(t *testing.T) {
 	}
 	// Modify the original; the pointer should still point to "original"
 	original = "mutated"
+	_ = original
 	if *ptr != "original" {
 		t.Errorf("strPtr shares memory: *ptr=%q after mutating original", *ptr)
 	}
