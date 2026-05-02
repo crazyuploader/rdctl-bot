@@ -2,7 +2,7 @@
 -- Initial schema migration (v1)
 
 CREATE TABLE IF NOT EXISTS chats (
-    id         bigserial   PRIMARY KEY,
+    id         bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     chat_id    bigint      NOT NULL,
     title      text,
     type       text,
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS chats (
 );
 
 CREATE TABLE IF NOT EXISTS users (
-    id             bigserial   PRIMARY KEY,
+    id             bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id        bigint      NOT NULL,
     username       text,
     first_name     text,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS activity_logs (
-    id                bigserial   PRIMARY KEY,
+    id                bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     request_id        text,
     user_id           bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     chat_id           bigint      NOT NULL REFERENCES chats(chat_id) ON DELETE CASCADE,
@@ -39,12 +39,12 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     message_thread_id bigint,
     success           bool        NOT NULL DEFAULT true,
     error_message     text,
-    metadata          jsonb       NOT NULL DEFAULT '{}',
+    metadata          jsonb       NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(metadata) = 'object'),
     created_at        timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS torrent_activities (
-    id             bigserial   PRIMARY KEY,
+    id             bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     request_id     text,
     user_id        bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     chat_id        bigint      NOT NULL REFERENCES chats(chat_id) ON DELETE CASCADE,
@@ -55,16 +55,16 @@ CREATE TABLE IF NOT EXISTS torrent_activities (
     action         text        NOT NULL,
     status         text,
     file_size      bigint,
-    progress       numeric,
+    progress       numeric(5,2)             CHECK (progress >= 0 AND progress <= 100),
     success        bool        NOT NULL DEFAULT true,
     error_message  text,
-    metadata       jsonb       NOT NULL DEFAULT '{}',
+    metadata       jsonb       NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(metadata) = 'object'),
     created_at     timestamptz NOT NULL DEFAULT now(),
-    selected_files jsonb       NOT NULL DEFAULT '[]'
+    selected_files jsonb       NOT NULL DEFAULT '[]' CHECK (jsonb_typeof(selected_files) = 'array')
 );
 
 CREATE TABLE IF NOT EXISTS download_activities (
-    id                  bigserial   PRIMARY KEY,
+    id                  bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     request_id          text,
     user_id             bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     chat_id             bigint      NOT NULL REFERENCES chats(chat_id) ON DELETE CASCADE,
@@ -76,13 +76,13 @@ CREATE TABLE IF NOT EXISTS download_activities (
     action              text        NOT NULL,
     success             bool        NOT NULL DEFAULT true,
     error_message       text,
-    metadata            jsonb       NOT NULL DEFAULT '{}',
+    metadata            jsonb       NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(metadata) = 'object'),
     created_at          timestamptz NOT NULL DEFAULT now(),
     torrent_activity_id bigint      REFERENCES torrent_activities(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS command_logs (
-    id                bigserial   PRIMARY KEY,
+    id                bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id           bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     chat_id           bigint      NOT NULL REFERENCES chats(chat_id) ON DELETE CASCADE,
     username          text,
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 CREATE TABLE IF NOT EXISTS kept_torrents (
-    id         bigserial   PRIMARY KEY,
+    id         bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     torrent_id text        NOT NULL,
     filename   text,
     kept_by_id bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -112,9 +112,9 @@ CREATE TABLE IF NOT EXISTS kept_torrents (
 );
 
 CREATE TABLE IF NOT EXISTS kept_torrent_actions (
-    id         bigserial   PRIMARY KEY,
+    id         bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     torrent_id text        NOT NULL,
-    action     text        NOT NULL,
+    action     text        NOT NULL CHECK (action IN ('keep', 'unkeep')),
     user_id    bigint      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     username   text,
     created_at timestamptz NOT NULL DEFAULT now()
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS kept_torrent_actions (
 -- all other tables. The repository resolves the Telegram user_id to users.id
 -- before inserting.
 CREATE TABLE IF NOT EXISTS setting_audits (
-    id         bigserial   PRIMARY KEY,
+    id         bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     key        text        NOT NULL,
     old_value  text,
     new_value  text,
@@ -187,6 +187,8 @@ CREATE INDEX IF NOT EXISTS idx_kept_torrent_actions_user_id    ON kept_torrent_a
 -- Covering index: history lookup ordered by time per key
 CREATE INDEX IF NOT EXISTS idx_setting_audits_key_time   ON setting_audits (key, changed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_setting_audits_changed_by ON setting_audits (changed_by);
+-- FK index: chat_id is nullable so partial index skips NULLs
+CREATE INDEX IF NOT EXISTS idx_setting_audits_chat_id    ON setting_audits (chat_id) WHERE chat_id IS NOT NULL;
 
 -- Seed system user (user_id=0) and system chat (chat_id=0)
 INSERT INTO chats (chat_id, title, type, created_at, updated_at)
