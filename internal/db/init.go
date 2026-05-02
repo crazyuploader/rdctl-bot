@@ -68,7 +68,11 @@ func RunMigrations(dsn string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open migration database: %w", err)
 	}
-	defer sqlDB.Close()
+	defer func() {
+		if closeErr := sqlDB.Close(); closeErr != nil {
+			log.Printf("Warning: failed to close migration database: %v", closeErr)
+		}
+	}()
 
 	driver, err := pgxmigrate.WithInstance(sqlDB, &pgxmigrate.Config{})
 	if err != nil {
