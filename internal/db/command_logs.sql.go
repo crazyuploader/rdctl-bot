@@ -13,11 +13,13 @@ import (
 
 const insertCommandLog = `-- name: InsertCommandLog :exec
 INSERT INTO command_logs (
-    user_id, chat_id, username, command, full_command, message_thread_id,
+    user_id, chat_id, username, command, full_command,
+    message_id, message_thread_id,
     execution_time, success, error_message, response_length, created_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6,
-    $7, $8, $9, $10, $11
+    $1, $2, $3, $4, $5,
+    $6, $7,
+    $8, $9, $10, $11, $12
 )
 `
 
@@ -27,6 +29,7 @@ type InsertCommandLogParams struct {
 	Username        *string            `json:"username"`
 	Command         string             `json:"command"`
 	FullCommand     *string            `json:"full_command"`
+	MessageID       *int64             `json:"message_id"`
 	MessageThreadID *int64             `json:"message_thread_id"`
 	ExecutionTime   *int64             `json:"execution_time"`
 	Success         bool               `json:"success"`
@@ -42,6 +45,7 @@ func (q *Queries) InsertCommandLog(ctx context.Context, arg InsertCommandLogPara
 		arg.Username,
 		arg.Command,
 		arg.FullCommand,
+		arg.MessageID,
 		arg.MessageThreadID,
 		arg.ExecutionTime,
 		arg.Success,

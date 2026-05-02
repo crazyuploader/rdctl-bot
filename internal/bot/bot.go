@@ -151,7 +151,7 @@ func NewBot(cfg *config.Config, database *pgxpool.Pool, proxyURL, ipTestURL, ipV
 	}
 
 	// Create or retrieve system user for automated operations
-	systemUser, err := b.userRepo.GetOrCreateUser(context.Background(), 0, "system", "System", "Bot", false)
+	systemUser, err := b.userRepo.GetOrCreateUser(context.Background(), 0, "system", "System", "Bot", "", false, false, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create system user: %w", err)
 	}
@@ -240,18 +240,14 @@ func defaultHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 }
 
 // getUserFromUpdate extracts user information from an update
-func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThreadID int, username, firstName, lastName string, userID int64) {
+func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThreadID int, username, firstName, lastName, languageCode string, isBot, isPremium bool, userID int64) {
+	var from *models.User
 	if update.Message != nil {
 		chatID = update.Message.Chat.ID
 		if update.Message.MessageThreadID != 0 {
 			messageThreadID = update.Message.MessageThreadID
 		}
-		if update.Message.From != nil {
-			username = update.Message.From.Username
-			firstName = update.Message.From.FirstName
-			lastName = update.Message.From.LastName
-			userID = update.Message.From.ID
-		}
+		from = update.Message.From
 	} else if update.CallbackQuery != nil {
 		if update.CallbackQuery.Message.Message != nil {
 			chatID = update.CallbackQuery.Message.Message.Chat.ID
@@ -259,10 +255,16 @@ func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThr
 				messageThreadID = update.CallbackQuery.Message.Message.MessageThreadID
 			}
 		}
-		username = update.CallbackQuery.From.Username
-		firstName = update.CallbackQuery.From.FirstName
-		lastName = update.CallbackQuery.From.LastName
-		userID = update.CallbackQuery.From.ID
+		from = &update.CallbackQuery.From
+	}
+	if from != nil {
+		username = from.Username
+		firstName = from.FirstName
+		lastName = from.LastName
+		userID = from.ID
+		languageCode = from.LanguageCode
+		isBot = from.IsBot
+		isPremium = from.IsPremium
 	}
 
 	if username == "" {
@@ -272,7 +274,7 @@ func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThr
 }
 
 // getChatFromUpdate extracts chat info from an update
-func (b *Bot) getChatFromUpdate(update *models.Update) (chatID int64, title, chatType string) {
+func (b *Bot) getChatFromUpdate(update *models.Update) (chatID int64, title, chatUsername, chatType string, isForum bool) {
 	var chat *models.Chat
 	if update.Message != nil {
 		chat = &update.Message.Chat
@@ -282,7 +284,9 @@ func (b *Bot) getChatFromUpdate(update *models.Update) (chatID int64, title, cha
 	if chat != nil {
 		chatID = chat.ID
 		title = chat.Title
+		chatUsername = chat.Username
 		chatType = string(chat.Type)
+		isForum = chat.IsForum
 		if title == "" {
 			title = chat.Username
 		}
@@ -295,13 +299,13 @@ func (b *Bot) getChatFromUpdate(update *models.Update) (chatID int64, title, cha
 
 // withAuth is a middleware to check authorization and execute the handler
 func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(ctx context.Context, chatID int64, chatPK int64, messageThreadID int, isSuperAdmin bool, user *db.User)) {
-	chatID, messageThreadID, username, firstName, lastName, userID := b.getUserFromUpdate(update)
-	_, title, chatType := b.getChatFromUpdate(update)
+	chatID, messageThreadID, username, firstName, lastName, languageCode, isBot, isPremium, userID := b.getUserFromUpdate(update)
+	_, title, chatUsername, chatType, isForum := b.getChatFromUpdate(update)
 
 	isAllowed, isSuperAdmin := b.middleware.CheckAuthorization(chatID, userID)
 
 	chatPK := int64(0)
-	chat, err := b.chatRepo.GetOrCreateChat(ctx, chatID, title, chatType)
+	chat, err := b.chatRepo.GetOrCreateChat(ctx, chatID, title, chatUsername, chatType, isForum)
 	if err != nil {
 		log.Printf("Warning: failed to automatically log chat ID: %v", err)
 	}
@@ -309,7 +313,7 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 		chatPK = chat.ID
 	}
 
-	user, err := b.userRepo.GetOrCreateUser(ctx, userID, username, firstName, lastName, isSuperAdmin)
+	user, err := b.userRepo.GetOrCreateUser(ctx, userID, username, firstName, lastName, languageCode, isBot, isPremium, isSuperAdmin)
 	if err != nil {
 		log.Printf("Error getting/creating user: %v", err)
 		if chatID != 0 {
@@ -329,7 +333,7 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 		b.middleware.LogUnauthorized(username, chatID, userID)
 		b.sendUnauthorizedMessage(ctx, chatID, messageThreadID, userID)
 		if user != nil {
-			if err := b.activityRepo.LogActivity(ctx, "", user.ID, chatPK, username, db.ActivityTypeUnauthorized, "", messageThreadID, false, "Unauthorized access attempt", nil); err != nil {
+			if err := b.activityRepo.LogActivity(ctx, "", user.ID, chatPK, username, db.ActivityTypeUnauthorized, "", 0, messageThreadID, false, "Unauthorized access attempt", nil); err != nil {
 				log.Printf("Warning: failed to log unauthorized activity: %v", err)
 			}
 		}

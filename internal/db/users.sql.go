@@ -11,8 +11,30 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const banUser = `-- name: BanUser :exec
+UPDATE users SET is_allowed = false, ban_reason = $2, banned_at = $3, updated_at = $4
+WHERE user_id = $1
+`
+
+type BanUserParams struct {
+	UserID    int64              `json:"user_id"`
+	BanReason *string            `json:"ban_reason"`
+	BannedAt  pgtype.Timestamptz `json:"banned_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) BanUser(ctx context.Context, arg BanUserParams) error {
+	_, err := q.db.Exec(ctx, banUser,
+		arg.UserID,
+		arg.BanReason,
+		arg.BannedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, user_id, username, first_name, last_name, is_super_admin, is_allowed, first_seen_at, last_seen_at, total_commands, created_at, updated_at, deleted_at FROM users WHERE id = $1 AND deleted_at IS NULL
+SELECT id, user_id, username, first_name, last_name, language_code, is_bot, is_premium, is_super_admin, is_allowed, ban_reason, banned_at, first_seen_at, last_seen_at, total_commands, total_torrents_added, total_downloads, created_at, updated_at, deleted_at FROM users WHERE id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id int64) (Users, error) {
@@ -24,11 +46,18 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (Users, error) {
 		&i.Username,
 		&i.FirstName,
 		&i.LastName,
+		&i.LanguageCode,
+		&i.IsBot,
+		&i.IsPremium,
 		&i.IsSuperAdmin,
 		&i.IsAllowed,
+		&i.BanReason,
+		&i.BannedAt,
 		&i.FirstSeenAt,
 		&i.LastSeenAt,
 		&i.TotalCommands,
+		&i.TotalTorrentsAdded,
+		&i.TotalDownloads,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -37,7 +66,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (Users, error) {
 }
 
 const getUserByUserID = `-- name: GetUserByUserID :one
-SELECT id, user_id, username, first_name, last_name, is_super_admin, is_allowed, first_seen_at, last_seen_at, total_commands, created_at, updated_at, deleted_at FROM users WHERE user_id = $1 AND deleted_at IS NULL
+SELECT id, user_id, username, first_name, last_name, language_code, is_bot, is_premium, is_super_admin, is_allowed, ban_reason, banned_at, first_seen_at, last_seen_at, total_commands, total_torrents_added, total_downloads, created_at, updated_at, deleted_at FROM users WHERE user_id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) GetUserByUserID(ctx context.Context, userID int64) (Users, error) {
@@ -49,11 +78,18 @@ func (q *Queries) GetUserByUserID(ctx context.Context, userID int64) (Users, err
 		&i.Username,
 		&i.FirstName,
 		&i.LastName,
+		&i.LanguageCode,
+		&i.IsBot,
+		&i.IsPremium,
 		&i.IsSuperAdmin,
 		&i.IsAllowed,
+		&i.BanReason,
+		&i.BannedAt,
 		&i.FirstSeenAt,
 		&i.LastSeenAt,
 		&i.TotalCommands,
+		&i.TotalTorrentsAdded,
+		&i.TotalDownloads,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -70,8 +106,26 @@ func (q *Queries) IncrementUserCommands(ctx context.Context, userID int64) error
 	return err
 }
 
+const incrementUserDownloads = `-- name: IncrementUserDownloads :exec
+UPDATE users SET total_downloads = total_downloads + 1 WHERE user_id = $1
+`
+
+func (q *Queries) IncrementUserDownloads(ctx context.Context, userID int64) error {
+	_, err := q.db.Exec(ctx, incrementUserDownloads, userID)
+	return err
+}
+
+const incrementUserTorrents = `-- name: IncrementUserTorrents :exec
+UPDATE users SET total_torrents_added = total_torrents_added + 1 WHERE user_id = $1
+`
+
+func (q *Queries) IncrementUserTorrents(ctx context.Context, userID int64) error {
+	_, err := q.db.Exec(ctx, incrementUserTorrents, userID)
+	return err
+}
+
 const lockUserForUpdate = `-- name: LockUserForUpdate :one
-SELECT id, user_id, username, first_name, last_name, is_super_admin, is_allowed, first_seen_at, last_seen_at, total_commands, created_at, updated_at, deleted_at FROM users WHERE user_id = $1 AND deleted_at IS NULL FOR UPDATE
+SELECT id, user_id, username, first_name, last_name, language_code, is_bot, is_premium, is_super_admin, is_allowed, ban_reason, banned_at, first_seen_at, last_seen_at, total_commands, total_torrents_added, total_downloads, created_at, updated_at, deleted_at FROM users WHERE user_id = $1 AND deleted_at IS NULL FOR UPDATE
 `
 
 func (q *Queries) LockUserForUpdate(ctx context.Context, userID int64) (Users, error) {
@@ -83,11 +137,18 @@ func (q *Queries) LockUserForUpdate(ctx context.Context, userID int64) (Users, e
 		&i.Username,
 		&i.FirstName,
 		&i.LastName,
+		&i.LanguageCode,
+		&i.IsBot,
+		&i.IsPremium,
 		&i.IsSuperAdmin,
 		&i.IsAllowed,
+		&i.BanReason,
+		&i.BannedAt,
 		&i.FirstSeenAt,
 		&i.LastSeenAt,
 		&i.TotalCommands,
+		&i.TotalTorrentsAdded,
+		&i.TotalDownloads,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -95,22 +156,44 @@ func (q *Queries) LockUserForUpdate(ctx context.Context, userID int64) (Users, e
 	return i, err
 }
 
+const unbanUser = `-- name: UnbanUser :exec
+UPDATE users SET is_allowed = true, ban_reason = NULL, banned_at = NULL, updated_at = $2
+WHERE user_id = $1
+`
+
+type UnbanUserParams struct {
+	UserID    int64              `json:"user_id"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) UnbanUser(ctx context.Context, arg UnbanUserParams) error {
+	_, err := q.db.Exec(ctx, unbanUser, arg.UserID, arg.UpdatedAt)
+	return err
+}
+
 const upsertUser = `-- name: UpsertUser :one
 INSERT INTO users (
-    user_id, username, first_name, last_name, is_super_admin, is_allowed,
+    user_id, username, first_name, last_name,
+    language_code, is_bot, is_premium,
+    is_super_admin, is_allowed,
     first_seen_at, last_seen_at, total_commands, created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, false,
-    $6, $7, 0, $8, $9
+    $1, $2, $3, $4,
+    $5, $6, $7,
+    $8, false,
+    $9, $10, 0, $11, $12
 )
 ON CONFLICT (user_id) DO UPDATE SET
     username       = EXCLUDED.username,
     first_name     = EXCLUDED.first_name,
     last_name      = EXCLUDED.last_name,
+    language_code  = EXCLUDED.language_code,
+    is_bot         = EXCLUDED.is_bot,
+    is_premium     = EXCLUDED.is_premium,
     is_super_admin = EXCLUDED.is_super_admin,
     last_seen_at   = EXCLUDED.last_seen_at,
     updated_at     = EXCLUDED.updated_at
-RETURNING id, user_id, username, first_name, last_name, is_super_admin, is_allowed, first_seen_at, last_seen_at, total_commands, created_at, updated_at, deleted_at
+RETURNING id, user_id, username, first_name, last_name, language_code, is_bot, is_premium, is_super_admin, is_allowed, ban_reason, banned_at, first_seen_at, last_seen_at, total_commands, total_torrents_added, total_downloads, created_at, updated_at, deleted_at
 `
 
 type UpsertUserParams struct {
@@ -118,6 +201,9 @@ type UpsertUserParams struct {
 	Username     *string            `json:"username"`
 	FirstName    *string            `json:"first_name"`
 	LastName     *string            `json:"last_name"`
+	LanguageCode *string            `json:"language_code"`
+	IsBot        bool               `json:"is_bot"`
+	IsPremium    bool               `json:"is_premium"`
 	IsSuperAdmin bool               `json:"is_super_admin"`
 	FirstSeenAt  pgtype.Timestamptz `json:"first_seen_at"`
 	LastSeenAt   pgtype.Timestamptz `json:"last_seen_at"`
@@ -131,6 +217,9 @@ func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (Users, 
 		arg.Username,
 		arg.FirstName,
 		arg.LastName,
+		arg.LanguageCode,
+		arg.IsBot,
+		arg.IsPremium,
 		arg.IsSuperAdmin,
 		arg.FirstSeenAt,
 		arg.LastSeenAt,
@@ -144,11 +233,18 @@ func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (Users, 
 		&i.Username,
 		&i.FirstName,
 		&i.LastName,
+		&i.LanguageCode,
+		&i.IsBot,
+		&i.IsPremium,
 		&i.IsSuperAdmin,
 		&i.IsAllowed,
+		&i.BanReason,
+		&i.BannedAt,
 		&i.FirstSeenAt,
 		&i.LastSeenAt,
 		&i.TotalCommands,
+		&i.TotalTorrentsAdded,
+		&i.TotalDownloads,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,

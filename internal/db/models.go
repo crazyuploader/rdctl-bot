@@ -18,18 +18,22 @@ type ActivityLogs struct {
 	Username        *string            `json:"username"`
 	ActivityType    string             `json:"activity_type"`
 	Command         *string            `json:"command"`
+	MessageID       *int64             `json:"message_id"`
 	MessageThreadID *int64             `json:"message_thread_id"`
 	Success         bool               `json:"success"`
 	ErrorMessage    *string            `json:"error_message"`
-	Metadata        *json.RawMessage   `json:"metadata"`
+	Metadata        json.RawMessage    `json:"metadata"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	CreatedDate     pgtype.Date        `json:"created_date"`
 }
 
 type Chats struct {
 	ID        int64              `json:"id"`
 	ChatID    int64              `json:"chat_id"`
 	Title     *string            `json:"title"`
+	Username  *string            `json:"username"`
 	Type      *string            `json:"type"`
+	IsForum   bool               `json:"is_forum"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
@@ -41,12 +45,25 @@ type CommandLogs struct {
 	Username        *string            `json:"username"`
 	Command         string             `json:"command"`
 	FullCommand     *string            `json:"full_command"`
+	MessageID       *int64             `json:"message_id"`
 	MessageThreadID *int64             `json:"message_thread_id"`
 	ExecutionTime   *int64             `json:"execution_time"`
 	Success         bool               `json:"success"`
 	ErrorMessage    *string            `json:"error_message"`
 	ResponseLength  *int64             `json:"response_length"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	CreatedDate     pgtype.Date        `json:"created_date"`
+}
+
+type DailyStats struct {
+	StatDate        pgtype.Date        `json:"stat_date"`
+	CommandsTotal   int64              `json:"commands_total"`
+	CommandsSuccess int64              `json:"commands_success"`
+	CommandsFail    int64              `json:"commands_fail"`
+	TorrentsAdded   int64              `json:"torrents_added"`
+	DownloadsTotal  int64              `json:"downloads_total"`
+	ActiveUsers     int64              `json:"active_users"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type DownloadActivities struct {
@@ -62,8 +79,9 @@ type DownloadActivities struct {
 	Action            string             `json:"action"`
 	Success           bool               `json:"success"`
 	ErrorMessage      *string            `json:"error_message"`
-	Metadata          *json.RawMessage   `json:"metadata"`
+	Metadata          json.RawMessage    `json:"metadata"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	CreatedDate       pgtype.Date        `json:"created_date"`
 	TorrentActivityID *int64             `json:"torrent_activity_id"`
 }
 
@@ -82,6 +100,19 @@ type KeptTorrents struct {
 	Filename  *string            `json:"filename"`
 	KeptByID  int64              `json:"kept_by_id"`
 	KeptAt    pgtype.Timestamptz `json:"kept_at"`
+}
+
+type Messages struct {
+	ID          int64              `json:"id"`
+	MessageID   int64              `json:"message_id"`
+	ChatID      int64              `json:"chat_id"`
+	UserID      *int64             `json:"user_id"`
+	ThreadID    *int64             `json:"thread_id"`
+	Text        *string            `json:"text"`
+	MessageType string             `json:"message_type"`
+	ReplyToID   *int64             `json:"reply_to_id"`
+	IsForward   bool               `json:"is_forward"`
+	SentAt      pgtype.Timestamptz `json:"sent_at"`
 }
 
 type SettingAudits struct {
@@ -117,21 +148,47 @@ type TorrentActivities struct {
 	ErrorMessage  *string            `json:"error_message"`
 	Metadata      json.RawMessage    `json:"metadata"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	CreatedDate   pgtype.Date        `json:"created_date"`
 	SelectedFiles json.RawMessage    `json:"selected_files"`
 }
 
+type UserChatMemberships struct {
+	ID           int64              `json:"id"`
+	UserID       int64              `json:"user_id"`
+	ChatID       int64              `json:"chat_id"`
+	FirstSeenAt  pgtype.Timestamptz `json:"first_seen_at"`
+	LastSeenAt   pgtype.Timestamptz `json:"last_seen_at"`
+	CommandCount int64              `json:"command_count"`
+}
+
+type UserDailyStats struct {
+	ID            int64       `json:"id"`
+	StatDate      pgtype.Date `json:"stat_date"`
+	UserID        int64       `json:"user_id"`
+	Commands      int64       `json:"commands"`
+	TorrentsAdded int64       `json:"torrents_added"`
+	Downloads     int64       `json:"downloads"`
+}
+
 type Users struct {
-	ID            int64              `json:"id"`
-	UserID        int64              `json:"user_id"`
-	Username      *string            `json:"username"`
-	FirstName     *string            `json:"first_name"`
-	LastName      *string            `json:"last_name"`
-	IsSuperAdmin  bool               `json:"is_super_admin"`
-	IsAllowed     bool               `json:"is_allowed"`
-	FirstSeenAt   pgtype.Timestamptz `json:"first_seen_at"`
-	LastSeenAt    pgtype.Timestamptz `json:"last_seen_at"`
-	TotalCommands int64              `json:"total_commands"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
+	ID                 int64              `json:"id"`
+	UserID             int64              `json:"user_id"`
+	Username           *string            `json:"username"`
+	FirstName          *string            `json:"first_name"`
+	LastName           *string            `json:"last_name"`
+	LanguageCode       *string            `json:"language_code"`
+	IsBot              bool               `json:"is_bot"`
+	IsPremium          bool               `json:"is_premium"`
+	IsSuperAdmin       bool               `json:"is_super_admin"`
+	IsAllowed          bool               `json:"is_allowed"`
+	BanReason          *string            `json:"ban_reason"`
+	BannedAt           pgtype.Timestamptz `json:"banned_at"`
+	FirstSeenAt        pgtype.Timestamptz `json:"first_seen_at"`
+	LastSeenAt         pgtype.Timestamptz `json:"last_seen_at"`
+	TotalCommands      int64              `json:"total_commands"`
+	TotalTorrentsAdded int64              `json:"total_torrents_added"`
+	TotalDownloads     int64              `json:"total_downloads"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt          pgtype.Timestamptz `json:"deleted_at"`
 }

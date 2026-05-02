@@ -47,7 +47,7 @@ type InsertDownloadActivityParams struct {
 	Action            string             `json:"action"`
 	Success           bool               `json:"success"`
 	ErrorMessage      *string            `json:"error_message"`
-	Metadata          *json.RawMessage   `json:"metadata"`
+	Metadata          json.RawMessage    `json:"metadata"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	TorrentActivityID *int64             `json:"torrent_activity_id"`
 }

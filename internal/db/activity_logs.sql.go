@@ -26,10 +26,10 @@ func (q *Queries) CountActivitiesByUser(ctx context.Context, userID int64) (int6
 const insertActivityLog = `-- name: InsertActivityLog :exec
 INSERT INTO activity_logs (
     request_id, user_id, chat_id, username, activity_type, command,
-    message_thread_id, success, error_message, metadata, created_at
+    message_id, message_thread_id, success, error_message, metadata, created_at
 ) VALUES (
     $1, $2, $3, $4, $5, $6,
-    $7, $8, $9, $10, $11
+    $7, $8, $9, $10, $11, $12
 )
 `
 
@@ -40,10 +40,11 @@ type InsertActivityLogParams struct {
 	Username        *string            `json:"username"`
 	ActivityType    string             `json:"activity_type"`
 	Command         *string            `json:"command"`
+	MessageID       *int64             `json:"message_id"`
 	MessageThreadID *int64             `json:"message_thread_id"`
 	Success         bool               `json:"success"`
 	ErrorMessage    *string            `json:"error_message"`
-	Metadata        *json.RawMessage   `json:"metadata"`
+	Metadata        json.RawMessage    `json:"metadata"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 }
 
@@ -55,6 +56,7 @@ func (q *Queries) InsertActivityLog(ctx context.Context, arg InsertActivityLogPa
 		arg.Username,
 		arg.ActivityType,
 		arg.Command,
+		arg.MessageID,
 		arg.MessageThreadID,
 		arg.Success,
 		arg.ErrorMessage,

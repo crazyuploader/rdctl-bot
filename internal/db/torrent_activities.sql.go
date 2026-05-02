@@ -24,7 +24,7 @@ func (q *Queries) CountTorrentAddsByUser(ctx context.Context, userID int64) (int
 }
 
 const getAllTorrentActivities = `-- name: GetAllTorrentActivities :many
-SELECT id, request_id, user_id, chat_id, torrent_id, torrent_hash, torrent_name, magnet_link, action, status, file_size, progress, success, error_message, metadata, created_at, selected_files FROM torrent_activities
+SELECT id, request_id, user_id, chat_id, torrent_id, torrent_hash, torrent_name, magnet_link, action, status, file_size, progress, success, error_message, metadata, created_at, created_date, selected_files FROM torrent_activities
 ORDER BY created_at DESC
 LIMIT $1
 `
@@ -55,6 +55,7 @@ func (q *Queries) GetAllTorrentActivities(ctx context.Context, limit int32) ([]T
 			&i.ErrorMessage,
 			&i.Metadata,
 			&i.CreatedAt,
+			&i.CreatedDate,
 			&i.SelectedFiles,
 		); err != nil {
 			return nil, err
@@ -68,7 +69,7 @@ func (q *Queries) GetAllTorrentActivities(ctx context.Context, limit int32) ([]T
 }
 
 const getTorrentActivities = `-- name: GetTorrentActivities :many
-SELECT id, request_id, user_id, chat_id, torrent_id, torrent_hash, torrent_name, magnet_link, action, status, file_size, progress, success, error_message, metadata, created_at, selected_files FROM torrent_activities
+SELECT id, request_id, user_id, chat_id, torrent_id, torrent_hash, torrent_name, magnet_link, action, status, file_size, progress, success, error_message, metadata, created_at, created_date, selected_files FROM torrent_activities
 WHERE user_id = $1
 ORDER BY created_at DESC
 LIMIT $2
@@ -105,6 +106,7 @@ func (q *Queries) GetTorrentActivities(ctx context.Context, arg GetTorrentActivi
 			&i.ErrorMessage,
 			&i.Metadata,
 			&i.CreatedAt,
+			&i.CreatedDate,
 			&i.SelectedFiles,
 		); err != nil {
 			return nil, err

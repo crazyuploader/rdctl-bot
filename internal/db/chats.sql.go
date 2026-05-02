@@ -11,20 +11,64 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getChatByChatID = `-- name: GetChatByChatID :one
+SELECT id, chat_id, title, username, type, is_forum, created_at, updated_at FROM chats WHERE chat_id = $1
+`
+
+func (q *Queries) GetChatByChatID(ctx context.Context, chatID int64) (Chats, error) {
+	row := q.db.QueryRow(ctx, getChatByChatID, chatID)
+	var i Chats
+	err := row.Scan(
+		&i.ID,
+		&i.ChatID,
+		&i.Title,
+		&i.Username,
+		&i.Type,
+		&i.IsForum,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getChatByID = `-- name: GetChatByID :one
+SELECT id, chat_id, title, username, type, is_forum, created_at, updated_at FROM chats WHERE id = $1
+`
+
+func (q *Queries) GetChatByID(ctx context.Context, id int64) (Chats, error) {
+	row := q.db.QueryRow(ctx, getChatByID, id)
+	var i Chats
+	err := row.Scan(
+		&i.ID,
+		&i.ChatID,
+		&i.Title,
+		&i.Username,
+		&i.Type,
+		&i.IsForum,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const upsertChat = `-- name: UpsertChat :one
-INSERT INTO chats (chat_id, title, type, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO chats (chat_id, title, username, type, is_forum, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (chat_id) DO UPDATE SET
     title      = EXCLUDED.title,
+    username   = EXCLUDED.username,
     type       = EXCLUDED.type,
+    is_forum   = EXCLUDED.is_forum,
     updated_at = EXCLUDED.updated_at
-RETURNING id, chat_id, title, type, created_at, updated_at
+RETURNING id, chat_id, title, username, type, is_forum, created_at, updated_at
 `
 
 type UpsertChatParams struct {
 	ChatID    int64              `json:"chat_id"`
 	Title     *string            `json:"title"`
+	Username  *string            `json:"username"`
 	Type      *string            `json:"type"`
+	IsForum   bool               `json:"is_forum"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
@@ -33,7 +77,9 @@ func (q *Queries) UpsertChat(ctx context.Context, arg UpsertChatParams) (Chats, 
 	row := q.db.QueryRow(ctx, upsertChat,
 		arg.ChatID,
 		arg.Title,
+		arg.Username,
 		arg.Type,
+		arg.IsForum,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -42,7 +88,9 @@ func (q *Queries) UpsertChat(ctx context.Context, arg UpsertChatParams) (Chats, 
 		&i.ID,
 		&i.ChatID,
 		&i.Title,
+		&i.Username,
 		&i.Type,
+		&i.IsForum,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

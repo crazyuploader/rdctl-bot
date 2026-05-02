@@ -17,6 +17,12 @@ func toPgtypeTimestamptz(t time.Time) pgtype.Timestamptz {
 	return pgtype.Timestamptz{Time: t.UTC(), Valid: true}
 }
 
+// toPgtypeDate converts t to a pgtype.Date (calendar date only, no time).
+func toPgtypeDate(t time.Time) pgtype.Date {
+	y, m, d := t.UTC().Date()
+	return pgtype.Date{Time: time.Date(y, m, d, 0, 0, 0, 0, time.UTC), Valid: true}
+}
+
 // strPtr returns a pointer to s or nil when s is an empty string.
 func strPtr(s string) *string {
 	if s == "" {
@@ -151,13 +157,16 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 }
 
 // GetOrCreateUser upserts a user and returns the current record.
-func (r *UserRepository) GetOrCreateUser(ctx context.Context, userID int64, username, firstName, lastName string, isSuperAdmin bool) (*User, error) {
+func (r *UserRepository) GetOrCreateUser(ctx context.Context, userID int64, username, firstName, lastName, languageCode string, isBot, isPremium, isSuperAdmin bool) (*User, error) {
 	now := time.Now().UTC()
 	u, err := r.queries.UpsertUser(ctx, UpsertUserParams{
 		UserID:       userID,
 		Username:     strPtr(username),
 		FirstName:    strPtr(firstName),
 		LastName:     strPtr(lastName),
+		LanguageCode: strPtr(languageCode),
+		IsBot:        isBot,
+		IsPremium:    isPremium,
 		IsSuperAdmin: isSuperAdmin,
 		FirstSeenAt:  toPgtypeTimestamptz(now),
 		LastSeenAt:   toPgtypeTimestamptz(now),
@@ -186,12 +195,14 @@ func NewChatRepository(pool *pgxpool.Pool) *ChatRepository {
 }
 
 // GetOrCreateChat upserts a chat and returns the current record.
-func (r *ChatRepository) GetOrCreateChat(ctx context.Context, chatID int64, title, chatType string) (*Chat, error) {
+func (r *ChatRepository) GetOrCreateChat(ctx context.Context, chatID int64, title, username, chatType string, isForum bool) (*Chat, error) {
 	now := time.Now().UTC()
 	c, err := r.queries.UpsertChat(ctx, UpsertChatParams{
 		ChatID:    chatID,
 		Title:     strPtr(title),
+		Username:  strPtr(username),
 		Type:      strPtr(chatType),
+		IsForum:   isForum,
 		CreatedAt: toPgtypeTimestamptz(now),
 		UpdatedAt: toPgtypeTimestamptz(now),
 	})
@@ -217,7 +228,7 @@ func NewActivityRepository(pool *pgxpool.Pool) *ActivityRepository {
 }
 
 // LogActivity logs a general activity.
-func (r *ActivityRepository) LogActivity(ctx context.Context, requestID string, userID int64, chatID int64, username string, activityType ActivityType, command string, messageThreadID int, success bool, errorMsg string, metadata map[string]interface{}) error {
+func (r *ActivityRepository) LogActivity(ctx context.Context, requestID string, userID int64, chatID int64, username string, activityType ActivityType, command string, messageID int64, messageThreadID int, success bool, errorMsg string, metadata map[string]interface{}) error {
 	metaJSON, err := json.Marshal(metadata)
 	if err != nil {
 		metaJSON = []byte("{}")
@@ -235,10 +246,11 @@ func (r *ActivityRepository) LogActivity(ctx context.Context, requestID string, 
 		Username:        strPtr(username),
 		ActivityType:    string(activityType),
 		Command:         strPtr(command),
+		MessageID:       int64Ptr(messageID),
 		MessageThreadID: threadID,
 		Success:         success,
 		ErrorMessage:    strPtr(errorMsg),
-		Metadata:        &raw,
+		Metadata:        raw,
 		CreatedAt:       toPgtypeTimestamptz(time.Now().UTC()),
 	})
 }
@@ -259,6 +271,7 @@ func NewTorrentRepository(pool *pgxpool.Pool) *TorrentRepository {
 }
 
 // LogTorrentActivity logs a torrent-specific activity.
+// When action=="add" and success==true, also increments daily and user torrent counters.
 func (r *TorrentRepository) LogTorrentActivity(ctx context.Context, requestID string, userID int64, chatID int64, torrentID, torrentHash, torrentName, magnetLink, action, status string, fileSize int64, progress float64, success bool, errorMsg string, metadata map[string]interface{}) error {
 	if metadata == nil {
 		metadata = make(map[string]interface{})
@@ -267,23 +280,39 @@ func (r *TorrentRepository) LogTorrentActivity(ctx context.Context, requestID st
 	if err != nil {
 		metaJSON = []byte("{}")
 	}
-	return r.queries.InsertTorrentActivity(ctx, InsertTorrentActivityParams{
-		RequestID:     strPtr(requestID),
-		UserID:        userID,
-		ChatID:        chatID,
-		TorrentID:     torrentID,
-		TorrentHash:   strPtr(torrentHash),
-		TorrentName:   strPtr(torrentName),
-		MagnetLink:    strPtr(magnetLink),
-		Action:        action,
-		Status:        strPtr(status),
-		FileSize:      int64Ptr(fileSize),
-		Progress:      toNumericFromFloat64(progress),
-		Success:       success,
-		ErrorMessage:  strPtr(errorMsg),
-		Metadata:      json.RawMessage(metaJSON),
-		CreatedAt:     toPgtypeTimestamptz(time.Now().UTC()),
-		SelectedFiles: json.RawMessage("[]"),
+	today := toPgtypeDate(time.Now())
+	return withTx(ctx, r.pool, func(tx pgx.Tx) error {
+		q := New(tx)
+		if err := q.InsertTorrentActivity(ctx, InsertTorrentActivityParams{
+			RequestID:     strPtr(requestID),
+			UserID:        userID,
+			ChatID:        chatID,
+			TorrentID:     torrentID,
+			TorrentHash:   strPtr(torrentHash),
+			TorrentName:   strPtr(torrentName),
+			MagnetLink:    strPtr(magnetLink),
+			Action:        action,
+			Status:        strPtr(status),
+			FileSize:      int64Ptr(fileSize),
+			Progress:      toNumericFromFloat64(progress),
+			Success:       success,
+			ErrorMessage:  strPtr(errorMsg),
+			Metadata:      json.RawMessage(metaJSON),
+			CreatedAt:     toPgtypeTimestamptz(time.Now().UTC()),
+			SelectedFiles: json.RawMessage("[]"),
+		}); err != nil {
+			return err
+		}
+		if action == "add" && success {
+			if err := q.IncrementUserTorrents(ctx, userID); err != nil {
+				return err
+			}
+			if err := q.IncrementDailyTorrent(ctx, today); err != nil {
+				return err
+			}
+			return q.IncrementUserDailyTorrent(ctx, IncrementUserDailyTorrentParams{StatDate: today, UserID: userID})
+		}
+		return nil
 	})
 }
 
@@ -361,6 +390,7 @@ func NewDownloadRepository(pool *pgxpool.Pool) *DownloadRepository {
 }
 
 // LogDownloadActivity logs a download/unrestrict activity.
+// When success==true, also increments daily and user download counters.
 func (r *DownloadRepository) LogDownloadActivity(ctx context.Context, requestID string, userID int64, chatID int64, downloadID, originalLink, fileName, host, action string, fileSize int64, success bool, errorMsg string, metadata map[string]interface{}, torrentActivityID *int64) error {
 	if metadata == nil {
 		metadata = make(map[string]interface{})
@@ -370,21 +400,37 @@ func (r *DownloadRepository) LogDownloadActivity(ctx context.Context, requestID 
 		metaJSON = []byte("{}")
 	}
 	raw := json.RawMessage(metaJSON)
-	return r.queries.InsertDownloadActivity(ctx, InsertDownloadActivityParams{
-		RequestID:         strPtr(requestID),
-		UserID:            userID,
-		ChatID:            chatID,
-		DownloadID:        strPtr(downloadID),
-		OriginalLink:      strPtr(originalLink),
-		FileName:          strPtr(fileName),
-		FileSize:          int64Ptr(fileSize),
-		Host:              strPtr(host),
-		Action:            action,
-		Success:           success,
-		ErrorMessage:      strPtr(errorMsg),
-		Metadata:          &raw,
-		CreatedAt:         toPgtypeTimestamptz(time.Now().UTC()),
-		TorrentActivityID: torrentActivityID,
+	today := toPgtypeDate(time.Now())
+	return withTx(ctx, r.pool, func(tx pgx.Tx) error {
+		q := New(tx)
+		if err := q.InsertDownloadActivity(ctx, InsertDownloadActivityParams{
+			RequestID:         strPtr(requestID),
+			UserID:            userID,
+			ChatID:            chatID,
+			DownloadID:        strPtr(downloadID),
+			OriginalLink:      strPtr(originalLink),
+			FileName:          strPtr(fileName),
+			FileSize:          int64Ptr(fileSize),
+			Host:              strPtr(host),
+			Action:            action,
+			Success:           success,
+			ErrorMessage:      strPtr(errorMsg),
+			Metadata:          raw,
+			CreatedAt:         toPgtypeTimestamptz(time.Now().UTC()),
+			TorrentActivityID: torrentActivityID,
+		}); err != nil {
+			return err
+		}
+		if success {
+			if err := q.IncrementUserDownloads(ctx, userID); err != nil {
+				return err
+			}
+			if err := q.IncrementDailyDownload(ctx, today); err != nil {
+				return err
+			}
+			return q.IncrementUserDailyDownload(ctx, IncrementUserDailyDownloadParams{StatDate: today, UserID: userID})
+		}
+		return nil
 	})
 }
 
@@ -404,7 +450,7 @@ func NewCommandRepository(pool *pgxpool.Pool) *CommandRepository {
 }
 
 // LogCommand logs a command execution and atomically increments total_commands.
-func (r *CommandRepository) LogCommand(ctx context.Context, userID int64, chatID int64, username, command, fullCommand string, messageThreadID int, executionTime int64, success bool, errorMsg string, responseLength int) error {
+func (r *CommandRepository) LogCommand(ctx context.Context, userID int64, chatID int64, username, command, fullCommand string, messageID int64, messageThreadID int, executionTime int64, success bool, errorMsg string, responseLength int) error {
 	var threadID *int64
 	if messageThreadID != 0 {
 		tid := int64(messageThreadID)
@@ -412,6 +458,7 @@ func (r *CommandRepository) LogCommand(ctx context.Context, userID int64, chatID
 	}
 	respLen := int64(responseLength)
 
+	today := toPgtypeDate(time.Now())
 	return withTx(ctx, r.pool, func(tx pgx.Tx) error {
 		q := New(tx)
 		if err := q.InsertCommandLog(ctx, InsertCommandLogParams{
@@ -420,6 +467,7 @@ func (r *CommandRepository) LogCommand(ctx context.Context, userID int64, chatID
 			Username:        strPtr(username),
 			Command:         command,
 			FullCommand:     strPtr(fullCommand),
+			MessageID:       int64Ptr(messageID),
 			MessageThreadID: threadID,
 			ExecutionTime:   &executionTime,
 			Success:         success,
@@ -429,7 +477,13 @@ func (r *CommandRepository) LogCommand(ctx context.Context, userID int64, chatID
 		}); err != nil {
 			return err
 		}
-		return q.IncrementUserCommands(ctx, userID)
+		if err := q.IncrementUserCommands(ctx, userID); err != nil {
+			return err
+		}
+		if err := q.IncrementDailyCommand(ctx, IncrementDailyCommandParams{StatDate: today, Column2: success}); err != nil {
+			return err
+		}
+		return q.IncrementUserDailyCommand(ctx, IncrementUserDailyCommandParams{StatDate: today, UserID: userID})
 	})
 }
 
@@ -764,6 +818,72 @@ func withTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) erro
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+// ─────────────────────────────────────────────────────────────
+// MessageRepository
+// ─────────────────────────────────────────────────────────────
+
+// MessageRepository handles raw Telegram message archival.
+type MessageRepository struct {
+	pool    *pgxpool.Pool
+	queries *Queries
+}
+
+// NewMessageRepository creates a MessageRepository backed by the provided pgxpool.Pool.
+func NewMessageRepository(pool *pgxpool.Pool) *MessageRepository {
+	return &MessageRepository{pool: pool, queries: New(pool)}
+}
+
+// RecordMessage upserts a Telegram message into the archive.
+func (r *MessageRepository) RecordMessage(ctx context.Context, messageID int64, chatPK int64, userPK *int64, threadID int64, text, messageType string, replyToID int64, isForward bool, sentAt time.Time) error {
+	_, err := r.queries.UpsertMessage(ctx, UpsertMessageParams{
+		MessageID:   messageID,
+		ChatID:      chatPK,
+		UserID:      userPK,
+		ThreadID:    int64Ptr(threadID),
+		Text:        strPtr(text),
+		MessageType: messageType,
+		ReplyToID:   int64Ptr(replyToID),
+		IsForward:   isForward,
+		SentAt:      toPgtypeTimestamptz(sentAt),
+	})
+	return err
+}
+
+// ─────────────────────────────────────────────────────────────
+// UserChatMembershipRepository
+// ─────────────────────────────────────────────────────────────
+
+// UserChatMembershipRepository tracks per-user-per-chat activity.
+type UserChatMembershipRepository struct {
+	pool    *pgxpool.Pool
+	queries *Queries
+}
+
+// NewUserChatMembershipRepository creates a UserChatMembershipRepository backed by the provided pgxpool.Pool.
+func NewUserChatMembershipRepository(pool *pgxpool.Pool) *UserChatMembershipRepository {
+	return &UserChatMembershipRepository{pool: pool, queries: New(pool)}
+}
+
+// Touch upserts a membership record and optionally increments the command count.
+func (r *UserChatMembershipRepository) Touch(ctx context.Context, userPK int64, chatPK int64, incrementCommand bool) error {
+	now := toPgtypeTimestamptz(time.Now().UTC())
+	if err := r.queries.UpsertUserChatMembership(ctx, UpsertUserChatMembershipParams{
+		UserID:      userPK,
+		ChatID:      chatPK,
+		FirstSeenAt: now,
+	}); err != nil {
+		return err
+	}
+	if incrementCommand {
+		return r.queries.IncrementMembershipCommandCount(ctx, IncrementMembershipCommandCountParams{
+			UserID:      userPK,
+			ChatID:      chatPK,
+			LastSeenAt:  now,
+		})
+	}
+	return nil
 }
 
 // withReadTx runs fn inside a REPEATABLE READ read-only transaction so that
