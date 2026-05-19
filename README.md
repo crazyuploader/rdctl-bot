@@ -23,6 +23,7 @@ The bot uses `config.yaml`. See `example-config.yaml` for a template.
 - `app.rate_limit.burst`: Max message burst to Telegram.
 - `app.max_kept_torrents`: Max kept torrents per non-admin user (0 = unlimited).
 - `app.auto_delete_days`: Default auto-delete days fallback when not set in UI/DB (0 = disabled).
+- `app.auto_delete_check_interval_hours`: How often the cleanup job runs in hours (default: `1`).
 - `app.auto_delete_warning.chat_id`: Chat ID to send warning notifications (0 = disabled).
 - `app.auto_delete_warning.topic_id`: Topic/thread ID for warnings (0 = main chat).
 - `app.auto_delete_warning.hours_before`: Hours before deletion to send warning (default: 6).
