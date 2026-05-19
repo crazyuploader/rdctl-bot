@@ -203,8 +203,8 @@ func (b *Bot) registerHandlers() {
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/status", bot.MatchTypeExact, b.handleStatusCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/stats", bot.MatchTypeExact, b.handleStatsCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/dashboard", bot.MatchTypeExact, b.handleDashboardCommand)
-	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/autodelete", bot.MatchTypePrefix, b.handleAutoDeleteCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/autodelete-interval", bot.MatchTypePrefix, b.handleAutoDeleteIntervalCommand)
+	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/autodelete", bot.MatchTypePrefix, b.handleAutoDeleteCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/keep", bot.MatchTypePrefix, b.handleKeepCommand)
 	b.api.RegisterHandler(bot.HandlerTypeMessageText, "/unkeep", bot.MatchTypePrefix, b.handleUnkeepCommand)
 
