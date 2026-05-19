@@ -92,20 +92,20 @@ func (m *Middleware) LogCommand(update *models.Update, command string) {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("[%s] User: [username=%s, user_id=%d] - Chat: [chat_id=%d",
+	fmt.Fprintf(&sb, "[%s] User: [username=%s, user_id=%d] - Chat: [chat_id=%d",
 		time.Now().Format("2006-01-02 15:04:05"),
 		user,
 		userID,
 		chatID,
-	))
+	)
 
 	if messageThreadID != 0 {
-		sb.WriteString(fmt.Sprintf(", topicID=%d]", messageThreadID))
+		fmt.Fprintf(&sb, ", topicID=%d]", messageThreadID)
 	} else {
 		sb.WriteString("]")
 	}
 
-	sb.WriteString(fmt.Sprintf(" - Command: %s", command))
+	fmt.Fprintf(&sb, " - Command: %s", command)
 
 	log.Println(sb.String())
 }
