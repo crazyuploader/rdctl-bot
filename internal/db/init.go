@@ -19,7 +19,7 @@ import (
 var migrationsFS embed.FS
 
 // It returns an error if migrations fail, if the DSN cannot be parsed, if the pool cannot be created, or if the initial ping fails (the pool is closed on ping failure).
-func Init(dsn string) (*pgxpool.Pool, error) {
+func Init(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	if err := RunMigrations(dsn); err != nil {
 		return nil, fmt.Errorf("migrations failed: %w", err)
 	}
@@ -46,6 +46,27 @@ func Init(dsn string) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("failed to ping: %w", err)
 	}
 	log.Println("Database connected and migrations completed successfully!")
+
+	// Start periodic pool stats logging; stops when ctx is cancelled
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				stat := pool.Stat()
+				log.Printf("db pool: acquired=%d idle=%d waiting=%d max=%d",
+					stat.AcquiredConns(),
+					stat.IdleConns(),
+					stat.TotalConns()-stat.AcquiredConns(),
+					stat.MaxConns(),
+				)
+			}
+		}
+	}()
+
 	return pool, nil
 }
 

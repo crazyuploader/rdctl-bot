@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/crazyuploader/rdctl-bot/internal/config"
@@ -90,22 +91,23 @@ func (m *Middleware) LogCommand(update *models.Update, command string) {
 		}
 	}
 
-	logMessage := fmt.Sprintf("[%s] User: [username=%s, user_id=%d] - Chat: [chat_id=%d",
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("[%s] User: [username=%s, user_id=%d] - Chat: [chat_id=%d",
 		time.Now().Format("2006-01-02 15:04:05"),
 		user,
 		userID,
 		chatID,
-	)
+	))
 
 	if messageThreadID != 0 {
-		logMessage += fmt.Sprintf(", topicID=%d]", messageThreadID)
+		sb.WriteString(fmt.Sprintf(", topicID=%d]", messageThreadID))
 	} else {
-		logMessage += "]"
+		sb.WriteString("]")
 	}
 
-	logMessage += fmt.Sprintf(" - Command: %s", command)
+	sb.WriteString(fmt.Sprintf(" - Command: %s", command))
 
-	log.Println(logMessage)
+	log.Println(sb.String())
 }
 
 // LogUnauthorized logs unauthorized access attempts

@@ -52,7 +52,7 @@ type TelegramConfig struct {
 	BotToken        string             `mapstructure:"bot_token"`
 	AllowedChatIDs  []int64            `mapstructure:"allowed_chat_ids"`
 	SuperAdminIDs   []int64            `mapstructure:"super_admin_ids"`
-	AllowedTopicIDs map[string][]int64 `mapstructure:"allowed_topic_ids"` // map[chatID][]topicID - if set, bot only responds in these topics for that chat
+	AllowedTopicIDs map[string][]int64 `mapstructure:"allowed_topic_ids"` // map[chatID][]topicID; if set, bot only responds in listed topics
 }
 
 // RealDebridConfig holds Real-Debrid API settings
@@ -69,9 +69,9 @@ type RealDebridConfig struct {
 type AppConfig struct {
 	LogLevel                     string                  `mapstructure:"log_level"`
 	RateLimit                    RateLimitConfig         `mapstructure:"rate_limit"`
-	MaxKeptTorrents              int                     `mapstructure:"max_kept_torrents"`                // Max kept torrents per non-admin user (0 = unlimited, admins always unlimited)
-	AutoDeleteDays               int                     `mapstructure:"auto_delete_days"`                 // Default auto-delete days fallback when not set in DB
-	AutoDeleteCheckIntervalHours int                     `mapstructure:"auto_delete_check_interval_hours"` // Default check interval in hours (default: 1)
+	MaxKeptTorrents              int                     `mapstructure:"max_kept_torrents"`                // Per non-admin user; 0 = unlimited
+	AutoDeleteDays               int                     `mapstructure:"auto_delete_days"`                 // Fallback when not set in DB
+	AutoDeleteCheckIntervalHours int                     `mapstructure:"auto_delete_check_interval_hours"` // Hours between cleanup runs
 	AutoDeleteWarning            AutoDeleteWarningConfig `mapstructure:"auto_delete_warning"`
 }
 
@@ -299,12 +299,7 @@ func Get() *Config {
 
 // IsAllowedChat checks if a chat ID is allowed
 func (c *Config) IsAllowedChat(chatID int64) bool {
-	for _, id := range c.Telegram.AllowedChatIDs {
-		if id == chatID {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(c.Telegram.AllowedChatIDs, chatID)
 }
 
 // IsSuperAdmin checks if a user ID belongs to a super admin

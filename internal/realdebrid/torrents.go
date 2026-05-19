@@ -109,6 +109,9 @@ func (c *Client) GetTorrentsWithCount(limit, offset int) (*TorrentsResult, error
 
 // GetTorrentInfo retrieves detailed information about a torrent
 func (c *Client) GetTorrentInfo(torrentID string) (*Torrent, error) {
+	if err := validateID(torrentID, "torrent"); err != nil {
+		return nil, err
+	}
 	data, err := c.GET("/torrents/info/"+torrentID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get torrent info: %w", err)
@@ -143,6 +146,9 @@ func (c *Client) AddMagnet(magnetURL string) (*AddMagnetResponse, error) {
 
 // SelectFiles selects which files to download from a torrent
 func (c *Client) SelectFiles(torrentID string, fileIDs []int) error {
+	if err := validateID(torrentID, "torrent"); err != nil {
+		return err
+	}
 	fileIDsStr := make([]string, len(fileIDs))
 	for i, id := range fileIDs {
 		fileIDsStr[i] = fmt.Sprintf("%d", id)
@@ -162,6 +168,9 @@ func (c *Client) SelectFiles(torrentID string, fileIDs []int) error {
 
 // SelectAllFiles selects all files in a torrent
 func (c *Client) SelectAllFiles(torrentID string) error {
+	if err := validateID(torrentID, "torrent"); err != nil {
+		return err
+	}
 	formData := map[string]string{
 		"files": "all",
 	}
@@ -176,6 +185,9 @@ func (c *Client) SelectAllFiles(torrentID string) error {
 
 // DeleteTorrent deletes a torrent
 func (c *Client) DeleteTorrent(torrentID string) error {
+	if err := validateID(torrentID, "torrent"); err != nil {
+		return err
+	}
 	_, err := c.DELETE("/torrents/delete/" + torrentID)
 	if err != nil {
 		return fmt.Errorf("failed to delete torrent: %w", err)

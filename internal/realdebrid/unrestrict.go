@@ -93,6 +93,9 @@ func (c *Client) GetDownloadsWithCount(limit, offset int) (*DownloadsResult, err
 
 // DeleteDownload removes a download from history
 func (c *Client) DeleteDownload(downloadID string) error {
+	if err := validateID(downloadID, "download"); err != nil {
+		return err
+	}
 	_, err := c.DELETE("/downloads/delete/" + downloadID)
 	if err != nil {
 		return fmt.Errorf("failed to delete download: %w", err)

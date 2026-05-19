@@ -64,10 +64,17 @@ type Bot struct {
 	systemUserID   int64
 }
 
+// IPTestConfig holds configuration for proxy IP testing
+type IPTestConfig struct {
+	ProxyURL  string
+	TestURL   string // URL to fetch IP from (default: https://api.ipify.org?format=json)
+	VerifyURL string // If set, verifies primary IP matches this endpoint
+}
+
 // NewBot creates and returns a fully configured Bot.
-func NewBot(cfg *config.Config, database *pgxpool.Pool, proxyURL, ipTestURL, ipVerifyURL string) (*Bot, error) {
+func NewBot(cfg *config.Config, database *pgxpool.Pool, ipTest IPTestConfig) (*Bot, error) {
 	// Perform IP tests first
-	if err := performIPTests(proxyURL, ipTestURL, ipVerifyURL); err != nil {
+	if err := performIPTests(ipTest); err != nil {
 		return nil, fmt.Errorf("IP test failed: %w", err)
 	}
 
@@ -90,7 +97,7 @@ func NewBot(cfg *config.Config, database *pgxpool.Pool, proxyURL, ipTestURL, ipV
 	rdClient := realdebrid.NewClient(
 		cfg.RealDebrid.BaseURL,
 		cfg.RealDebrid.APIToken,
-		proxyURL,
+		ipTest.ProxyURL,
 		time.Duration(cfg.RealDebrid.Timeout)*time.Second,
 	)
 
@@ -240,38 +247,52 @@ func defaultHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 	// Silently ignore
 }
 
+// UserInfo holds extracted user information from an update
+type UserInfo struct {
+	ChatID          int64
+	MessageThreadID int
+	Username        string
+	FirstName       string
+	LastName        string
+	LanguageCode    string
+	IsBot           bool
+	IsPremium       bool
+	UserID          int64
+}
+
 // getUserFromUpdate extracts user information from an update
-func (b *Bot) getUserFromUpdate(update *models.Update) (chatID int64, messageThreadID int, username, firstName, lastName, languageCode string, isBot, isPremium bool, userID int64) {
+func (b *Bot) getUserFromUpdate(update *models.Update) UserInfo {
+	var info UserInfo
 	var from *models.User
 	if update.Message != nil {
-		chatID = update.Message.Chat.ID
+		info.ChatID = update.Message.Chat.ID
 		if update.Message.MessageThreadID != 0 {
-			messageThreadID = update.Message.MessageThreadID
+			info.MessageThreadID = update.Message.MessageThreadID
 		}
 		from = update.Message.From
 	} else if update.CallbackQuery != nil {
 		if update.CallbackQuery.Message.Message != nil {
-			chatID = update.CallbackQuery.Message.Message.Chat.ID
+			info.ChatID = update.CallbackQuery.Message.Message.Chat.ID
 			if update.CallbackQuery.Message.Message.MessageThreadID != 0 {
-				messageThreadID = update.CallbackQuery.Message.Message.MessageThreadID
+				info.MessageThreadID = update.CallbackQuery.Message.Message.MessageThreadID
 			}
 		}
 		from = &update.CallbackQuery.From
 	}
 	if from != nil {
-		username = from.Username
-		firstName = from.FirstName
-		lastName = from.LastName
-		userID = from.ID
-		languageCode = from.LanguageCode
-		isBot = from.IsBot
-		isPremium = from.IsPremium
+		info.Username = from.Username
+		info.FirstName = from.FirstName
+		info.LastName = from.LastName
+		info.UserID = from.ID
+		info.LanguageCode = from.LanguageCode
+		info.IsBot = from.IsBot
+		info.IsPremium = from.IsPremium
 	}
 
-	if username == "" {
-		username = firstName
+	if info.Username == "" {
+		info.Username = info.FirstName
 	}
-	return
+	return info
 }
 
 // getChatFromUpdate extracts chat info from an update
@@ -300,13 +321,13 @@ func (b *Bot) getChatFromUpdate(update *models.Update) (chatID int64, title, cha
 
 // withAuth is a middleware to check authorization and execute the handler
 func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(ctx context.Context, chatID int64, chatPK int64, messageThreadID int, isSuperAdmin bool, user *db.User)) {
-	chatID, messageThreadID, username, firstName, lastName, languageCode, isBot, isPremium, userID := b.getUserFromUpdate(update)
+	userInfo := b.getUserFromUpdate(update)
 	_, title, chatUsername, chatType, isForum := b.getChatFromUpdate(update)
 
-	isAllowed, isSuperAdmin := b.middleware.CheckAuthorization(chatID, userID)
+	isAllowed, isSuperAdmin := b.middleware.CheckAuthorization(userInfo.ChatID, userInfo.UserID)
 
 	chatPK := int64(0)
-	chat, err := b.chatRepo.GetOrCreateChat(ctx, chatID, title, chatUsername, chatType, isForum)
+	chat, err := b.chatRepo.GetOrCreateChat(ctx, userInfo.ChatID, title, chatUsername, chatType, isForum)
 	if err != nil {
 		log.Printf("Warning: failed to automatically log chat ID: %v", err)
 	}
@@ -315,18 +336,18 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 	}
 
 	var user *db.User
-	if userID != 0 {
-		user, err = b.userRepo.GetOrCreateUser(ctx, userID, username, firstName, lastName, languageCode, isBot, isPremium, isSuperAdmin)
+	if userInfo.UserID != 0 {
+		user, err = b.userRepo.GetOrCreateUser(ctx, userInfo.UserID, userInfo.Username, userInfo.FirstName, userInfo.LastName, userInfo.LanguageCode, userInfo.IsBot, userInfo.IsPremium, isSuperAdmin)
 		if err != nil {
 			log.Printf("Error getting/creating user: %v", err)
-			if chatID != 0 {
+			if userInfo.ChatID != 0 {
 				if err2 := b.middleware.WaitForRateLimit(); err2 != nil {
 					log.Printf("Rate limit error: %v", err2)
 				}
 				_, _ = b.api.SendMessage(ctx, &bot.SendMessageParams{
-					ChatID:          chatID,
+					ChatID:          userInfo.ChatID,
 					Text:            "[ERROR] An internal error occurred. Please try again later.",
-					MessageThreadID: messageThreadID,
+					MessageThreadID: userInfo.MessageThreadID,
 				})
 			}
 			return
@@ -336,10 +357,10 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 	}
 
 	if !isAllowed {
-		b.middleware.LogUnauthorized(username, chatID, userID)
-		b.sendUnauthorizedMessage(ctx, chatID, messageThreadID, userID)
+		b.middleware.LogUnauthorized(userInfo.Username, userInfo.ChatID, userInfo.UserID)
+		b.sendUnauthorizedMessage(ctx, userInfo.ChatID, userInfo.MessageThreadID, userInfo.UserID)
 		if user != nil {
-			if err := b.activityRepo.LogActivity(ctx, "", user.ID, chatPK, username, db.ActivityTypeUnauthorized, "", 0, messageThreadID, false, "Unauthorized access attempt", nil); err != nil {
+			if err := b.activityRepo.LogActivity(ctx, "", user.ID, chatPK, userInfo.Username, db.ActivityTypeUnauthorized, "", 0, userInfo.MessageThreadID, false, "Unauthorized access attempt", nil); err != nil {
 				log.Printf("Warning: failed to log unauthorized activity: %v", err)
 			}
 		}
@@ -347,13 +368,13 @@ func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(
 	}
 
 	// Check topic restrictions if configured
-	if !b.config.IsAllowedTopic(chatID, messageThreadID) {
-		log.Printf("Topic %d not allowed for chat %d (config topics: %v)", messageThreadID, chatID, b.config.Telegram.AllowedTopicIDs[fmt.Sprintf("%d", chatID)])
-		b.middleware.LogUnauthorized(username, chatID, userID)
+	if !b.config.IsAllowedTopic(userInfo.ChatID, userInfo.MessageThreadID) {
+		log.Printf("Topic %d not allowed for chat %d (config topics: %v)", userInfo.MessageThreadID, userInfo.ChatID, b.config.Telegram.AllowedTopicIDs[fmt.Sprintf("%d", userInfo.ChatID)])
+		b.middleware.LogUnauthorized(userInfo.Username, userInfo.ChatID, userInfo.UserID)
 		return
 	}
 
-	handler(ctx, chatID, chatPK, messageThreadID, isSuperAdmin, user)
+	handler(ctx, userInfo.ChatID, chatPK, userInfo.MessageThreadID, isSuperAdmin, user)
 }
 
 // sendUnauthorizedMessage sends an unauthorized message
@@ -396,19 +417,19 @@ func (b *Bot) maskUsername(username string) string {
 }
 
 // performIPTests performs IP address checks using an optional proxy and test endpoints.
-// When ipVerifyURL is provided, it verifies the primary IP (from ipTestURL or default) matches the verification endpoint and returns an error if the primary IP cannot be obtained, the verification request or response parsing fails, or the IPs do not match; it returns nil on success.
-func performIPTests(proxyURL, ipTestURL, ipVerifyURL string) error {
+// When cfg.VerifyURL is provided, it verifies the primary IP matches the verification endpoint.
+func performIPTests(cfg IPTestConfig) error {
 	var ipTestClient *http.Client
 	var primaryIP string
 
 	currentIpTestURL := "https://api.ipify.org?format=json"
-	if ipTestURL != "" {
-		currentIpTestURL = ipTestURL
+	if cfg.TestURL != "" {
+		currentIpTestURL = cfg.TestURL
 	}
 
-	if proxyURL != "" {
+	if cfg.ProxyURL != "" {
 		log.Println("Proxy configured. Performing IP test...")
-		parsedProxyURL, err := url.Parse(proxyURL)
+		parsedProxyURL, err := url.Parse(cfg.ProxyURL)
 		if err != nil {
 			log.Printf("Warning: Invalid proxy URL for IP test: %v. Skipping IP test.", err)
 			ipTestClient = &http.Client{Timeout: 10 * time.Second}
@@ -448,12 +469,12 @@ func performIPTests(proxyURL, ipTestURL, ipVerifyURL string) error {
 		}
 	}
 
-	if ipVerifyURL != "" {
+	if cfg.VerifyURL != "" {
 		if primaryIP == "" {
 			return fmt.Errorf("cannot perform IP verification without a primary IP")
 		}
 		log.Println("Performing IP verification test...")
-		verifyResp, verifyErr := ipTestClient.Get(ipVerifyURL)
+		verifyResp, verifyErr := ipTestClient.Get(cfg.VerifyURL)
 		if verifyErr != nil {
 			return fmt.Errorf("failed to perform IP verification test: %w", verifyErr)
 		}

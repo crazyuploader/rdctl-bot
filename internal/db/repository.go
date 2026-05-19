@@ -12,6 +12,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Sentinel errors returned by repository methods.
+var (
+	ErrUserNotFound    = errors.New("user not found")
+	ErrTorrentNotKept  = errors.New("torrent is not kept or you don't have permission to unkeep it")
+)
+
 // toPgtypeTimestamptz converts t to a pgtype.Timestamptz with the time normalized to UTC and Valid set to true.
 func toPgtypeTimestamptz(t time.Time) pgtype.Timestamptz {
 	return pgtype.Timestamptz{Time: t.UTC(), Valid: true}
@@ -132,13 +138,12 @@ func toFloat64FromNumeric(n pgtype.Numeric) float64 {
 }
 
 // toNumericFromFloat64 converts a float64 to a pgtype.Numeric.
-// On scan failure it returns an invalid (zero) pgtype.Numeric.
-func toNumericFromFloat64(f float64) pgtype.Numeric {
+func toNumericFromFloat64(f float64) (pgtype.Numeric, error) {
 	var n pgtype.Numeric
 	if err := n.Scan(fmt.Sprintf("%g", f)); err != nil {
-		return pgtype.Numeric{}
+		return pgtype.Numeric{}, fmt.Errorf("convert float %v to numeric: %w", f, err)
 	}
-	return n
+	return n, nil
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -284,6 +289,10 @@ func (r *TorrentRepository) LogTorrentActivity(ctx context.Context, requestID st
 		metaJSON = []byte("{}")
 	}
 	today := toPgtypeDate(time.Now())
+	progressVal, err := toNumericFromFloat64(progress)
+	if err != nil {
+		return fmt.Errorf("LogTorrentActivity: %w", err)
+	}
 	return withTx(ctx, r.pool, func(tx pgx.Tx) error {
 		q := New(tx)
 		if err := q.InsertTorrentActivity(ctx, InsertTorrentActivityParams{
@@ -297,7 +306,7 @@ func (r *TorrentRepository) LogTorrentActivity(ctx context.Context, requestID st
 			Action:        action,
 			Status:        strPtr(status),
 			FileSize:      int64Ptr(fileSize),
-			Progress:      toNumericFromFloat64(progress),
+			Progress:      progressVal,
 			Success:       success,
 			ErrorMessage:  strPtr(errorMsg),
 			Metadata:      json.RawMessage(metaJSON),
@@ -501,7 +510,7 @@ func (r *CommandRepository) GetUserStats(ctx context.Context, telegramUserID int
 		u, err := q.GetUserByUserID(ctx, telegramUserID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return errors.New("user not found")
+				return ErrUserNotFound
 			}
 			return err
 		}
@@ -732,7 +741,7 @@ func (r *KeptTorrentRepository) UnkeepTorrent(ctx context.Context, torrentID str
 				return err
 			}
 			if tag.RowsAffected() == 0 {
-				return fmt.Errorf("torrent is not kept or you don't have permission to unkeep it")
+				return ErrTorrentNotKept
 			}
 		} else {
 			tag, err := tx.Exec(ctx,
@@ -742,7 +751,7 @@ func (r *KeptTorrentRepository) UnkeepTorrent(ctx context.Context, torrentID str
 				return err
 			}
 			if tag.RowsAffected() == 0 {
-				return fmt.Errorf("torrent is not kept or you don't have permission to unkeep it")
+				return ErrTorrentNotKept
 			}
 		}
 
@@ -817,7 +826,9 @@ func withTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) erro
 		return err
 	}
 	if err := fn(tx); err != nil {
-		_ = tx.Rollback(ctx)
+		if rbErr := tx.Rollback(ctx); rbErr != nil {
+			return fmt.Errorf("operation failed: %w; rollback also failed: %v", err, rbErr)
+		}
 		return err
 	}
 	return tx.Commit(ctx)
@@ -900,7 +911,9 @@ func withReadTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) 
 		return err
 	}
 	if err := fn(tx); err != nil {
-		_ = tx.Rollback(ctx)
+		if rbErr := tx.Rollback(ctx); rbErr != nil {
+			return fmt.Errorf("operation failed: %w; rollback also failed: %v", err, rbErr)
+		}
 		return err
 	}
 	return tx.Commit(ctx)

@@ -8,7 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -48,12 +48,9 @@ func NewClient(baseURL, apiToken, proxyURL string, timeout time.Duration) *Clien
 	if proxyURL != "" {
 		parsedProxyURL, err := url.Parse(proxyURL)
 		if err != nil {
-			// Log error or handle it appropriately, for now, we'll just proceed without proxy
-			fmt.Printf("Warning: Invalid proxy URL provided: %v. Proceeding without proxy.\n", err)
-			os.Exit(1)
-		} else {
-			transport.Proxy = http.ProxyURL(parsedProxyURL)
+			log.Fatalf("Invalid proxy URL %q: %v", proxyURL, err)
 		}
+		transport.Proxy = http.ProxyURL(parsedProxyURL)
 	}
 
 	return &Client{
@@ -64,6 +61,17 @@ func NewClient(baseURL, apiToken, proxyURL string, timeout time.Duration) *Clien
 			Transport: transport,
 		},
 	}
+}
+
+// validTorrentID matches Real-Debrid torrent/download IDs (alphanumeric)
+var validTorrentID = regexp.MustCompile(`^[A-Za-z0-9]+$`)
+
+// validateID returns an error if the ID contains characters that could alter URL paths
+func validateID(id, label string) error {
+	if !validTorrentID.MatchString(id) {
+		return fmt.Errorf("invalid %s ID %q: must be alphanumeric", label, id)
+	}
+	return nil
 }
 
 func (c *Client) doRequest(method, endpoint string, body interface{}, queryParams map[string]string) ([]byte, error) {

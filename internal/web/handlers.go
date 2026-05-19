@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"log"
 	"strconv"
 	"strings"
@@ -391,7 +392,10 @@ func (d *Dependencies) UnkeepTorrent(c fiber.Ctx) error {
 	isAdmin := role == RoleAdmin
 
 	if err := d.KeptRepo.UnkeepTorrent(c.Context(), id, userID, isAdmin); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		if errors.Is(err, db.ErrTorrentNotKept) {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
+		return fiber.NewError(fiber.StatusInternalServerError, "Failed to unkeep torrent")
 	}
 
 	return c.JSON(fiber.Map{

@@ -157,7 +157,10 @@ func TestToFloat64FromNumeric_InvalidReturnsZero(t *testing.T) {
 }
 
 func TestToFloat64FromNumeric_ValidValue(t *testing.T) {
-	n := toNumericFromFloat64(3.14)
+	n, err := toNumericFromFloat64(3.14)
+	if err != nil {
+		t.Fatalf("toNumericFromFloat64(3.14): %v", err)
+	}
 	got := toFloat64FromNumeric(n)
 	// Allow small floating-point tolerance
 	diff := got - 3.14
@@ -167,7 +170,10 @@ func TestToFloat64FromNumeric_ValidValue(t *testing.T) {
 }
 
 func TestToNumericFromFloat64_Zero(t *testing.T) {
-	n := toNumericFromFloat64(0)
+	n, err := toNumericFromFloat64(0)
+	if err != nil {
+		t.Fatalf("toNumericFromFloat64(0): %v", err)
+	}
 	got := toFloat64FromNumeric(n)
 	if got != 0 {
 		t.Errorf("toNumericFromFloat64(0) round-trip: got %v, want 0", got)
@@ -175,7 +181,10 @@ func TestToNumericFromFloat64_Zero(t *testing.T) {
 }
 
 func TestToNumericFromFloat64_NegativeValue(t *testing.T) {
-	n := toNumericFromFloat64(-1.5)
+	n, err := toNumericFromFloat64(-1.5)
+	if err != nil {
+		t.Fatalf("toNumericFromFloat64(-1.5): %v", err)
+	}
 	got := toFloat64FromNumeric(n)
 	diff := got - (-1.5)
 	if diff < -1e-9 || diff > 1e-9 {
@@ -184,7 +193,10 @@ func TestToNumericFromFloat64_NegativeValue(t *testing.T) {
 }
 
 func TestToNumericFromFloat64_IsValid(t *testing.T) {
-	n := toNumericFromFloat64(42.0)
+	n, err := toNumericFromFloat64(42.0)
+	if err != nil {
+		t.Fatalf("toNumericFromFloat64(42.0): %v", err)
+	}
 	if !n.Valid {
 		t.Error("toNumericFromFloat64(42.0): expected Valid == true")
 	}

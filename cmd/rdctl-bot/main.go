@@ -138,9 +138,10 @@ func main() {
 	}
 }
 
-// runBot executes the main lifecycle: loads configuration, starts the bot and web server,
-// runBot loads and validates configuration, initializes and starts the database, web server, and (unless disabled) the Telegram bot, and manages graceful shutdown using the CLI-configurable timeout.
-// It reads flags from cmd: --web-only (disable Telegram bot), --validate-config (validate configuration and exit), and --shutdown-timeout (graceful shutdown timeout). The args parameter is unused.
+// runBot loads and validates configuration, initializes the database, web server,
+// and (unless disabled) the Telegram bot, then manages graceful shutdown.
+// It reads flags: --web-only, --validate-config, and --shutdown-timeout.
+// The args parameter is unused.
 func runBot(cmd *cobra.Command, args []string) {
 	// Load configuration
 	cfg, err := config.Load(cfgFile)
@@ -181,8 +182,12 @@ func runBot(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	// Setup graceful shutdown context early so db goroutines can observe cancellation
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	// Initialize database
-	database, err := db.Init(cfg.Database.GetDSN())
+	database, err := db.Init(ctx, cfg.Database.GetDSN())
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
@@ -219,7 +224,11 @@ func runBot(cmd *cobra.Command, args []string) {
 		// Create bot instance
 		log.Println("Initializing bot...")
 		var err error
-		b, err = bot.NewBot(cfg, database, cfg.RealDebrid.Proxy, cfg.RealDebrid.IPTestURL, cfg.RealDebrid.IPVerifyURL)
+		b, err = bot.NewBot(cfg, database, bot.IPTestConfig{
+			ProxyURL:  cfg.RealDebrid.Proxy,
+			TestURL:   cfg.RealDebrid.IPTestURL,
+			VerifyURL: cfg.RealDebrid.IPVerifyURL,
+		})
 		if err != nil {
 			log.Fatalf("Failed to create bot: %v", err)
 		}
@@ -243,10 +252,6 @@ func runBot(cmd *cobra.Command, args []string) {
 
 	// Initialize web server
 	webServer := web.NewServer(deps)
-
-	// Setup graceful shutdown using context with signal notification
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	// Channel to listen for errors from bot and web server
 	errCh := make(chan error, 2)
