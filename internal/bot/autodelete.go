@@ -19,15 +19,30 @@ const (
 	// settingAutoDeleteDays is the DB key for the auto-delete configuration
 	settingAutoDeleteDays = "auto_delete_days"
 
-	// autoDeleteCheckInterval defines how often the worker checks for old torrents
-	autoDeleteCheckInterval = 1 * time.Hour
+	// settingAutoDeleteCheckIntervalHours is the DB key for the check interval configuration
+	settingAutoDeleteCheckIntervalHours = "auto_delete_check_interval_hours"
 
 	// maxAutoDeleteDays is the maximum allowed value for auto-delete days
 	maxAutoDeleteDays = 3650
 
+	// maxAutoDeleteCheckIntervalHours is the maximum allowed check interval
+	maxAutoDeleteCheckIntervalHours = 168 // 7 days
+
 	// warningCheckInterval defines how often to check for torrents needing warning
 	warningCheckInterval = 1 * time.Hour
 )
+
+// getAutoDeleteCheckInterval returns the check interval from DB setting, falling back to config.
+func (b *Bot) getAutoDeleteCheckInterval(ctx context.Context) time.Duration {
+	val, err := b.settingRepo.GetSetting(ctx, settingAutoDeleteCheckIntervalHours)
+	if err == nil && val != "" {
+		hours, parseErr := strconv.Atoi(val)
+		if parseErr == nil && hours > 0 {
+			return time.Duration(hours) * time.Hour
+		}
+	}
+	return time.Duration(b.config.App.AutoDeleteCheckIntervalHours) * time.Hour
+}
 
 // handleAutoDeleteCommand handles the /autodelete command (superadmin only)
 func (b *Bot) handleAutoDeleteCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
@@ -126,13 +141,106 @@ func (b *Bot) handleAutoDeleteCommand(ctx context.Context, _ *bot.Bot, update *m
 	})
 }
 
+// handleAutoDeleteIntervalCommand handles the /autodelete-interval command (superadmin only)
+func (b *Bot) handleAutoDeleteIntervalCommand(ctx context.Context, _ *bot.Bot, update *models.Update) {
+	b.withAuth(ctx, update, func(ctx context.Context, chatID int64, chatPK int64, messageThreadID int, isSuperAdmin bool, user *db.User) {
+		startTime := time.Now()
+		b.middleware.LogCommand(update, "autodelete-interval")
+
+		if !isSuperAdmin {
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, "<b>[ERROR]</b> Access Denied. This command is for superadmins only.", update.Message.ID)
+			if user != nil {
+				if err := b.commandRepo.LogCommand(ctx, user.ID, chatPK, user.Username, "autodelete-interval", update.Message.Text, int64(update.Message.ID), messageThreadID, time.Since(startTime).Milliseconds(), false, "Unauthorized - not superadmin", 0); err != nil {
+					log.Printf("Warning: failed to log unauthorized autodelete-interval command: %v", err)
+				}
+			}
+			return
+		}
+
+		parts := strings.Fields(update.Message.Text)
+
+		if len(parts) < 2 {
+			currentInterval := b.getAutoDeleteCheckInterval(ctx)
+			dbVal, dbErr := b.settingRepo.GetSetting(ctx, settingAutoDeleteCheckIntervalHours)
+
+			var text string
+			if dbErr != nil || dbVal == "" {
+				text = fmt.Sprintf(
+					"<b>🔄 Auto-Delete Interval</b>\n\n"+
+						"The cleanup job runs every <b>%s</b> (using default).\n\n"+
+						"<b>Usage:</b> <code>/autodelete-interval &lt;hours&gt;</code>\n"+
+						"Examples: <code>1</code> (1 hour), <code>6</code> (6 hours), <code>24</code> (1 day).",
+					formatDuration(currentInterval),
+				)
+			} else {
+				text = fmt.Sprintf(
+					"<b>🔄 Auto-Delete Interval</b>\n\n"+
+						"The cleanup job runs every <b>%s</b>.\n\n"+
+						"<b>Usage:</b> <code>/autodelete-interval &lt;hours&gt;</code>\n"+
+						"Examples: <code>1</code> (1 hour), <code>6</code> (6 hours), <code>24</code> (1 day).",
+					formatDuration(currentInterval),
+				)
+			}
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
+			b.logCommandHelper(ctx, user, chatPK, int64(update.Message.ID), messageThreadID, "autodelete-interval", update.Message.Text, startTime, true, "", len(text))
+			return
+		}
+
+		hoursStr := parts[1]
+		hours, err := strconv.Atoi(hoursStr)
+		if err != nil || hours < 1 || hours > maxAutoDeleteCheckIntervalHours {
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, fmt.Sprintf("<b>[ERROR]</b> Please provide a valid number of hours (1 to %d).", maxAutoDeleteCheckIntervalHours), update.Message.ID)
+			b.logCommandHelper(ctx, user, chatPK, int64(update.Message.ID), messageThreadID, "autodelete-interval", update.Message.Text, startTime, false, "Invalid hours value", 0)
+			return
+		}
+
+		if err := b.settingRepo.SetSettingWithAudit(ctx, settingAutoDeleteCheckIntervalHours, strconv.Itoa(hours), user.UserID, chatPK); err != nil {
+			text := fmt.Sprintf("<b>[ERROR]</b> Failed to save setting: %s", html.EscapeString(err.Error()))
+			b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
+			b.logCommandHelper(ctx, user, chatPK, int64(update.Message.ID), messageThreadID, "autodelete-interval", update.Message.Text, startTime, false, err.Error(), 0)
+			return
+		}
+
+		text := fmt.Sprintf(
+			"<b>🔄 Auto-Delete Interval Updated</b>\n\n"+
+				"The cleanup job will now run every <b>%s</b>.\n"+
+				"The new interval takes effect on the next scheduled run.",
+			formatDuration(time.Duration(hours)*time.Hour),
+		)
+
+		b.sendHTMLMessage(ctx, chatID, messageThreadID, text, update.Message.ID)
+		b.logCommandHelper(ctx, user, chatPK, int64(update.Message.ID), messageThreadID, "autodelete-interval", update.Message.Text, startTime, true, "", len(text))
+	})
+}
+
+// formatDuration returns a human-readable string for a duration.
+func formatDuration(d time.Duration) string {
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+	if hours > 0 && minutes > 0 {
+		return fmt.Sprintf("%d hours %d minutes", hours, minutes)
+	}
+	if hours > 0 {
+		if hours == 1 {
+			return "1 hour"
+		}
+		return fmt.Sprintf("%d hours", hours)
+	}
+	if minutes == 1 {
+		return "1 minute"
+	}
+	return fmt.Sprintf("%d minutes", minutes)
+}
+
 // startAutoDeleteWorker runs a background goroutine that periodically deletes old torrents.
-// It reads the auto_delete_days setting from the DB on each tick. The worker stops when ctx is cancelled.
+// It reads the auto_delete_days and check interval settings from the DB on each tick.
+// The worker stops when ctx is cancelled.
 func (b *Bot) startAutoDeleteWorker(ctx context.Context) {
-	ticker := time.NewTicker(autoDeleteCheckInterval)
+	interval := b.getAutoDeleteCheckInterval(ctx)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	log.Println("Auto-delete worker started (checking every hour)")
+	log.Printf("Auto-delete worker started (checking every %s)", formatDuration(interval))
 
 	// Run first check immediately on startup
 	b.runAutoDeleteCheck(ctx)
@@ -144,6 +252,13 @@ func (b *Bot) startAutoDeleteWorker(ctx context.Context) {
 			return
 		case <-ticker.C:
 			b.runAutoDeleteCheck(ctx)
+			// Re-read interval and reset ticker if it changed
+			newInterval := b.getAutoDeleteCheckInterval(ctx)
+			if newInterval != interval {
+				ticker.Reset(newInterval)
+				interval = newInterval
+				log.Printf("Auto-delete interval changed to %s", formatDuration(interval))
+			}
 		}
 	}
 }

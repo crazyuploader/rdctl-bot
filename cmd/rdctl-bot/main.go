@@ -196,6 +196,7 @@ func runBot(cmd *cobra.Command, args []string) {
 	if cfg.App.AutoDeleteWarning.ChatID != 0 {
 		log.Printf("Auto-delete warning: chat_id=%d, topic_id=%d", cfg.App.AutoDeleteWarning.ChatID, cfg.App.AutoDeleteWarning.TopicID)
 	}
+	log.Printf("Auto-delete check interval: %d hours", cfg.App.AutoDeleteCheckIntervalHours)
 	log.Printf("Rate limit: %d messages/sec (burst: %d)", cfg.App.RateLimit.MessagesPerSecond, cfg.App.RateLimit.Burst)
 	log.Printf("Database: %s:%d/%s", cfg.Database.Host, cfg.Database.Port, cfg.Database.DBName)
 

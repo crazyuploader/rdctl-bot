@@ -67,11 +67,12 @@ type RealDebridConfig struct {
 
 // AppConfig holds application settings
 type AppConfig struct {
-	LogLevel          string                  `mapstructure:"log_level"`
-	RateLimit         RateLimitConfig         `mapstructure:"rate_limit"`
-	MaxKeptTorrents   int                     `mapstructure:"max_kept_torrents"` // Max kept torrents per non-admin user (0 = unlimited, admins always unlimited)
-	AutoDeleteDays    int                     `mapstructure:"auto_delete_days"`  // Default auto-delete days fallback when not set in DB
-	AutoDeleteWarning AutoDeleteWarningConfig `mapstructure:"auto_delete_warning"`
+	LogLevel                     string                  `mapstructure:"log_level"`
+	RateLimit                    RateLimitConfig         `mapstructure:"rate_limit"`
+	MaxKeptTorrents              int                     `mapstructure:"max_kept_torrents"`                // Max kept torrents per non-admin user (0 = unlimited, admins always unlimited)
+	AutoDeleteDays               int                     `mapstructure:"auto_delete_days"`                 // Default auto-delete days fallback when not set in DB
+	AutoDeleteCheckIntervalHours int                     `mapstructure:"auto_delete_check_interval_hours"` // Default check interval in hours (default: 1)
+	AutoDeleteWarning            AutoDeleteWarningConfig `mapstructure:"auto_delete_warning"`
 }
 
 // AutoDeleteWarningConfig holds settings for auto-delete warning notifications
@@ -233,6 +234,11 @@ func (c *Config) Validate(webOnly bool) error {
 
 	if c.App.RateLimit.Burst == 0 {
 		c.App.RateLimit.Burst = 5
+	}
+
+	// Auto-delete check interval defaults
+	if c.App.AutoDeleteCheckIntervalHours == 0 {
+		c.App.AutoDeleteCheckIntervalHours = 1
 	}
 
 	// Auto-delete warning defaults
