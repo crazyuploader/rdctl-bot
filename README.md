@@ -1,5 +1,7 @@
 # Telegram Real-Debrid Bot
 
+[![DeepSource](https://app.deepsource.com/gh/crazyuploader/rdctl-bot.svg/?label=code+coverage&show_trend=true&token=04hutSQiiEOCY6C18-BAopUC)](https://app.deepsource.com/gh/crazyuploader/rdctl-bot/)
+
 A powerful Telegram bot for managing Real-Debrid torrents and hoster links on the go, written in Go.
 
 ## Configuration
