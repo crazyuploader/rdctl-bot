@@ -11,6 +11,10 @@
     {
       "matchCategories": ["golang"],
       "enabled": true
+    },
+    {
+      "matchDepTypes": ["indirect"],
+      "enabled": false
     }
   ]
 }
