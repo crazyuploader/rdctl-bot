@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -417,7 +419,10 @@ func (b *Bot) maskUsername(username string) string {
 }
 
 // performIPTests performs IP address checks using an optional proxy and test endpoints.
-// When cfg.VerifyURL is provided, it verifies the primary IP matches the verification endpoint.
+// When cfg.VerifyURL is provided it verifies the primary IP matches the verification
+// endpoint. If the verify URL is unreachable (e.g. the mediaflow proxy is down),
+// the function retries indefinitely using exponential backoff (starting at 2 s,
+// doubling each attempt up to a maximum of 5 minutes) with ±20 % random jitter.
 func performIPTests(cfg IPTestConfig) error {
 	var ipTestClient *http.Client
 	var primaryIP string
@@ -469,26 +474,54 @@ func performIPTests(cfg IPTestConfig) error {
 		}
 	}
 
-	if cfg.VerifyURL != "" {
-		if primaryIP == "" {
-			return fmt.Errorf("cannot perform IP verification without a primary IP")
-		}
-		log.Println("Performing IP verification test...")
+	if cfg.VerifyURL == "" {
+		return nil
+	}
+
+	if primaryIP == "" {
+		return fmt.Errorf("cannot perform IP verification without a primary IP")
+	}
+
+	// Retry loop with exponential backoff for the mediaflow proxy verify URL.
+	const (
+		initialBackoff = 2 * time.Second
+		maxBackoff     = 5 * time.Minute
+		jitterFactor   = 0.2 // ±20 %
+	)
+
+	backoff := initialBackoff
+	attempt := 0
+
+	for {
+		attempt++
+		log.Printf("Performing IP verification test (attempt %d)...", attempt)
+
 		verifyResp, verifyErr := ipTestClient.Get(cfg.VerifyURL)
 		if verifyErr != nil {
-			return fmt.Errorf("failed to perform IP verification test: %w", verifyErr)
-		}
-		defer func() {
-			if cerr := verifyResp.Body.Close(); cerr != nil {
-				log.Printf("Warning: failed to close verifyResp body: %v", cerr)
+			// Mediaflow proxy is unreachable — wait and retry indefinitely.
+			jitter := time.Duration(float64(backoff) * jitterFactor * (rand.Float64()*2 - 1))
+			waitDuration := backoff + jitter
+			if waitDuration < 0 {
+				waitDuration = initialBackoff
 			}
-		}()
-		var verifyIpResponse struct {
-			IP string `json:"ip"`
+			log.Printf("Mediaflow proxy not available (attempt %d): %v. Retrying in %s...", attempt, verifyErr, waitDuration.Round(time.Millisecond))
+			time.Sleep(waitDuration)
+
+			// Exponential backoff capped at maxBackoff.
+			backoff = time.Duration(math.Min(float64(backoff*2), float64(maxBackoff)))
+			continue
 		}
+
+		// Successfully reached the verify endpoint — parse and compare IPs.
 		verifyBody, readErr := io.ReadAll(verifyResp.Body)
+		if cerr := verifyResp.Body.Close(); cerr != nil {
+			log.Printf("Warning: failed to close verifyResp body: %v", cerr)
+		}
 		if readErr != nil {
 			return fmt.Errorf("failed to read IP verification response: %w", readErr)
+		}
+		var verifyIpResponse struct {
+			IP string `json:"ip"`
 		}
 		if err := json.Unmarshal(verifyBody, &verifyIpResponse); err != nil {
 			return fmt.Errorf("failed to parse IP verification test response: %w", err)
@@ -498,7 +531,6 @@ func performIPTests(cfg IPTestConfig) error {
 			return fmt.Errorf("primary IP (%s) does not match verification IP (%s)", primaryIP, verifyIpResponse.IP)
 		}
 		log.Println("Primary and verification IPs match. Continuing...")
+		return nil
 	}
-
-	return nil
 }

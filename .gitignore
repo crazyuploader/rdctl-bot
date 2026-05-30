@@ -43,3 +43,6 @@ config.yaml
 
 # DB files
 *.db
+
+# AntiGravity CLI
+.antigravitycli
