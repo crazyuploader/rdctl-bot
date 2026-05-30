@@ -2,13 +2,14 @@ package bot
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"math"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -247,7 +248,7 @@ func (b *Bot) SetTokenStore(ts *web.TokenStore) {
 }
 
 // defaultHandler ignores unhandled updates
-func defaultHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+func defaultHandler(_ context.Context, _ *bot.Bot, _ *models.Update) {
 	// Silently ignore
 }
 
@@ -265,7 +266,7 @@ type UserInfo struct {
 }
 
 // getUserFromUpdate extracts user information from an update
-func (b *Bot) getUserFromUpdate(update *models.Update) UserInfo {
+func getUserFromUpdate(update *models.Update) UserInfo {
 	var info UserInfo
 	var from *models.User
 	if update.Message != nil {
@@ -300,7 +301,7 @@ func (b *Bot) getUserFromUpdate(update *models.Update) UserInfo {
 }
 
 // getChatFromUpdate extracts chat info from an update
-func (b *Bot) getChatFromUpdate(update *models.Update) (chatID int64, title, chatUsername, chatType string, isForum bool) {
+func getChatFromUpdate(update *models.Update) (chatID int64, title, chatUsername, chatType string, isForum bool) {
 	var chat *models.Chat
 	if update.Message != nil {
 		chat = &update.Message.Chat
@@ -325,8 +326,8 @@ func (b *Bot) getChatFromUpdate(update *models.Update) (chatID int64, title, cha
 
 // withAuth is a middleware to check authorization and execute the handler
 func (b *Bot) withAuth(ctx context.Context, update *models.Update, handler func(ctx context.Context, chatID int64, chatPK int64, messageThreadID int, isSuperAdmin bool, user *db.User)) {
-	userInfo := b.getUserFromUpdate(update)
-	_, title, chatUsername, chatType, isForum := b.getChatFromUpdate(update)
+	userInfo := getUserFromUpdate(update)
+	_, title, chatUsername, chatType, isForum := getChatFromUpdate(update)
 
 	isAllowed, isSuperAdmin := b.middleware.CheckAuthorization(userInfo.ChatID, userInfo.UserID)
 
@@ -413,7 +414,7 @@ func (b *Bot) sendUnauthorizedMessage(ctx context.Context, chatID int64, message
 }
 
 // maskUsername masks the username for privacy
-func (b *Bot) maskUsername(username string) string {
+func maskUsername(username string) string {
 	if len(username) <= 5 {
 		return "*****"
 	}
@@ -425,138 +426,154 @@ func (b *Bot) maskUsername(username string) string {
 // With cfg.ProxyURL set, confirms StremThru sees the proxy as the caller.
 // On StremThru unreachability, retries indefinitely: exponential backoff 2s-5min, +-20% jitter.
 func performIPTests(cfg IPTestConfig) error {
-	var ipTestClient *http.Client
-	var primaryIP string
-
 	ipTestURL := "https://api.ipify.org?format=json"
 	if cfg.TestURL != "" {
 		ipTestURL = cfg.TestURL
 	}
 
-	if cfg.ProxyURL != "" {
-		log.Println("Proxy configured. Performing IP test...")
-		proxyURL, err := url.Parse(cfg.ProxyURL)
-		if err != nil {
-			log.Printf("Warning: invalid proxy URL for IP test: %v. Skipping IP test.", err)
-			ipTestClient = &http.Client{Timeout: 10 * time.Second}
-		} else {
-			ipTestClient = &http.Client{
-				Transport: &http.Transport{
-					Proxy: http.ProxyURL(proxyURL),
-				},
-				Timeout: 10 * time.Second,
-			}
-		}
-	} else {
-		log.Println("No proxy configured. Performing direct IP test...")
-		ipTestClient = &http.Client{Timeout: 10 * time.Second}
-	}
-
-	resp, err := ipTestClient.Get(ipTestURL)
-	if err != nil {
-		log.Printf("Warning: failed to perform primary IP test: %v", err)
-	} else {
-		defer func() {
-			if cerr := resp.Body.Close(); cerr != nil {
-				log.Printf("Warning: failed to close response body: %v", cerr)
-			}
-		}()
-		var ipResponse struct {
-			IP string `json:"ip"`
-		}
-		body, readErr := io.ReadAll(resp.Body)
-		if readErr != nil {
-			log.Printf("Warning: failed to read primary IP test response: %v", readErr)
-		} else if err := json.Unmarshal(body, &ipResponse); err != nil {
-			log.Printf("Warning: failed to parse primary IP test response: %v", err)
-		} else {
-			primaryIP = ipResponse.IP
-			log.Printf("Primary IP detected: %s", primaryIP)
-		}
-	}
+	primaryIP := fetchPrimaryIP(buildIPTestClient(cfg.ProxyURL), ipTestURL)
 
 	if cfg.StremThruURL == "" {
 		return nil
 	}
 
-	verifyURL := strings.TrimRight(cfg.StremThruURL, "/") + "/v0/health/__debug__"
+	stOutboundIP, err := queryStremThruOutboundIP(cfg)
+	if err != nil {
+		return err
+	}
+
+	if primaryIP != "" && primaryIP != stOutboundIP {
+		return fmt.Errorf(
+			"IP mismatch: bot uses %s but StremThru proxies from %s; configure a proxy so both IPs match",
+			primaryIP, stOutboundIP,
+		)
+	}
+	log.Printf("IP check passed: bot and StremThru both use %s", stOutboundIP)
+	return nil
+}
+
+func buildIPTestClient(proxyURL string) *http.Client {
+	if proxyURL == "" {
+		log.Println("No proxy configured. Performing direct IP test...")
+		return &http.Client{Timeout: 10 * time.Second}
+	}
+	log.Println("Proxy configured. Performing IP test...")
+	parsed, err := url.Parse(proxyURL)
+	if err != nil {
+		log.Printf("Warning: invalid proxy URL for IP test: %v. Skipping proxy.", err)
+		return &http.Client{Timeout: 10 * time.Second}
+	}
+	return &http.Client{
+		Transport: &http.Transport{Proxy: http.ProxyURL(parsed)},
+		Timeout:   10 * time.Second,
+	}
+}
+
+func fetchPrimaryIP(client *http.Client, testURL string) string {
+	resp, err := client.Get(testURL)
+	if err != nil {
+		log.Printf("Warning: failed to perform primary IP test: %v", err)
+		return ""
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			log.Printf("Warning: failed to close response body: %v", cerr)
+		}
+	}()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Warning: failed to read primary IP test response: %v", err)
+		return ""
+	}
+	var ipResponse struct {
+		IP string `json:"ip"`
+	}
+	if err := json.Unmarshal(body, &ipResponse); err != nil {
+		log.Printf("Warning: failed to parse primary IP test response: %v", err)
+		return ""
+	}
+	log.Printf("Primary IP detected: %s", ipResponse.IP)
+	return ipResponse.IP
+}
+
+func queryStremThruOutboundIP(cfg IPTestConfig) (string, error) {
 	const (
 		initialBackoff = 2 * time.Second
 		maxBackoff     = 5 * time.Minute
 		jitterFactor   = 0.2 // +-20%
 	)
-
-	backoff := initialBackoff
-	attempt := 0
-
+	verifyURL := strings.TrimRight(cfg.StremThruURL, "/") + "/v0/health/__debug__"
 	// StremThru is always dialed directly; the local proxy routes bot traffic only.
 	stClient := &http.Client{Timeout: 10 * time.Second}
+	backoff := initialBackoff
 
-	for {
-		attempt++
+	for attempt := 1; ; attempt++ {
 		log.Printf("Performing StremThru IP verification test (attempt %d)...", attempt)
 
-		verifyReq, err := http.NewRequest(http.MethodGet, verifyURL, nil)
+		req, err := http.NewRequest(http.MethodGet, verifyURL, http.NoBody)
 		if err != nil {
-			return fmt.Errorf("failed to create StremThru verify request: %w", err)
+			return "", fmt.Errorf("failed to create StremThru verify request: %w", err)
 		}
 		if cfg.StremThruAuth != "" {
 			encoded := base64.StdEncoding.EncodeToString([]byte(cfg.StremThruAuth))
-			verifyReq.Header.Set("X-StremThru-Authorization", "Basic "+encoded)
+			req.Header.Set("X-StremThru-Authorization", "Basic "+encoded)
 		}
-		verifyResp, err := stClient.Do(verifyReq)
+
+		resp, err := stClient.Do(req)
 		if err != nil {
-			jitter := time.Duration(float64(backoff) * jitterFactor * (rand.Float64()*2 - 1))
-			waitDuration := backoff + jitter
-			if waitDuration < 0 {
-				waitDuration = initialBackoff
-			}
+			waitDuration := jitteredBackoff(backoff, jitterFactor, initialBackoff)
 			log.Printf("StremThru not available (attempt %d): %v. Retrying in %s...", attempt, err, waitDuration.Round(time.Millisecond))
 			time.Sleep(waitDuration)
 			backoff = time.Duration(math.Min(float64(backoff*2), float64(maxBackoff)))
 			continue
 		}
 
-		// {"data": {"ip": {"client": "<addr>", "machine": "<addr>", "exposed": {"*": "<addr>"}}}, "error": null}
-		verifyBody, readErr := io.ReadAll(verifyResp.Body)
-		if cerr := verifyResp.Body.Close(); cerr != nil {
-			log.Printf("Warning: failed to close verifyResp body: %v", cerr)
-		}
-		if readErr != nil {
-			return fmt.Errorf("failed to read StremThru verify response: %w", readErr)
-		}
-		var stResp struct {
-			Data struct {
-				IP struct {
-					Client  string            `json:"client"`
-					Machine string            `json:"machine"`
-					Exposed map[string]string `json:"exposed"`
-				} `json:"ip"`
-			} `json:"data"`
-		}
-		if err := json.Unmarshal(verifyBody, &stResp); err != nil {
-			return fmt.Errorf("failed to parse StremThru verify response: %w", err)
-		}
-
-		// exposed["*"] is tunnel outbound; machine is bare server. RealDebrid sees this IP.
-		stOutboundIP := stResp.Data.IP.Machine
-		if ip := stResp.Data.IP.Exposed["*"]; ip != "" {
-			stOutboundIP = ip
-		}
-		if stOutboundIP == "" {
-			return fmt.Errorf("StremThru verify response: no usable outbound IP")
-		}
-		log.Printf("StremThru outbound IP (seen by upstream services): %s", stOutboundIP)
-
-		// Bot and StremThru must share the same outbound IP.
-		if primaryIP != "" && primaryIP != stOutboundIP {
-			return fmt.Errorf(
-				"IP mismatch: bot uses %s but StremThru proxies from %s; configure a proxy so both IPs match",
-				primaryIP, stOutboundIP,
-			)
-		}
-		log.Printf("IP check passed: bot and StremThru both use %s", stOutboundIP)
-
-		return nil
+		return parseStremThruOutboundIP(resp)
 	}
+}
+
+func parseStremThruOutboundIP(resp *http.Response) (string, error) {
+	body, err := io.ReadAll(resp.Body)
+	if cerr := resp.Body.Close(); cerr != nil {
+		log.Printf("Warning: failed to close StremThru response body: %v", cerr)
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to read StremThru verify response: %w", err)
+	}
+	var stResp struct {
+		Data struct {
+			IP struct {
+				Machine string            `json:"machine"`
+				Exposed map[string]string `json:"exposed"`
+			} `json:"ip"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &stResp); err != nil {
+		return "", fmt.Errorf("failed to parse StremThru verify response: %w", err)
+	}
+	// exposed["*"] is tunnel outbound; machine is bare server. RealDebrid sees this IP.
+	outboundIP := stResp.Data.IP.Machine
+	if ip := stResp.Data.IP.Exposed["*"]; ip != "" {
+		outboundIP = ip
+	}
+	if outboundIP == "" {
+		return "", fmt.Errorf("StremThru verify response: no usable outbound IP")
+	}
+	log.Printf("StremThru outbound IP (seen by upstream services): %s", outboundIP)
+	return outboundIP, nil
+}
+
+// jitteredBackoff returns backoff +- (factor * 100)% using crypto/rand.
+// Falls back to plain backoff if the random read fails.
+func jitteredBackoff(backoff time.Duration, factor float64, minDuration time.Duration) time.Duration {
+	var rb [8]byte
+	if _, err := cryptorand.Read(rb[:]); err != nil {
+		return backoff
+	}
+	ratio := float64(binary.BigEndian.Uint64(rb[:]))/float64(^uint64(0))*2 - 1 // -1.0 to +1.0
+	d := backoff + time.Duration(float64(backoff)*factor*ratio)
+	if d < minDuration {
+		return minDuration
+	}
+	return d
 }

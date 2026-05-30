@@ -563,7 +563,7 @@ func (b *Bot) handleStatusCommand(ctx context.Context, _ *bot.Bot, update *model
 
 		var text strings.Builder
 		text.WriteString("<b>Account Status</b>\n\n")
-		fmt.Fprintf(&text, "<i>Username:</i> <code>%s</code>\n", html.EscapeString(b.maskUsername(rdUser.Username)))
+		fmt.Fprintf(&text, "<i>Username:</i> <code>%s</code>\n", html.EscapeString(maskUsername(rdUser.Username)))
 		fmt.Fprintf(&text, "<i>Email:</i> <code>%s</code>\n", html.EscapeString(rdUser.Email))
 		fmt.Fprintf(&text, "<i>Account Type:</i> %s\n", html.EscapeString(cases.Title(language.English).String(rdUser.Type)))
 
