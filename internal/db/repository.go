@@ -14,8 +14,8 @@ import (
 
 // Sentinel errors returned by repository methods.
 var (
-	ErrUserNotFound    = errors.New("user not found")
-	ErrTorrentNotKept  = errors.New("torrent is not kept or you don't have permission to unkeep it")
+	ErrUserNotFound   = errors.New("user not found")
+	ErrTorrentNotKept = errors.New("torrent is not kept or you don't have permission to unkeep it")
 )
 
 // toPgtypeTimestamptz converts t to a pgtype.Timestamptz with the time normalized to UTC and Valid set to true.

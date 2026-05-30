@@ -57,12 +57,13 @@ type TelegramConfig struct {
 
 // RealDebridConfig holds Real-Debrid API settings
 type RealDebridConfig struct {
-	APIToken    string `mapstructure:"api_token"`
-	BaseURL     string `mapstructure:"base_url"`
-	Timeout     int    `mapstructure:"timeout"`
-	Proxy       string `mapstructure:"proxy"`
-	IPTestURL   string `mapstructure:"ip_test_url"`
-	IPVerifyURL string `mapstructure:"ip_verify_url"`
+	APIToken      string `mapstructure:"api_token"`
+	BaseURL       string `mapstructure:"base_url"`
+	Timeout       int    `mapstructure:"timeout"`
+	Proxy         string `mapstructure:"proxy"`
+	IPTestURL     string `mapstructure:"ip_test_url"`
+	StremThruURL  string `mapstructure:"stremthru_url"`
+	StremThruAuth string `mapstructure:"stremthru_auth"`
 }
 
 // AppConfig holds application settings
@@ -221,9 +222,9 @@ func (c *Config) Validate(webOnly bool) error {
 		}
 	}
 
-	if c.RealDebrid.IPVerifyURL != "" {
-		if _, err := url.Parse(c.RealDebrid.IPVerifyURL); err != nil {
-			return fmt.Errorf("invalid real-debrid IP verify URL: %w", err)
+	if c.RealDebrid.StremThruURL != "" {
+		if _, err := url.Parse(c.RealDebrid.StremThruURL); err != nil {
+			return fmt.Errorf("invalid real-debrid StremThru URL: %w", err)
 		}
 	}
 

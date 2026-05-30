@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -68,9 +69,10 @@ type Bot struct {
 
 // IPTestConfig holds configuration for proxy IP testing
 type IPTestConfig struct {
-	ProxyURL  string
-	TestURL   string // URL to fetch IP from (default: https://api.ipify.org?format=json)
-	VerifyURL string // If set, verifies primary IP matches this endpoint
+	ProxyURL      string
+	TestURL       string // URL to fetch IP from (default: https://api.ipify.org?format=json)
+	StremThruURL  string // If set, verifies primary IP via StremThru /v0/health/__debug__
+	StremThruAuth string // Optional "username:password" for StremThru Basic auth (sent as Proxy-Authorization header)
 }
 
 // NewBot creates and returns a fully configured Bot.
@@ -419,10 +421,11 @@ func (b *Bot) maskUsername(username string) string {
 }
 
 // performIPTests performs IP address checks using an optional proxy and test endpoints.
-// When cfg.VerifyURL is provided it verifies the primary IP matches the verification
-// endpoint. If the verify URL is unreachable (e.g. the mediaflow proxy is down),
-// the function retries indefinitely using exponential backoff (starting at 2 s,
-// doubling each attempt up to a maximum of 5 minutes) with ±20 % random jitter.
+// When cfg.StremThruURL is provided it verifies the primary IP against StremThru's
+// /v0/health/__debug__ endpoint, which returns {"data": {"ip": {"client": "<addr>"}}}.
+// If StremThru is unreachable the function
+// retries indefinitely using exponential backoff (starting at 2 s, doubling each
+// attempt up to a maximum of 5 minutes) with ±20 % random jitter.
 func performIPTests(cfg IPTestConfig) error {
 	var ipTestClient *http.Client
 	var primaryIP string
@@ -474,7 +477,7 @@ func performIPTests(cfg IPTestConfig) error {
 		}
 	}
 
-	if cfg.VerifyURL == "" {
+	if cfg.StremThruURL == "" {
 		return nil
 	}
 
@@ -482,7 +485,10 @@ func performIPTests(cfg IPTestConfig) error {
 		return fmt.Errorf("cannot perform IP verification without a primary IP")
 	}
 
-	// Retry loop with exponential backoff for the mediaflow proxy verify URL.
+	verifyURL := strings.TrimRight(cfg.StremThruURL, "/") + "/v0/health/__debug__"
+	// Retry loop with exponential backoff for the StremThru verify URL.
+	// StremThru's /v0/health/__debug__ endpoint returns the caller's IP at
+	// {"data": {"ip": {"client": "<addr>"}}, "error": null}
 	const (
 		initialBackoff = 2 * time.Second
 		maxBackoff     = 5 * time.Minute
@@ -494,17 +500,25 @@ func performIPTests(cfg IPTestConfig) error {
 
 	for {
 		attempt++
-		log.Printf("Performing IP verification test (attempt %d)...", attempt)
+		log.Printf("Performing StremThru IP verification test (attempt %d)...", attempt)
 
-		verifyResp, verifyErr := ipTestClient.Get(cfg.VerifyURL)
+		verifyReq, reqErr := http.NewRequest(http.MethodGet, verifyURL, nil)
+		if reqErr != nil {
+			return fmt.Errorf("failed to create StremThru verify request: %w", reqErr)
+		}
+		if cfg.StremThruAuth != "" {
+			encoded := base64.StdEncoding.EncodeToString([]byte(cfg.StremThruAuth))
+			verifyReq.Header.Set("Proxy-Authorization", "Basic "+encoded)
+		}
+		verifyResp, verifyErr := ipTestClient.Do(verifyReq)
 		if verifyErr != nil {
-			// Mediaflow proxy is unreachable — wait and retry indefinitely.
+			// StremThru is unreachable — wait and retry indefinitely.
 			jitter := time.Duration(float64(backoff) * jitterFactor * (rand.Float64()*2 - 1))
 			waitDuration := backoff + jitter
 			if waitDuration < 0 {
 				waitDuration = initialBackoff
 			}
-			log.Printf("Mediaflow proxy not available (attempt %d): %v. Retrying in %s...", attempt, verifyErr, waitDuration.Round(time.Millisecond))
+			log.Printf("StremThru not available (attempt %d): %v. Retrying in %s...", attempt, verifyErr, waitDuration.Round(time.Millisecond))
 			time.Sleep(waitDuration)
 
 			// Exponential backoff capped at maxBackoff.
@@ -512,25 +526,34 @@ func performIPTests(cfg IPTestConfig) error {
 			continue
 		}
 
-		// Successfully reached the verify endpoint — parse and compare IPs.
+		// Successfully reached StremThru — parse its envelope and compare IPs.
+		// Response format: {"data": {"ip": {"client": "<addr>"}}, "error": null}
 		verifyBody, readErr := io.ReadAll(verifyResp.Body)
 		if cerr := verifyResp.Body.Close(); cerr != nil {
 			log.Printf("Warning: failed to close verifyResp body: %v", cerr)
 		}
 		if readErr != nil {
-			return fmt.Errorf("failed to read IP verification response: %w", readErr)
+			return fmt.Errorf("failed to read StremThru IP verification response: %w", readErr)
 		}
-		var verifyIpResponse struct {
-			IP string `json:"ip"`
+		var stremThruResp struct {
+			Data struct {
+				IP struct {
+					Client string `json:"client"`
+				} `json:"ip"`
+			} `json:"data"`
 		}
-		if err := json.Unmarshal(verifyBody, &verifyIpResponse); err != nil {
-			return fmt.Errorf("failed to parse IP verification test response: %w", err)
+		if err := json.Unmarshal(verifyBody, &stremThruResp); err != nil {
+			return fmt.Errorf("failed to parse StremThru IP verification response: %w", err)
 		}
-		log.Printf("Verification IP detected: %s", verifyIpResponse.IP)
-		if primaryIP != verifyIpResponse.IP {
-			return fmt.Errorf("primary IP (%s) does not match verification IP (%s)", primaryIP, verifyIpResponse.IP)
+		verifyIP := stremThruResp.Data.IP.Client
+		if verifyIP == "" {
+			return fmt.Errorf("StremThru IP verification response contained an empty IP address")
 		}
-		log.Println("Primary and verification IPs match. Continuing...")
+		log.Printf("StremThru verification IP detected: %s", verifyIP)
+		if primaryIP != verifyIP {
+			return fmt.Errorf("primary IP (%s) does not match StremThru verification IP (%s)", primaryIP, verifyIP)
+		}
+		log.Println("Primary and StremThru verification IPs match. Continuing...")
 		return nil
 	}
 }

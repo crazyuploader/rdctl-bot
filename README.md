@@ -19,7 +19,8 @@ The bot uses `config.yaml`. See `example-config.yaml` for a template.
 - `realdebrid.timeout`: Request timeout in seconds (default: `30`).
 - `realdebrid.proxy`: (Optional) HTTP/SOCKS5 proxy URL.
 - `realdebrid.ip_test_url`: (Optional) URL for IP testing (e.g. via proxy).
-- `realdebrid.ip_verify_url`: (Optional) Second URL to verify IP consistency.
+- `realdebrid.stremthru_url`: (Optional) StremThru base URL for IP verification. Appends `/v0/health/__debug__` automatically.
+- `realdebrid.stremthru_auth`: (Optional) StremThru credentials in `username:password` format for `Proxy-Authorization` Basic auth.
 - `app.log_level`: Logging level (`debug`, `info`, `warn`, `error`).
 - `app.rate_limit.messages_per_second`: Max messages/sec to Telegram.
 - `app.rate_limit.burst`: Max message burst to Telegram.

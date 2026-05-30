@@ -225,9 +225,10 @@ func runBot(cmd *cobra.Command, args []string) {
 		log.Println("Initializing bot...")
 		var err error
 		b, err = bot.NewBot(cfg, database, bot.IPTestConfig{
-			ProxyURL:  cfg.RealDebrid.Proxy,
-			TestURL:   cfg.RealDebrid.IPTestURL,
-			VerifyURL: cfg.RealDebrid.IPVerifyURL,
+			ProxyURL:      cfg.RealDebrid.Proxy,
+			TestURL:       cfg.RealDebrid.IPTestURL,
+			StremThruURL:  cfg.RealDebrid.StremThruURL,
+			StremThruAuth: cfg.RealDebrid.StremThruAuth,
 		})
 		if err != nil {
 			log.Fatalf("Failed to create bot: %v", err)
