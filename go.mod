@@ -1,6 +1,6 @@
 module github.com/crazyuploader/rdctl-bot
 
-go 1.25.3
+go 1.26.0
 
 require (
 	github.com/Jeckerson/fiberprometheus/v3 v3.0.0-20260309164651-64432236fb30
@@ -12,7 +12,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	golang.org/x/text v0.41.0
-	golang.org/x/time v0.15.0
+	golang.org/x/time v0.16.0
 )
 
 require (
