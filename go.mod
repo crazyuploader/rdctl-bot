@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/Jeckerson/fiberprometheus/v3 v3.0.0-20260309164651-64432236fb30
-	github.com/go-telegram/bot v1.25.0
+	github.com/go-telegram/bot v1.27.0
 	github.com/gofiber/fiber/v3 v3.5.0
 	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/jackc/pgx/v5 v5.11.0
